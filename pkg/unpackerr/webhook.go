@@ -90,10 +90,22 @@ func (statuses *ExtractStatuses) MarshalENV(tag string) (map[string]string, erro
 
 // runAllHooks sends webhooks and executes command hooks.
 func (u *Unpackerr) runAllHooks(item *Extract) {
-	if item.Status == IMPORTED && item.App == FolderString {
-		return // This is an internal state change we don't need to fire on.
+	payload := buildWebhookPayload(item)
+
+	for _, hook := range u.Webhook {
+		if hook.HasEvent(item.Status) && !hook.Excluded(item.App) {
+			u.hookChan <- &hookQueueItem{WebhookConfig: hook, WebhookPayload: payload}
+		}
 	}
 
+	for _, hook := range u.Cmdhook {
+		if hook.HasEvent(item.Status) && !hook.Excluded(item.App) {
+			u.hookChan <- &hookQueueItem{WebhookConfig: hook, WebhookPayload: payload}
+		}
+	}
+}
+
+func buildWebhookPayload(item *Extract) *WebhookPayload {
 	payload := &WebhookPayload{
 		Path:  item.Path,
 		App:   item.App,
@@ -111,43 +123,35 @@ func (u *Unpackerr) runAllHooks(item *Extract) {
 		Started:  version.Started,
 	}
 
-	if item.Status <= EXTRACTED && item.Resp != nil {
-		payload.Data = &XtractPayload{
-			Files:   item.Resp.NewFiles,
-			File:    item.Resp.NewFiles,
-			Start:   item.Resp.Started,
-			Output:  item.Resp.Output,
-			Bytes:   item.Resp.Size,
-			Queue:   item.Resp.Queued,
-			Elapsed: cnfg.Duration{Duration: item.Resp.Elapsed},
-		}
-
-		for _, v := range item.Resp.Archives {
-			payload.Data.Archives = append(payload.Data.Archives, v...)
-			payload.Data.Archive = append(payload.Data.Archive, v...)
-		}
-
-		for _, v := range item.Resp.Extras {
-			payload.Data.Archives = append(payload.Data.Archives, v...)
-			payload.Data.Archive = append(payload.Data.Archive, v...)
-		}
-
-		if item.Resp.Error != nil {
-			payload.Data.Error = item.Resp.Error.Error()
-		}
+	if item.Resp == nil {
+		return payload
 	}
 
-	for _, hook := range u.Webhook {
-		if hook.HasEvent(item.Status) && !hook.Excluded(item.App) {
-			u.hookChan <- &hookQueueItem{WebhookConfig: hook, WebhookPayload: payload}
-		}
+	payload.Data = &XtractPayload{
+		Files:   item.Resp.NewFiles,
+		File:    item.Resp.NewFiles,
+		Start:   item.Resp.Started,
+		Output:  item.Resp.Output,
+		Bytes:   item.Resp.Size,
+		Queue:   item.Resp.Queued,
+		Elapsed: cnfg.Duration{Duration: item.Resp.Elapsed},
 	}
 
-	for _, hook := range u.Cmdhook {
-		if hook.HasEvent(item.Status) && !hook.Excluded(item.App) {
-			u.hookChan <- &hookQueueItem{WebhookConfig: hook, WebhookPayload: payload}
-		}
+	for _, v := range item.Resp.Archives {
+		payload.Data.Archives = append(payload.Data.Archives, v...)
+		payload.Data.Archive = append(payload.Data.Archive, v...)
 	}
+
+	for _, v := range item.Resp.Extras {
+		payload.Data.Archives = append(payload.Data.Archives, v...)
+		payload.Data.Archive = append(payload.Data.Archive, v...)
+	}
+
+	if item.Resp.Error != nil {
+		payload.Data.Error = item.Resp.Error.Error()
+	}
+
+	return payload
 }
 
 func (u *Unpackerr) sendWebhookWithLog(hook *WebhookConfig, payload *WebhookPayload) {
