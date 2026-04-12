@@ -15,6 +15,7 @@ import (
 
 type WebServer struct {
 	Metrics    bool        `json:"metrics"     toml:"metrics"       xml:"metrics"       yaml:"metrics"`
+	UI         bool        `json:"ui"          toml:"ui"            xml:"ui"            yaml:"ui"`
 	LogFiles   int         `json:"logFiles"    toml:"log_files"     xml:"log_files"     yaml:"logFiles"`
 	LogFileMb  int         `json:"logFileMb"   toml:"log_file_mb"   xml:"log_file_mb"   yaml:"logFileMb"`
 	ListenAddr string      `json:"listenAddr"  toml:"listen_addr"   xml:"listen_addr"   yaml:"listenAddr"`
@@ -29,7 +30,7 @@ type WebServer struct {
 }
 
 func (w *WebServer) Enabled() bool {
-	return w != nil && w.Metrics && w.ListenAddr != ""
+	return w != nil && w.ListenAddr != "" && (w.Metrics || w.UI)
 }
 
 func (u *Unpackerr) logWebserver() {
@@ -48,8 +49,16 @@ func (u *Unpackerr) logWebserver() {
 		ssl = "s"
 	}
 
-	u.Printf(" => Starting webserver. Listen address: http%s://%v%s (%d upstreams)",
-		ssl, addr, u.Webserver.URLBase, len(u.Webserver.Upstreams))
+	features := []string{}
+	if u.Webserver.UI {
+		features = append(features, "status-ui")
+	}
+	if u.Webserver.Metrics {
+		features = append(features, "metrics")
+	}
+
+	u.Printf(" => Starting webserver. Listen address: http%s://%v%s (%s, %d upstreams)",
+		ssl, addr, u.Webserver.URLBase, strings.Join(features, ", "), len(u.Webserver.Upstreams))
 }
 
 func (u *Unpackerr) startWebServer() {
@@ -87,7 +96,12 @@ func (u *Unpackerr) startWebServer() {
 }
 
 func (u *Unpackerr) webRoutes() {
-	u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), Index)
+	if u.Webserver.UI {
+		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), u.webIndex)
+		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/api/status"), u.webStatusAPI)
+	} else {
+		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), Index)
+	}
 
 	if !u.Webserver.Metrics {
 		return

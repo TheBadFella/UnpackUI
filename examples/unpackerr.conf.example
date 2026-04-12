@@ -76,7 +76,9 @@ dir_mode = "0755"
 passwords = []
 
 [webserver]
-## The web server currently only supports metrics; set this to true if you wish to use it.
+## Enable the lightweight status page so you can see queue state and extract progress.
+ ui = false
+## Enable Prometheus metrics on /metrics.
  metrics = false
 ## This may be set to a port or an ip:port to bind a specific IP. 0.0.0.0 binds ALL IPs.
  listen_addr = "0.0.0.0:5656"
