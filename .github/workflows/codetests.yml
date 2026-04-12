@@ -1,6 +1,9 @@
 name: test-and-lint
 on:
   push:
+    branches:
+      - main
+      - unstable
   pull_request_target:
 permissions:
   contents: read
