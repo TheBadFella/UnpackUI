@@ -2,7 +2,8 @@ FROM golang:1-alpine AS builder
 
 WORKDIR /src
 COPY main.go settings.sh go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY pkg pkg
 COPY examples examples
 RUN go generate ./...
@@ -19,7 +20,9 @@ ENV GOFLAGS="-trimpath -mod=readonly -modcacherw"
 ENV GOOS=${TARGETOS}
 ENV GOARCH=${TARGETARCH}
 
-RUN go build -o /tmp/unpackerr -tags osusergo,netgo \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -o /tmp/unpackerr -tags osusergo,netgo \
     -ldflags "-w -s -X \"golift.io/version.Branch=${BRANCH} (${COMMIT})\" \
     -X \"golift.io/version.BuildDate=${BUILD_DATE}\" \
     -X \"golift.io/version.BuildUser=docker\" \
