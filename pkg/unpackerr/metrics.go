@@ -40,7 +40,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect satisfies the Prometheus custom metrics collector.
 func (c *MetricsCollector) Collect(metrics chan<- prometheus.Metric) {
-	stats := c.stats()
+	stats := c.snapshotStats()
 	newMetric := prometheus.MustNewConstMetric
 
 	metrics <- newMetric(c.gauge, prometheus.GaugeValue, float64(stats.Waiting), "waiting")
@@ -56,9 +56,14 @@ func (c *MetricsCollector) Collect(metrics chan<- prometheus.Metric) {
 	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(stats.CmdFail), "cmd_fail")
 	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(c.Retries), "retries")
 	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(c.Finished), "finished")
-	metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.folders.Events)), "folder_events")
+	if c.folders != nil {
+		metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.folders.Events)), "folder_events")
+		metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.folders.Updates)), "folder_updates")
+	} else {
+		metrics <- newMetric(c.buffer, prometheus.GaugeValue, 0, "folder_events")
+		metrics <- newMetric(c.buffer, prometheus.GaugeValue, 0, "folder_updates")
+	}
 	metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.updates)), "xtractr_updates")
-	metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.folders.Updates)), "folder_updates")
 	metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.delChan)), "deletes")
 	metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.hookChan)), "hooks")
 }
@@ -157,32 +162,4 @@ type Stats struct {
 	HookFail   uint
 	CmdOK      uint
 	CmdFail    uint
-}
-
-// stats compiles and builds the statistics for the app.
-func (u *Unpackerr) stats() *Stats {
-	stats := &Stats{}
-	stats.HookOK, stats.HookFail = u.WebhookCounts()
-	stats.CmdOK, stats.CmdFail = u.CmdhookCounts()
-
-	for name := range u.Map {
-		switch u.Map[name].Status {
-		case WAITING:
-			stats.Waiting++
-		case QUEUED:
-			stats.Queued++
-		case EXTRACTING:
-			stats.Extracting++
-		case DELETEFAILED, EXTRACTFAILED:
-			stats.Failed++
-		case EXTRACTED:
-			stats.Extracted++
-		case DELETED, DELETING:
-			stats.Deleted++
-		case IMPORTED:
-			stats.Imported++
-		}
-	}
-
-	return stats
 }

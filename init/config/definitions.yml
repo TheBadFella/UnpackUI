@@ -383,19 +383,28 @@ sections:
   webserver:
     title: Web Server
     docs: |
-      :::note Metrics
-      The web server currently only provides prometheus metrics, which you can display in
+      :::note Web UI
+      The web server can expose a lightweight status UI for live extraction progress and/or
+      prometheus metrics, which you can display in
       [Grafana](https://grafana.com/grafana/dashboards/18817-unpackerr/).
-      It provides no UI. This may change in the future. The web server was added in v0.12.0.
+      Enable only the features you want. The web server was added in v0.12.0.
       :::
     envvar_prefix: WEBSERVER_
     params:
+      - name: ui
+        envvar: UI
+        default: false
+        recommend: *BOOLEAN
+        short: Enable the lightweight status page.
+        desc: |
+          Enable the built-in status UI at the web server root path.
+          This shows queue state, extraction progress, and recent extraction results.
       - name: metrics
         envvar: METRICS
         default: false
         recommend: *BOOLEAN
-        short: Extracted folders are written with this mode
-        desc: The web server currently only supports metrics; set this to true if you wish to use it.
+        short: Enable prometheus metrics on `/metrics`.
+        desc: Enable the Prometheus metrics endpoint on `/metrics`.
       - name: listen_addr
         envvar: LISTEN_ADDR
         default: 0.0.0.0:5656

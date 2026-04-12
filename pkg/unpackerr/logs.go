@@ -118,7 +118,7 @@ func (l *Logger) Errorf(msg string, v ...any) {
 
 // logCurrentQueue prints the number of things happening.
 func (u *Unpackerr) logCurrentQueue(now time.Time) {
-	stats := u.stats()
+	stats := u.currentStats()
 	u.Printf("[Unpackerr] Queue: %d waiting, %d queued, %d extracting, %d extracted, %d imported, %d failed, %d deleted",
 		stats.Waiting, stats.Queued, stats.Extracting, stats.Extracted, stats.Imported, stats.Failed, stats.Deleted)
 

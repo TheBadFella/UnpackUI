@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Unpackerr/unpackerr/pkg/ui"
@@ -66,6 +67,7 @@ type Unpackerr struct {
 	*Logger
 	rotatorr *rotatorr.Logger
 	menu     map[string]ui.MenuItem
+	webState atomic.Pointer[webStatusSnapshot]
 }
 
 type fileDeleteReq struct {
@@ -190,6 +192,7 @@ func Start() error {
 	}
 
 	go unpackerr.watchDeleteChannel()
+	unpackerr.refreshWebState(version.Started)
 	unpackerr.startWebServer()
 	unpackerr.watchWorkThread()
 	unpackerr.startTray() // runs tray or waits for exit depending on hasGUI.
@@ -359,6 +362,7 @@ func (u *Unpackerr) Run() {
 
 	u.PollFolders()          // This initializes channel(s) used below.
 	u.retrieveAppQueues(now) // Get in-app queues on startup.
+	u.refreshWebState(now)
 
 	// This is the "main go routine" in start.go.
 	for {
@@ -368,31 +372,39 @@ func (u *Unpackerr) Run() {
 			u.retrieveAppQueues(now)
 			// check for state changes in the qpp queues.
 			u.checkQueueChanges(now)
+			u.refreshWebState(now)
 		case now = <-xtractr.C:
 			// Check if any completed items have elapsed their start delay.
 			u.extractCompletedDownloads(now)
+			u.refreshWebState(now)
 		case now = <-cleaner.C:
 			// Check for extraction state changes and act on them.
 			u.checkExtractDone(now)
 			u.checkFolderStats(now)
+			u.refreshWebState(now)
 		case resp := <-u.updates:
 			// xtractr callback for starr download extraction.
 			u.handleXtractrCallback(resp)
+			u.refreshWebState(resp.Started.Add(resp.Elapsed))
 		case resp := <-u.folders.Updates:
 			// xtractr callback for a watched folder extraction.
 			u.folderXtractrCallback(resp)
+			u.refreshWebState(resp.Started.Add(resp.Elapsed))
 		case event := <-u.folders.Events:
 			// file system event for watched folder.
 			u.processEvent(event, now)
+			u.refreshWebState(now)
 		case now := <-logger:
 			// Log/print current queue counts once in a while.
 			u.logCurrentQueue(now)
 		case prog := <-u.progChan:
 			// Update progress for in-process extractions.
 			u.handleProgress(prog)
+			u.refreshWebState(time.Now())
 		case now = <-progress.C:
 			// Print the collected progress info.
 			u.printProgress(now)
+			u.refreshWebState(now)
 		}
 	}
 }
