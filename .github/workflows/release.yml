@@ -14,7 +14,7 @@ permissions:
 jobs:
   macapp-test:
     # description: "Builds and signs a macOS app then packages it in a notarized DMG."
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable'
+    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable') && github.event_name != 'workflow_dispatch'
     name: Make macOS DMG
     runs-on: macos-latest
     steps:
@@ -45,7 +45,7 @@ jobs:
 
   release-test:
     # description: "Builds all the application client binaries and packages for a release."
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable' || github.ref == 'refs/heads/main'
+    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable' || github.ref == 'refs/heads/main') && github.event_name != 'workflow_dispatch'
     outputs:
       version: ${{ steps.release.outputs.version }}
     name: Make Release Assets
@@ -76,7 +76,7 @@ jobs:
 
   deploy-unstable-unstable:
     # description: "Uploads pre-built binaries to unstable.golift.io."
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable'
+    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable') && github.event_name != 'workflow_dispatch'
     strategy:
       matrix:
         files: [release, dmg-release]
@@ -102,7 +102,7 @@ jobs:
 
   deploy-unstable-packagecloud:
     # description: "Uploads pre-built RPM and DEB packages to packagecloud.io/golift"
-    if: github.ref == 'refs/heads/unstable'
+    if: github.ref == 'refs/heads/unstable' && github.event_name != 'workflow_dispatch'
     needs: release-test
     name: Deploy Unstable PackageCloud
     runs-on: ubuntu-latest
@@ -121,7 +121,7 @@ jobs:
 
   deploy-packagecloud:
     # description: "Uploads pre-built RPM and DEB packages to packagecloud.io/golift"
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch'
     needs: release-test
     name: Deploy Release PackageCloud
     runs-on: ubuntu-latest
@@ -140,7 +140,7 @@ jobs:
 
   deploy-github-release:
     # description: uploads all the built release assets to the GitHub Release.
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch'
     permissions:
       contents: write
     needs: [release-test, macapp-test]
@@ -183,7 +183,7 @@ jobs:
           DEPLOY_KEY: ${{ secrets.AUR_DEPLOY_KEY }}
 
   docker-ghcr-build-push:
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable'
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable'
     name: Deploy GHCR Container
     runs-on: ubuntu-latest
     permissions:

@@ -182,14 +182,23 @@ func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
 		wrote, total = progress.Read, progress.Compressed
 	}
 
+	basePath := ""
+	if progress.Extract != nil {
+		basePath = progress.Extract.Path
+	}
+
 	archive := ""
 	if progress.XFile != nil {
-		archive = strings.TrimLeft(strings.TrimPrefix(progress.XFile.FilePath, progress.Path), `/\`)
+		archive = strings.TrimLeft(strings.TrimPrefix(progress.XFile.FilePath, basePath), `/\`)
 	}
 
 	summary := "no progress yet"
-	if progress.XFile != nil {
+	if progress.XFile != nil && progress.Extract != nil {
 		summary = progress.String()
+	} else if progress.XFile != nil {
+		summary = fmt.Sprintf("on archive: %d/%d @ %sB/%sB (%.0f%%): %s",
+			progress.Extracted+1, progress.Archives, bytefmt.ByteSize(wrote), bytefmt.ByteSize(total),
+			progress.Percent(), archive)
 	}
 
 	return &webStatusProgress{
