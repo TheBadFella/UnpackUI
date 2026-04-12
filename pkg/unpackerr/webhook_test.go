@@ -1,0 +1,88 @@
+package unpackerr
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"golift.io/xtractr"
+)
+
+func TestBuildWebhookPayloadKeepsDataForImportedFolder(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 12, 49, 0, 0, time.UTC)
+	item := &Extract{
+		App:     FolderString,
+		Path:    "/downloads/Big.Mistakes.S01",
+		Status:  IMPORTED,
+		Updated: now,
+		IDs:     map[string]any{"title": "Big Mistakes"},
+		Resp: &xtractr.Response{
+			NewFiles: []string{"/downloads/Big.Mistakes.S01/episode.mkv"},
+			Output:   "/downloads/Big.Mistakes.S01_unpackerr",
+			Size:     123456789,
+			Queued:   1,
+			Elapsed:  42 * time.Second,
+			Started:  now.Add(-42 * time.Second),
+			Archives: xtractr.ArchiveList{
+				".rar": []string{"/downloads/Big.Mistakes.S01/archive.part01.rar"},
+			},
+		},
+	}
+
+	payload := buildWebhookPayload(item)
+	if payload.Event != IMPORTED {
+		t.Fatalf("expected imported event, got %s", payload.Event)
+	}
+
+	if payload.Data == nil {
+		t.Fatal("expected extraction data to be present for imported folder payload")
+	}
+
+	if len(payload.Data.Files) != 1 || len(payload.Data.Archives) != 1 {
+		t.Fatalf("expected extracted files and archives in payload, got files=%d archives=%d",
+			len(payload.Data.Files), len(payload.Data.Archives))
+	}
+}
+
+func TestBuildWebhookPayloadKeepsDataForDeletedEvent(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 12, 53, 0, 0, time.UTC)
+	item := &Extract{
+		App:     FolderString,
+		Path:    "/downloads/Big.Mistakes.S01",
+		Status:  DELETED,
+		Updated: now,
+		IDs:     map[string]any{"title": "Big Mistakes"},
+		Resp: &xtractr.Response{
+			NewFiles: []string{
+				"/downloads/Big.Mistakes.S01/episode.mkv",
+				"/downloads/Big.Mistakes.S01/episode.srt",
+			},
+			Output:  "/downloads/Big.Mistakes.S01_unpackerr",
+			Size:    123456789,
+			Elapsed: 42 * time.Second,
+			Started: now.Add(-10 * time.Minute),
+			Error:   errors.New("sample error"),
+		},
+	}
+
+	payload := buildWebhookPayload(item)
+	if payload.Event != DELETED {
+		t.Fatalf("expected deleted event, got %s", payload.Event)
+	}
+
+	if payload.Data == nil {
+		t.Fatal("expected extraction data to be present for deleted payload")
+	}
+
+	if len(payload.Data.Files) != 2 {
+		t.Fatalf("expected deleted payload to retain extracted file list, got %d files", len(payload.Data.Files))
+	}
+
+	if payload.Data.Error != "sample error" {
+		t.Fatalf("expected retained error string, got %q", payload.Data.Error)
+	}
+}
