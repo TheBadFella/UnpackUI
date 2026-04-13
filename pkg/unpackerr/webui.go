@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -50,6 +51,8 @@ type webStatusItem struct {
 	Completed   bool               `json:"completed"`
 	App         string             `json:"app"`
 	CurrentFile string             `json:"currentFile,omitempty"`
+	DeleteAt    string             `json:"deleteAt,omitempty"`
+	DeleteIn    string             `json:"deleteIn,omitempty"`
 	Elapsed     string             `json:"elapsed"`
 	Details     *webStatusDetails  `json:"details,omitempty"`
 	Error       string             `json:"error,omitempty"`
@@ -98,7 +101,12 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 	for name, item := range u.Map {
 		currentNames[name] = struct{}{}
 
-		webItem := buildWebStatusItem(name, item, now)
+		var folderItem *Folder
+		if u.folders != nil {
+			folderItem = u.folders.Folders[name]
+		}
+
+		webItem := buildWebStatusItem(name, item, folderItem, now)
 		if webItem.Completed {
 			if _, skip := dismissed[webItem.ID]; skip {
 				continue
@@ -187,7 +195,7 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 	}
 }
 
-func buildWebStatusItem(name string, item *Extract, now time.Time) webStatusItem {
+func buildWebStatusItem(name string, item *Extract, folder *Folder, now time.Time) webStatusItem {
 	output := webStatusItem{
 		ID:         webStatusItemID(name, item.Status, item.Updated),
 		Active:     !webStatusIsCompleted(item.Status.String()),
@@ -195,10 +203,10 @@ func buildWebStatusItem(name string, item *Extract, now time.Time) webStatusItem
 		App:        string(item.App),
 		Elapsed:    now.Sub(item.Updated).Round(time.Second).String(),
 		Details:    buildWebStatusDetails(item),
-		Name:       name,
+		Name:       webStatusDisplayName(name, item),
 		Path:       item.Path,
 		Status:     item.Status.String(),
-		StatusText: item.Status.Desc(),
+		StatusText: webStatusText(item.Status, string(item.App)),
 		UpdatedAt:  item.Updated.Format(time.RFC3339),
 	}
 
@@ -217,6 +225,8 @@ func buildWebStatusItem(name string, item *Extract, now time.Time) webStatusItem
 		}
 	}
 
+	output.DeleteIn, output.DeleteAt = webStatusDeleteTiming(item, folder, now)
+
 	return output
 }
 
@@ -232,11 +242,11 @@ func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) we
 		Completed:  false,
 		App:        FolderString,
 		Elapsed:    now.Sub(folder.updated).Round(time.Second).String(),
-		Name:       name,
+		Name:       webStatusLabel(name),
 		Path:       name,
 		Reason:     reason,
 		Status:     folder.status.String(),
-		StatusText: folder.status.Desc(),
+		StatusText: webStatusText(folder.status, FolderString),
 		UpdatedAt:  folder.updated.Format(time.RFC3339),
 	}
 }
@@ -246,10 +256,17 @@ func buildWebStatusDetails(item *Extract) *webStatusDetails {
 	if title, ok := item.IDs["title"]; ok {
 		details.Title = fmt.Sprint(title)
 	}
+	if details.Title == "" || details.Title == item.Path {
+		details.Title = webStatusDisplayName(item.Path, item)
+	}
 
 	if len(item.IDs) > 0 {
 		details.IDs = make(map[string]string, len(item.IDs))
 		for key, value := range item.IDs {
+			if key == "title" && details.Title != "" {
+				details.IDs[key] = details.Title
+				continue
+			}
 			details.IDs[key] = fmt.Sprint(value)
 		}
 	}
@@ -275,7 +292,12 @@ func buildWebStatusDetails(item *Extract) *webStatusDetails {
 		for _, extraGroup := range item.Resp.Extras {
 			details.Archives = append(details.Archives, extraGroup...)
 		}
-		details.Files = append(details.Files, item.Resp.NewFiles...)
+		for _, file := range item.Resp.NewFiles {
+			if webStatusShouldHideFile(file) {
+				continue
+			}
+			details.Files = append(details.Files, file)
+		}
 	}
 
 	if details.Title == "" && details.Bytes == "" && details.Elapsed == "" && details.Output == "" &&
@@ -285,6 +307,79 @@ func buildWebStatusDetails(item *Extract) *webStatusDetails {
 	}
 
 	return details
+}
+
+func webStatusDisplayName(name string, item *Extract) string {
+	if item != nil {
+		if title, ok := item.IDs["title"]; ok {
+			display := strings.TrimSpace(fmt.Sprint(title))
+			if display != "" && display != item.Path {
+				return display
+			}
+		}
+		if item.Path != "" {
+			return webStatusLabel(item.Path)
+		}
+	}
+
+	return webStatusLabel(name)
+}
+
+func webStatusText(status ExtractStatus, app string) string {
+	if app == FolderString && status == EXTRACTED {
+		return "Extracted"
+	}
+
+	return status.Desc()
+}
+
+func webStatusDeleteTiming(item *Extract, folder *Folder, now time.Time) (string, string) {
+	switch {
+	case item == nil:
+		return "", ""
+	case item.App == FolderString:
+		if item.Status != EXTRACTED || folder == nil || folder.config == nil || folder.config.DeleteAfter == nil {
+			return "", ""
+		}
+		return webStatusDeleteWindow(item.Updated, folder.config.DeleteAfter.Duration, now)
+	case item.Status == IMPORTED:
+		return webStatusDeleteWindow(item.Updated, item.DeleteDelay, now)
+	default:
+		return "", ""
+	}
+}
+
+func webStatusDeleteWindow(updated time.Time, delay time.Duration, now time.Time) (string, string) {
+	if delay <= 0 || updated.IsZero() {
+		return "", ""
+	}
+
+	deleteAt := updated.Add(delay)
+	remaining := deleteAt.Sub(now).Round(time.Second)
+	if remaining <= 0 {
+		return "", deleteAt.Format(time.RFC3339)
+	}
+
+	return remaining.String(), deleteAt.Format(time.RFC3339)
+}
+
+func webStatusLabel(value string) string {
+	value = filepath.Clean(value)
+	label := filepath.Base(value)
+	if label == "." || label == string(filepath.Separator) || label == "" {
+		return value
+	}
+
+	return label
+}
+
+func webStatusShouldHideFile(path string) bool {
+	base := strings.ToLower(filepath.Base(path))
+	if base == "unpackerred.txt" || base == "_unpackerred.txt" {
+		return true
+	}
+
+	return strings.HasPrefix(base, "_unpackerred.") && strings.HasSuffix(base, ".txt")
 }
 
 func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
@@ -994,15 +1089,15 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      </div>
 	      <div class="table-wrap">
 	        <table>
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Updated</th>
-              <th>Path</th>
-            </tr>
-          </thead>
+	          <thead>
+	            <tr id="items-head">
+	              <th>Item</th>
+	              <th>Status</th>
+	              <th>Progress</th>
+	              <th>Updated</th>
+	              <th>Path</th>
+	            </tr>
+	          </thead>
           <tbody id="items">
             <tr><td colspan="5" class="empty">Waiting for status data...</td></tr>
           </tbody>
@@ -1041,6 +1136,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	    const stamp = document.getElementById('stamp');
 	    const clearCompletedButton = document.getElementById('clear-completed');
 	    const itemCount = document.getElementById('item-count');
+	    const itemsHead = document.getElementById('items-head');
 	    const itemsBody = document.getElementById('items');
 	    const detailCard = document.getElementById('detail-card');
 	    const detailSubtitle = document.getElementById('detail-subtitle');
@@ -1123,6 +1219,8 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      if (details.bytes) fields.push(renderDetailField('Bytes written', details.bytes, false));
 	      if (details.elapsed) fields.push(renderDetailField('Extract elapsed', details.elapsed, false));
 	      if (details.startedAt) fields.push(renderDetailField('Extract started', new Date(details.startedAt).toLocaleString(), false));
+	      if (item.deleteIn) fields.push(renderDetailField('Deletes in', item.deleteIn, false));
+	      if (item.deleteAt) fields.push(renderDetailField('Deletes at', new Date(item.deleteAt).toLocaleString(), false));
 	      if (details.output) fields.push(renderDetailField('Temp folder', details.output, true));
 	      if (details.queue) fields.push(renderDetailField('Queue at start', details.queue, false));
 	      if (item.reason) fields.push(renderDetailField('Reason', item.reason, false));
@@ -1130,10 +1228,10 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 
 	      const lists = [];
 	      if ((details.archives ?? []).length) {
-	        lists.push(renderDetailList('Archives', details.archives, true));
+	        lists.push(renderDetailList('Archives (' + details.archives.length + ')', details.archives, true));
 	      }
 	      if ((details.files ?? []).length) {
-	        lists.push(renderDetailList('Extracted files', details.files, true));
+	        lists.push(renderDetailList('Extracted files (' + details.files.length + ')', details.files, true));
 	      }
 	      if (details.ids && Object.keys(details.ids).length) {
 	        const pairs = Object.entries(details.ids).map(([key, value]) => key + ': ' + value);
@@ -1152,45 +1250,62 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      const items = data.items ?? [];
 	      const activeCount = data.activeCount ?? 0;
 	      const completedCount = data.completedCount ?? 0;
+	      const showDeleteIn = items.some((item) => Boolean(item.deleteIn));
 	      itemCount.textContent = activeCount + ' active / ' + completedCount + ' completed';
 	      clearCompletedButton.disabled = completedCount === 0;
+	      itemsHead.innerHTML = [
+	        '<th>Item</th>',
+	        '<th>Status</th>',
+	        '<th>Progress</th>',
+	        showDeleteIn ? '<th>Deletes In</th>' : '',
+	        '<th>Updated</th>',
+	        '<th>Path</th>'
+	      ].join('');
 
 	      if (!items.length) {
-	        itemsBody.innerHTML = '<tr><td colspan="5" class="empty">Nothing is queued or being tracked right now.</td></tr>';
+	        itemsBody.innerHTML = '<tr><td colspan="' + (showDeleteIn ? '6' : '5') + '" class="empty">Nothing is queued or being tracked right now.</td></tr>';
 	        detailCard.hidden = true;
 	        return;
 	      }
 
 	      itemsBody.innerHTML = items.map((item) => {
 	        const progress = item.progress;
+	        const deleteHtml = item.deleteIn
+	          ? '<div class="muted">Deletes in ' + escapeHtml(item.deleteIn) + '</div>'
+	          : '';
 	        const progressHtml = progress ? (
 	          '<div class="progress">' +
 	            '<div><strong>' + escapeHtml((progress.percent || 0).toFixed(0)) + '%</strong> / ' + escapeHtml(progress.archiveIndex || 1) + ' of ' + escapeHtml(progress.archiveCount || 1) + ' archive' + ((progress.archiveCount || 1) === 1 ? '' : 's') + '</div>' +
 	            '<div class="progress-bar"><span style="width:' + Math.max(0, Math.min(100, progress.percent || 0)) + '%"></span></div>' +
 	            '<div class="muted">' + escapeHtml((progress.percent || 0).toFixed(0)) + '% - ' + escapeHtml(progress.writtenBytes || '0B') + ' / ' + escapeHtml(progress.totalBytes || '0B') + '</div>' +
+	            deleteHtml +
 	            (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
 	          '</div>'
-	        ) : '<span class="muted">' + (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') + '</span>';
+	        ) : '<span class="muted">' + (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') + '</span>' + deleteHtml;
 
-	        const notes = [
-	          item.reason ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>' : '',
-	          item.error ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>' : '',
-	          item.completed ? '<div class="muted">Retained until cleared</div>' : ''
-	        ].join('');
+		        const notes = [
+		          item.reason ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>' : '',
+		          item.error ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>' : '',
+		          item.completed ? '<div class="muted">Retained until cleared</div>' : ''
+		        ].join('');
+		        const deleteInHtml = showDeleteIn
+		          ? '<td>' + (item.deleteIn ? '<div>' + escapeHtml(item.deleteIn) + '</div>' : '<span class="muted">-</span>') + '</td>'
+		          : '';
 
-	        return (
-	          '<tr class="items-row' + (selectedItemId === item.id ? ' is-selected' : '') + '" data-item-id="' + escapeHtml(item.id) + '">' +
-	            '<td>' +
-	              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
+		        return (
+		          '<tr class="items-row' + (selectedItemId === item.id ? ' is-selected' : '') + '" data-item-id="' + escapeHtml(item.id) + '">' +
+		            '<td>' +
+		              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
 	              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
 	              notes +
-	            '</td>' +
-	            '<td><span class="status ' + escapeHtml(item.status) + '">' + escapeHtml(item.statusText) + '</span></td>' +
-	            '<td>' + progressHtml + '</td>' +
-	            '<td>' +
-	              '<div>' + escapeHtml(item.elapsed) + '</div>' +
-	              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
-	            '</td>' +
+		            '</td>' +
+		            '<td><span class="status ' + escapeHtml(item.status) + '">' + escapeHtml(item.statusText) + '</span></td>' +
+		            '<td>' + progressHtml + '</td>' +
+		            deleteInHtml +
+		            '<td>' +
+		              '<div>' + escapeHtml(item.elapsed) + '</div>' +
+		              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
+		            '</td>' +
 	            '<td><div class="path">' + escapeHtml(item.path) + '</div></td>' +
 	          '</tr>'
 	        );
