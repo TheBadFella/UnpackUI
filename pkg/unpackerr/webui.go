@@ -47,6 +47,7 @@ type webStatusCounters struct {
 
 type webStatusItem struct {
 	ID          string             `json:"id"`
+	Key         string             `json:"-"`
 	Active      bool               `json:"active"`
 	Completed   bool               `json:"completed"`
 	App         string             `json:"app"`
@@ -95,20 +96,19 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 	prev := u.webState.Load()
 	stats := u.currentStats()
 	items := make([]webStatusItem, 0, len(u.Map))
-	currentNames := make(map[string]struct{}, len(u.Map))
+	currentKeys := make(map[string]struct{}, len(u.Map))
 	dismissed := webStatusDismissedItems(prev)
 
 	for name, item := range u.Map {
-		currentNames[name] = struct{}{}
-
 		var folderItem *Folder
 		if u.folders != nil {
 			folderItem = u.folders.Folders[name]
 		}
 
 		webItem := buildWebStatusItem(name, item, folderItem, now)
+		currentKeys[webItem.Key] = struct{}{}
 		if webItem.Completed {
-			if _, skip := dismissed[webItem.ID]; skip {
+			if _, skip := dismissed[webItem.Key]; skip {
 				continue
 			}
 		}
@@ -122,24 +122,30 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 				continue
 			}
 
-			currentNames[name] = struct{}{}
-			items = append(items, buildWaitingFolderStatusItem(name, folder, now))
+			item := buildWaitingFolderStatusItem(name, folder, now)
+			currentKeys[item.Key] = struct{}{}
+			items = append(items, item)
 		}
 	}
 
 	if prev != nil {
+		retainedKeys := make(map[string]struct{}, len(prev.Items))
 		for _, item := range prev.Items {
 			if !item.Completed {
 				continue
 			}
-			if _, ok := currentNames[item.Name]; ok {
+			if _, ok := currentKeys[item.Key]; ok {
 				continue
 			}
-			if _, skip := dismissed[item.ID]; skip {
+			if _, ok := retainedKeys[item.Key]; ok {
+				continue
+			}
+			if _, skip := dismissed[item.Key]; skip {
 				continue
 			}
 
 			item.Elapsed = webStatusElapsed(item.UpdatedAt, now)
+			retainedKeys[item.Key] = struct{}{}
 			items = append(items, item)
 		}
 	}
@@ -198,6 +204,7 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 func buildWebStatusItem(name string, item *Extract, folder *Folder, now time.Time) webStatusItem {
 	output := webStatusItem{
 		ID:         webStatusItemID(name, item.Status, item.Updated),
+		Key:        webStatusItemKey(name, item.Path, string(item.App)),
 		Active:     !webStatusIsCompleted(item.Status.String()),
 		Completed:  webStatusIsCompleted(item.Status.String()),
 		App:        string(item.App),
@@ -238,6 +245,7 @@ func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) we
 
 	return webStatusItem{
 		ID:         webStatusItemID(name, folder.status, folder.updated),
+		Key:        webStatusItemKey(name, name, FolderString),
 		Active:     true,
 		Completed:  false,
 		App:        FolderString,
@@ -451,6 +459,14 @@ func webStatusItemID(name string, status ExtractStatus, updated time.Time) strin
 	return fmt.Sprintf("%s|%s|%s", name, status.String(), updated.Format(time.RFC3339Nano))
 }
 
+func webStatusItemKey(name, path, app string) string {
+	if path != "" {
+		return app + "|" + path
+	}
+
+	return app + "|" + name
+}
+
 func webStatusIsCompleted(status string) bool {
 	switch status {
 	case EXTRACTED.String(), IMPORTED.String(), DELETING.String(), DELETED.String(), EXTRACTEDNOTHING.String():
@@ -571,7 +587,7 @@ func (u *Unpackerr) webClearCompletedAPI(w http.ResponseWriter, _ *http.Request,
 
 	for _, item := range snapshot.Items {
 		if item.Completed {
-			next.dismissed[item.ID] = struct{}{}
+			next.dismissed[item.Key] = struct{}{}
 			continue
 		}
 
@@ -1201,6 +1217,38 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      })[char]);
 	    }
 
+	    function formatRemaining(deleteAt) {
+	      const target = new Date(deleteAt);
+	      if (Number.isNaN(target.getTime())) {
+	        return '';
+	      }
+
+	      let totalSeconds = Math.max(0, Math.round((target.getTime() - Date.now()) / 1000));
+	      const days = Math.floor(totalSeconds / 86400);
+	      totalSeconds -= days * 86400;
+	      const hours = Math.floor(totalSeconds / 3600);
+	      totalSeconds -= hours * 3600;
+	      const minutes = Math.floor(totalSeconds / 60);
+	      const seconds = totalSeconds - (minutes * 60);
+
+	      const parts = [];
+	      if (days) parts.push(days + 'd');
+	      if (hours || days) parts.push(hours + 'h');
+	      if (minutes || hours || days) parts.push(minutes + 'm');
+	      parts.push(seconds + 's');
+
+	      return parts.join('');
+	    }
+
+	    function updateDeleteCountdowns() {
+	      document.querySelectorAll('[data-delete-at]').forEach((node) => {
+	        const formatted = formatRemaining(node.dataset.deleteAt);
+	        const prefix = node.dataset.prefix || '';
+	        const fallback = node.dataset.empty || '';
+	        node.textContent = formatted ? prefix + formatted : fallback;
+	      });
+	    }
+
 	    function renderStats(stats = {}) {
 	      statGrid.innerHTML = statOrder.map(([key, label]) => (
 	        '<article class="card tone-' + key + '">' +
@@ -1262,7 +1310,16 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      if (details.bytes) fields.push(renderDetailField('Bytes written', details.bytes, false));
 	      if (details.elapsed) fields.push(renderDetailField('Extract elapsed', details.elapsed, false));
 	      if (details.startedAt) fields.push(renderDetailField('Extract started', new Date(details.startedAt).toLocaleString(), false));
-	      if (item.deleteIn) fields.push(renderDetailField('Deletes in', item.deleteIn, false));
+	      if (item.deleteAt) {
+	        fields.push(
+	          '<div class="detail-field">' +
+	            '<div class="label">Deletes in</div>' +
+	            '<div class="value" data-delete-at="' + escapeHtml(item.deleteAt) + '" data-empty="due now">' + escapeHtml(item.deleteIn || '') + '</div>' +
+	          '</div>'
+	        );
+	      } else if (item.deleteIn) {
+	        fields.push(renderDetailField('Deletes in', item.deleteIn, false));
+	      }
 	      if (item.deleteAt) fields.push(renderDetailField('Deletes at', new Date(item.deleteAt).toLocaleString(), false));
 	      if (details.output) fields.push(renderDetailField('Temp folder', details.output, true));
 	      if (details.queue) fields.push(renderDetailField('Queue at start', details.queue, false));
@@ -1313,18 +1370,14 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 
 	      itemsBody.innerHTML = items.map((item) => {
 	        const progress = item.progress;
-	        const deleteHtml = item.deleteIn
-	          ? '<div class="muted">Deletes in ' + escapeHtml(item.deleteIn) + '</div>'
-	          : '';
 	        const progressHtml = progress ? (
 	          '<div class="progress">' +
 	            '<div><strong>' + escapeHtml((progress.percent || 0).toFixed(0)) + '%</strong> / ' + escapeHtml(progress.archiveIndex || 1) + ' of ' + escapeHtml(progress.archiveCount || 1) + ' archive' + ((progress.archiveCount || 1) === 1 ? '' : 's') + '</div>' +
 	            '<div class="progress-bar"><span style="width:' + Math.max(0, Math.min(100, progress.percent || 0)) + '%"></span></div>' +
 	            '<div class="muted">' + escapeHtml((progress.percent || 0).toFixed(0)) + '% - ' + escapeHtml(progress.writtenBytes || '0B') + ' / ' + escapeHtml(progress.totalBytes || '0B') + '</div>' +
-	            deleteHtml +
 	            (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
 	          '</div>'
-	        ) : '<span class="muted">' + (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') + '</span>' + deleteHtml;
+	        ) : '<span class="muted">' + (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') + '</span>';
 
 		        const notes = [
 		          item.reason ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>' : '',
@@ -1332,7 +1385,11 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 		          item.completed ? '<div class="muted">Retained until cleared</div>' : ''
 		        ].join('');
 		        const deleteInHtml = showDeleteIn
-		          ? '<td>' + (item.deleteIn ? '<div>' + escapeHtml(item.deleteIn) + '</div>' : '<span class="muted">-</span>') + '</td>'
+		          ? '<td>' + (item.deleteAt
+		            ? '<div data-delete-at="' + escapeHtml(item.deleteAt) + '" data-empty="-">' + escapeHtml(item.deleteIn || '-') + '</div>'
+		            : item.deleteIn
+		              ? '<div>' + escapeHtml(item.deleteIn) + '</div>'
+		              : '<span class="muted">-</span>') + '</td>'
 		          : '';
 
 		        return (
@@ -1370,6 +1427,8 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	          detailCard.hidden = true;
 	        }
 	      }
+
+	      updateDeleteCountdowns();
 	    }
 
 	    async function refresh() {
@@ -1424,6 +1483,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	    });
 
 	    refresh();
+	    setInterval(updateDeleteCountdowns, 1000);
 	    setInterval(refresh, 2000);
 	  </script>
 </body>
