@@ -46,3 +46,4 @@ github_deploy_key*
 /.gocache
 /.gopath
 unpackerr.exe
+/tools

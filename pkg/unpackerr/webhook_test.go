@@ -1,7 +1,6 @@
 package unpackerr
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -22,24 +21,24 @@ func TestBuildWebhookPayloadUsesFriendlyTitles(t *testing.T) {
 		{name: "deleted", status: DELETED, want: "Source Deleted"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
 			payload := buildWebhookPayload(&Extract{
 				App:     FolderString,
 				Path:    "/downloads/test-item",
-				Status:  tt.status,
+				Status:  testCase.status,
 				Updated: time.Date(2026, 4, 12, 21, 33, 0, 0, time.UTC),
 				IDs:     map[string]any{"title": "test-item"},
 			})
 
-			if payload.Title != tt.want {
-				t.Fatalf("expected title %q, got %q", tt.want, payload.Title)
+			if payload.Title != testCase.want {
+				t.Fatalf("expected title %q, got %q", testCase.want, payload.Title)
 			}
 
-			if payload.Event != tt.status {
-				t.Fatalf("expected event %s, got %s", tt.status, payload.Event)
+			if payload.Event != testCase.status {
+				t.Fatalf("expected event %s, got %s", testCase.status, payload.Event)
 			}
 		})
 	}
@@ -102,7 +101,7 @@ func TestBuildWebhookPayloadKeepsDataForDeletedEvent(t *testing.T) {
 			Size:    123456789,
 			Elapsed: 42 * time.Second,
 			Started: now.Add(-10 * time.Minute),
-			Error:   errors.New("sample error"),
+			Error:   ErrInvalidStatus,
 		},
 	}
 
@@ -119,7 +118,7 @@ func TestBuildWebhookPayloadKeepsDataForDeletedEvent(t *testing.T) {
 		t.Fatalf("expected deleted payload to retain extracted file list, got %d files", len(payload.Data.Files))
 	}
 
-	if payload.Data.Error != "sample error" {
+	if payload.Data.Error != ErrInvalidStatus.Error() {
 		t.Fatalf("expected retained error string, got %q", payload.Data.Error)
 	}
 }

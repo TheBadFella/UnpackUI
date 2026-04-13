@@ -1,6 +1,7 @@
 package unpackerr
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,16 @@ import (
 	"golift.io/cnfg"
 	"golift.io/xtractr"
 )
+
+type webStatusAPITestResponse struct {
+	CompletedCount int                        `json:"completedCount"`
+	Items          []webStatusAPITestItem     `json:"items"`
+	Stats          map[string]json.RawMessage `json:"stats"`
+}
+
+type webStatusAPITestItem struct {
+	Completed bool `json:"completed"`
+}
 
 func TestWebServerEnabled(t *testing.T) {
 	t.Parallel()
@@ -35,8 +46,8 @@ func TestBuildWebStateIncludesProgress(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
-	u := New()
-	u.Map["Example.Release"] = &Extract{
+	unpackerr := New()
+	unpackerr.Map["Example.Release"] = &Extract{
 		App:     FolderString,
 		Path:    "/downloads/Example.Release",
 		Status:  EXTRACTING,
@@ -57,7 +68,7 @@ func TestBuildWebStateIncludesProgress(t *testing.T) {
 		},
 	}
 
-	snapshot := u.buildWebState(now)
+	snapshot := unpackerr.buildWebState(now)
 	if snapshot.Stats.Extracting != 1 {
 		t.Fatalf("expected 1 extracting item, got %d", snapshot.Stats.Extracting)
 	}
@@ -84,8 +95,8 @@ func TestBuildWebStateUsesFriendlyFolderDisplayName(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
-	u := New()
-	u.folders = &Folders{
+	unpackerr := New()
+	unpackerr.folders = &Folders{
 		Folders: map[string]*Folder{
 			"/downloads/Example.Release": {
 				updated: now,
@@ -96,7 +107,7 @@ func TestBuildWebStateUsesFriendlyFolderDisplayName(t *testing.T) {
 			},
 		},
 	}
-	u.Map["/downloads/Example.Release"] = &Extract{
+	unpackerr.Map["/downloads/Example.Release"] = &Extract{
 		App:     FolderString,
 		Path:    "/downloads/Example.Release",
 		Status:  EXTRACTED,
@@ -104,7 +115,7 @@ func TestBuildWebStateUsesFriendlyFolderDisplayName(t *testing.T) {
 		IDs:     map[string]any{"title": "/downloads/Example.Release"},
 	}
 
-	snapshot := u.buildWebState(now)
+	snapshot := unpackerr.buildWebState(now)
 	if len(snapshot.Items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(snapshot.Items))
 	}
@@ -160,8 +171,8 @@ func TestBuildWebStateIncludesDeleteCountdownForImportedItems(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
-	u := New()
-	u.Map["Example.Release"] = &Extract{
+	unpackerr := New()
+	unpackerr.Map["Example.Release"] = &Extract{
 		App:         "Sonarr",
 		Path:        "/downloads/Example.Release",
 		Status:      IMPORTED,
@@ -170,7 +181,7 @@ func TestBuildWebStateIncludesDeleteCountdownForImportedItems(t *testing.T) {
 		IDs:         map[string]any{"title": "Example Release"},
 	}
 
-	snapshot := u.buildWebState(now.Add(90 * time.Second))
+	snapshot := unpackerr.buildWebState(now.Add(90 * time.Second))
 	if len(snapshot.Items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(snapshot.Items))
 	}
@@ -184,8 +195,8 @@ func TestBuildWebStateDoesNotDuplicateCompletedItemsAcrossRefreshes(t *testing.T
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 21, 53, 46, 0, time.UTC)
-	u := New()
-	u.folders = &Folders{
+	unpackerr := New()
+	unpackerr.folders = &Folders{
 		Folders: map[string]*Folder{
 			"/downloads/sample-large-zip-file.zip": {
 				updated: now,
@@ -196,7 +207,7 @@ func TestBuildWebStateDoesNotDuplicateCompletedItemsAcrossRefreshes(t *testing.T
 			},
 		},
 	}
-	u.Map["/downloads/sample-large-zip-file.zip"] = &Extract{
+	unpackerr.Map["/downloads/sample-large-zip-file.zip"] = &Extract{
 		App:     FolderString,
 		Path:    "/downloads/sample-large-zip-file.zip",
 		Status:  EXTRACTED,
@@ -204,8 +215,8 @@ func TestBuildWebStateDoesNotDuplicateCompletedItemsAcrossRefreshes(t *testing.T
 		IDs:     map[string]any{"title": "/downloads/sample-large-zip-file.zip"},
 	}
 
-	u.refreshWebState(now.Add(5 * time.Second))
-	snapshot := u.buildWebState(now.Add(10 * time.Second))
+	unpackerr.refreshWebState(now.Add(5 * time.Second))
+	snapshot := unpackerr.buildWebState(now.Add(10 * time.Second))
 
 	if len(snapshot.Items) != 1 {
 		t.Fatalf("expected exactly one completed item after repeated refreshes, got %d", len(snapshot.Items))
@@ -220,9 +231,9 @@ func TestBuildWebStateReplacesCompletedItemWhenStatusChanges(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 21, 53, 46, 0, time.UTC)
-	u := New()
+	unpackerr := New()
 	path := "/downloads/sample-large-zip-file.zip"
-	u.Map[path] = &Extract{
+	unpackerr.Map[path] = &Extract{
 		App:     FolderString,
 		Path:    path,
 		Status:  EXTRACTED,
@@ -230,11 +241,11 @@ func TestBuildWebStateReplacesCompletedItemWhenStatusChanges(t *testing.T) {
 		IDs:     map[string]any{"title": path},
 	}
 
-	u.refreshWebState(now)
-	u.Map[path].Status = DELETED
-	u.Map[path].Updated = now.Add(time.Minute)
+	unpackerr.refreshWebState(now)
+	unpackerr.Map[path].Status = DELETED
+	unpackerr.Map[path].Updated = now.Add(time.Minute)
 
-	snapshot := u.buildWebState(now.Add(65 * time.Second))
+	snapshot := unpackerr.buildWebState(now.Add(65 * time.Second))
 	if len(snapshot.Items) != 1 {
 		t.Fatalf("expected one logical item after status change, got %d", len(snapshot.Items))
 	}
@@ -247,18 +258,18 @@ func TestBuildWebStateReplacesCompletedItemWhenStatusChanges(t *testing.T) {
 func TestWebStatusAPI(t *testing.T) {
 	t.Parallel()
 
-	u := New()
-	u.refreshWebState(time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC))
+	unpackerr := New()
+	unpackerr.refreshWebState(time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/status", nil)
 	rec := httptest.NewRecorder()
 
-	u.webStatusAPI(rec, req, nil)
+	unpackerr.webStatusAPI(rec, req, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var snapshot webStatusSnapshot
+	var snapshot webStatusAPITestResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &snapshot); err != nil {
 		t.Fatalf("failed to decode status payload: %v", err)
 	}
@@ -272,8 +283,8 @@ func TestBuildWebStateKeepsCompletedItemsAfterRemoval(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
-	u := New()
-	u.Map["Example.Release"] = &Extract{
+	unpackerr := New()
+	unpackerr.Map["Example.Release"] = &Extract{
 		App:     FolderString,
 		Path:    "/downloads/Example.Release",
 		Status:  DELETED,
@@ -281,10 +292,10 @@ func TestBuildWebStateKeepsCompletedItemsAfterRemoval(t *testing.T) {
 		IDs:     map[string]any{"title": "Example Release"},
 	}
 
-	u.refreshWebState(now)
-	delete(u.Map, "Example.Release")
+	unpackerr.refreshWebState(now)
+	delete(unpackerr.Map, "Example.Release")
 
-	snapshot := u.buildWebState(now.Add(45 * time.Second))
+	snapshot := unpackerr.buildWebState(now.Add(45 * time.Second))
 	if len(snapshot.Items) != 1 {
 		t.Fatalf("expected completed item to remain in snapshot, got %d items", len(snapshot.Items))
 	}
@@ -302,27 +313,29 @@ func TestWebClearCompletedAPI(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
-	u := New()
-	u.Map["Example.Release"] = &Extract{
+	unpackerr := New()
+	unpackerr.Map["Example.Release"] = &Extract{
 		App:     FolderString,
 		Path:    "/downloads/Example.Release",
 		Status:  DELETED,
 		Updated: now,
 		IDs:     map[string]any{"title": "Example Release"},
 	}
-	u.refreshWebState(now)
-	delete(u.Map, "Example.Release")
-	u.refreshWebState(now.Add(time.Minute))
+	unpackerr.refreshWebState(now)
+	delete(unpackerr.Map, "Example.Release")
+	unpackerr.refreshWebState(now.Add(time.Minute))
 
-	req := httptest.NewRequest(http.MethodPost, "/api/status/clear-completed", nil)
+	req := httptest.NewRequestWithContext(
+		context.Background(), http.MethodPost, "/api/status/clear-completed", nil,
+	)
 	rec := httptest.NewRecorder()
-	u.webClearCompletedAPI(rec, req, nil)
+	unpackerr.webClearCompletedAPI(rec, req, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	var snapshot webStatusSnapshot
+	var snapshot webStatusAPITestResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &snapshot); err != nil {
 		t.Fatalf("failed to decode clear payload: %v", err)
 	}

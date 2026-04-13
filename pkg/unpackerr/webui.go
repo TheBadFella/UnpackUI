@@ -14,6 +14,7 @@ import (
 	"github.com/hako/durafmt"
 	"github.com/julienschmidt/httprouter"
 	"golift.io/version"
+	"golift.io/xtractr"
 )
 
 type webStatusSnapshot struct {
@@ -88,6 +89,20 @@ type webStatusProgress struct {
 	WrittenBytes string  `json:"writtenBytes"`
 }
 
+const webStatusUptimeParts = 3
+
+const (
+	webStatusRankExtracting = iota
+	webStatusRankQueued
+	webStatusRankWaiting
+	webStatusRankFailed
+	webStatusRankExtracted
+	webStatusRankImported
+	webStatusRankDeleted
+	webStatusRankExtractedNothing
+	webStatusRankDefault
+)
+
 func (u *Unpackerr) refreshWebState(now time.Time) {
 	u.webState.Store(u.buildWebState(now))
 }
@@ -95,95 +110,19 @@ func (u *Unpackerr) refreshWebState(now time.Time) {
 func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 	prev := u.webState.Load()
 	stats := u.currentStats()
-	items := make([]webStatusItem, 0, len(u.Map))
-	currentKeys := make(map[string]struct{}, len(u.Map))
 	dismissed := webStatusDismissedItems(prev)
+	items, currentKeys := u.buildTrackedWebItems(now, dismissed)
 
-	for name, item := range u.Map {
-		var folderItem *Folder
-		if u.folders != nil {
-			folderItem = u.folders.Folders[name]
-		}
+	items = u.buildWaitingFolderWebItems(items, currentKeys, now)
+	items = mergeRetainedCompletedWebItems(items, prev, currentKeys, dismissed, now)
+	sortWebStatusItems(items)
 
-		webItem := buildWebStatusItem(name, item, folderItem, now)
-		currentKeys[webItem.Key] = struct{}{}
-		if webItem.Completed {
-			if _, skip := dismissed[webItem.Key]; skip {
-				continue
-			}
-		}
-
-		items = append(items, webItem)
-	}
-
-	if u.folders != nil {
-		for name, folder := range u.folders.Folders {
-			if _, ok := u.Map[name]; ok || folder == nil {
-				continue
-			}
-
-			item := buildWaitingFolderStatusItem(name, folder, now)
-			currentKeys[item.Key] = struct{}{}
-			items = append(items, item)
-		}
-	}
-
-	if prev != nil {
-		retainedKeys := make(map[string]struct{}, len(prev.Items))
-		for _, item := range prev.Items {
-			if !item.Completed {
-				continue
-			}
-			if _, ok := currentKeys[item.Key]; ok {
-				continue
-			}
-			if _, ok := retainedKeys[item.Key]; ok {
-				continue
-			}
-			if _, skip := dismissed[item.Key]; skip {
-				continue
-			}
-
-			item.Elapsed = webStatusElapsed(item.UpdatedAt, now)
-			retainedKeys[item.Key] = struct{}{}
-			items = append(items, item)
-		}
-	}
-
-	sort.Slice(items, func(i, j int) bool {
-		left, right := items[i], items[j]
-		if left.Completed != right.Completed {
-			return !left.Completed
-		}
-		if a, b := webStatusRank(left.Status), webStatusRank(right.Status); a != b {
-			return a < b
-		}
-
-		return left.UpdatedAt > right.UpdatedAt
-	})
-
-	buffers := webStatusBuffers{}
-	if u.folders != nil {
-		buffers.FolderEvents = len(u.folders.Events)
-		buffers.FolderUpdates = len(u.folders.Updates)
-	}
-
-	buffers.Deletes = len(u.delChan)
-	buffers.Hooks = len(u.hookChan)
-	buffers.XtractUpdates = len(u.updates)
-
-	var activeCount, completedCount int
-	for _, item := range items {
-		if item.Completed {
-			completedCount++
-		} else {
-			activeCount++
-		}
-	}
+	buffers := u.currentWebBuffers()
+	activeCount, completedCount := webStatusItemCounts(items)
 
 	return &webStatusSnapshot{
 		GeneratedAt:    now.Format(time.RFC3339),
-		Uptime:         durafmt.Parse(now.Sub(version.Started)).LimitFirstN(3).Format(durafmtUnits),
+		Uptime:         durafmt.Parse(now.Sub(version.Started)).LimitFirstN(webStatusUptimeParts).Format(durafmtUnits),
 		Stats:          stats,
 		Buffers:        buffers,
 		ActiveCount:    activeCount,
@@ -199,6 +138,130 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 		Items:     items,
 		dismissed: dismissed,
 	}
+}
+
+func (u *Unpackerr) buildTrackedWebItems(
+	now time.Time, dismissed map[string]struct{},
+) ([]webStatusItem, map[string]struct{}) {
+	items := make([]webStatusItem, 0, len(u.Map))
+	currentKeys := make(map[string]struct{}, len(u.Map))
+
+	for name, item := range u.Map {
+		var folderItem *Folder
+		if u.folders != nil {
+			folderItem = u.folders.Folders[name]
+		}
+
+		webItem := buildWebStatusItem(name, item, folderItem, now)
+		currentKeys[webItem.Key] = struct{}{}
+		if _, skip := dismissed[webItem.Key]; skip && webItem.Completed {
+			continue
+		}
+
+		items = append(items, webItem)
+	}
+
+	return items, currentKeys
+}
+
+func (u *Unpackerr) buildWaitingFolderWebItems(
+	items []webStatusItem, currentKeys map[string]struct{}, now time.Time,
+) []webStatusItem {
+	if u.folders == nil {
+		return items
+	}
+
+	for name, folder := range u.folders.Folders {
+		if _, ok := u.Map[name]; ok || folder == nil {
+			continue
+		}
+
+		item := buildWaitingFolderStatusItem(name, folder, now)
+		currentKeys[item.Key] = struct{}{}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func mergeRetainedCompletedWebItems(
+	items []webStatusItem,
+	prev *webStatusSnapshot,
+	currentKeys map[string]struct{},
+	dismissed map[string]struct{},
+	now time.Time,
+) []webStatusItem {
+	if prev == nil {
+		return items
+	}
+
+	retainedKeys := make(map[string]struct{}, len(prev.Items))
+	for _, item := range prev.Items {
+		if !item.Completed {
+			continue
+		}
+		if _, ok := currentKeys[item.Key]; ok {
+			continue
+		}
+		if _, ok := retainedKeys[item.Key]; ok {
+			continue
+		}
+		if _, skip := dismissed[item.Key]; skip {
+			continue
+		}
+
+		item.Elapsed = webStatusElapsed(item.UpdatedAt, now)
+		retainedKeys[item.Key] = struct{}{}
+		items = append(items, item)
+	}
+
+	return items
+}
+
+func sortWebStatusItems(items []webStatusItem) {
+	sort.Slice(items, func(i, j int) bool {
+		left, right := items[i], items[j]
+		if left.Completed != right.Completed {
+			return !left.Completed
+		}
+		if leftRank, rightRank := webStatusRank(left.Status), webStatusRank(right.Status); leftRank != rightRank {
+			return leftRank < rightRank
+		}
+
+		return left.UpdatedAt > right.UpdatedAt
+	})
+}
+
+func (u *Unpackerr) currentWebBuffers() webStatusBuffers {
+	buffers := webStatusBuffers{
+		Deletes:       len(u.delChan),
+		Hooks:         len(u.hookChan),
+		XtractUpdates: len(u.updates),
+	}
+	if u.folders == nil {
+		return buffers
+	}
+
+	buffers.FolderEvents = len(u.folders.Events)
+	buffers.FolderUpdates = len(u.folders.Updates)
+
+	return buffers
+}
+
+func webStatusItemCounts(items []webStatusItem) (int, int) {
+	var activeCount int
+	var completedCount int
+
+	for _, item := range items {
+		if item.Completed {
+			completedCount++
+			continue
+		}
+
+		activeCount++
+	}
+
+	return activeCount, completedCount
 }
 
 func buildWebStatusItem(name string, item *Extract, folder *Folder, now time.Time) webStatusItem {
@@ -261,6 +324,19 @@ func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) we
 
 func buildWebStatusDetails(item *Extract) *webStatusDetails {
 	details := &webStatusDetails{}
+	populateWebStatusIdentityDetails(details, item)
+	if item.Resp != nil {
+		populateWebStatusResponseDetails(details, item.Resp)
+	}
+
+	if webStatusDetailsEmpty(details) {
+		return nil
+	}
+
+	return details
+}
+
+func populateWebStatusIdentityDetails(details *webStatusDetails, item *Extract) {
 	if title, ok := item.IDs["title"]; ok {
 		details.Title = fmt.Sprint(title)
 	}
@@ -268,53 +344,61 @@ func buildWebStatusDetails(item *Extract) *webStatusDetails {
 		details.Title = webStatusDisplayName(item.Path, item)
 	}
 
-	if len(item.IDs) > 0 {
-		details.IDs = make(map[string]string, len(item.IDs))
-		for key, value := range item.IDs {
-			if key == "title" && details.Title != "" {
-				details.IDs[key] = details.Title
-				continue
-			}
-			details.IDs[key] = fmt.Sprint(value)
-		}
+	if len(item.IDs) == 0 {
+		return
 	}
 
-	if item.Resp != nil {
-		if item.Resp.Started.Unix() > 0 {
-			details.StartedAt = item.Resp.Started.Format(time.RFC3339)
+	details.IDs = make(map[string]string, len(item.IDs))
+	for key, value := range item.IDs {
+		if key == "title" && details.Title != "" {
+			details.IDs[key] = details.Title
+			continue
 		}
-		if item.Resp.Output != "" {
-			details.Output = item.Resp.Output
-		}
-		if item.Resp.Size > 0 {
-			details.Bytes = bytefmt.ByteSize(item.Resp.Size) + "B"
-		}
-		if item.Resp.Elapsed > 0 {
-			details.Elapsed = item.Resp.Elapsed.Round(time.Second).String()
-		}
-		details.Queue = item.Resp.Queued
 
-		for _, archiveGroup := range item.Resp.Archives {
-			details.Archives = append(details.Archives, archiveGroup...)
-		}
-		for _, extraGroup := range item.Resp.Extras {
-			details.Archives = append(details.Archives, extraGroup...)
-		}
-		for _, file := range item.Resp.NewFiles {
-			if webStatusShouldHideFile(file) {
-				continue
-			}
-			details.Files = append(details.Files, file)
-		}
+		details.IDs[key] = fmt.Sprint(value)
 	}
+}
 
-	if details.Title == "" && details.Bytes == "" && details.Elapsed == "" && details.Output == "" &&
-		details.StartedAt == "" && details.Queue == 0 && len(details.Archives) == 0 &&
-		len(details.Files) == 0 && len(details.IDs) == 0 {
-		return nil
+func populateWebStatusResponseDetails(details *webStatusDetails, response *xtractr.Response) {
+	if response.Started.Unix() > 0 {
+		details.StartedAt = response.Started.Format(time.RFC3339)
 	}
+	if response.Output != "" {
+		details.Output = response.Output
+	}
+	if response.Size > 0 {
+		details.Bytes = bytefmt.ByteSize(response.Size) + "B"
+	}
+	if response.Elapsed > 0 {
+		details.Elapsed = response.Elapsed.Round(time.Second).String()
+	}
+	details.Queue = response.Queued
 
-	return details
+	for _, archiveGroup := range response.Archives {
+		details.Archives = append(details.Archives, archiveGroup...)
+	}
+	for _, extraGroup := range response.Extras {
+		details.Archives = append(details.Archives, extraGroup...)
+	}
+	for _, file := range response.NewFiles {
+		if webStatusShouldHideFile(file) {
+			continue
+		}
+
+		details.Files = append(details.Files, file)
+	}
+}
+
+func webStatusDetailsEmpty(details *webStatusDetails) bool {
+	return details.Title == "" &&
+		details.Bytes == "" &&
+		details.Elapsed == "" &&
+		details.Output == "" &&
+		details.StartedAt == "" &&
+		details.Queue == 0 &&
+		len(details.Archives) == 0 &&
+		len(details.Files) == 0 &&
+		len(details.IDs) == 0
 }
 
 func webStatusDisplayName(name string, item *Extract) string {
@@ -412,7 +496,7 @@ func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
 		archive = strings.TrimLeft(strings.TrimPrefix(progress.XFile.FilePath, basePath), `/\`)
 	}
 
-	summary := "no progress yet"
+	summary := noProgressText
 	if progress.XFile != nil && progress.Extract != nil {
 		summary = progress.String()
 	} else if progress.XFile != nil {
@@ -435,23 +519,23 @@ func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
 func webStatusRank(status string) int {
 	switch status {
 	case EXTRACTING.String():
-		return 0
+		return webStatusRankExtracting
 	case QUEUED.String():
-		return 1
+		return webStatusRankQueued
 	case WAITING.String():
-		return 2
+		return webStatusRankWaiting
 	case EXTRACTFAILED.String():
-		return 3
+		return webStatusRankFailed
 	case EXTRACTED.String():
-		return 4
+		return webStatusRankExtracted
 	case IMPORTED.String():
-		return 5
+		return webStatusRankImported
 	case DELETED.String(), DELETING.String():
-		return 6
+		return webStatusRankDeleted
 	case EXTRACTEDNOTHING.String():
-		return 7
+		return webStatusRankExtractedNothing
 	default:
-		return 8
+		return webStatusRankDefault
 	}
 }
 
@@ -552,27 +636,30 @@ func addStatusCount(stats *Stats, status ExtractStatus) {
 	}
 }
 
-func (u *Unpackerr) webIndex(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = statusTemplate.Execute(w, nil)
+func (u *Unpackerr) webIndex(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if err := statusPageTemplate().Execute(writer, nil); err != nil {
+		u.Errorf("rendering web status page: %v", err)
+	}
 }
 
-func (u *Unpackerr) webStatusAPI(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+func (u *Unpackerr) webStatusAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	snapshot := u.webState.Load()
 	if snapshot == nil {
 		snapshot = &webStatusSnapshot{Stats: &Stats{}}
 	}
 
-	_ = json.NewEncoder(w).Encode(snapshot)
+	encodeWebStatusJSON(writer, snapshot, u.Errorf)
 }
 
-func (u *Unpackerr) webClearCompletedAPI(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+func (u *Unpackerr) webClearCompletedAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	snapshot := u.webState.Load()
 	if snapshot == nil {
@@ -596,16 +683,30 @@ func (u *Unpackerr) webClearCompletedAPI(w http.ResponseWriter, _ *http.Request,
 	}
 
 	u.webState.Store(&next)
-	_ = json.NewEncoder(w).Encode(&next)
+	encodeWebStatusJSON(writer, &next, u.Errorf)
 }
 
-var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
-<html lang="en">
-<head>
+func encodeWebStatusJSON(writer http.ResponseWriter, payload any, logFunc func(string, ...any)) {
+	if err := json.NewEncoder(writer).Encode(payload); err != nil {
+		logFunc("encoding web status payload: %v", err)
+	}
+}
+
+func statusPageTemplate() *template.Template {
+	return template.Must(template.New("status").Parse(statusPageHTML))
+}
+
+const statusPageHTML = `<!doctype html>
+	<html lang="en">
+	<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unpackerr Status</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23000'/%3E%3Cpath d='M18 21h28l-4 22H22z' fill='%23121518' stroke='%23ffb04a' stroke-width='3'/%3E%3Cpath d='M24 16h16l6 7H18z' fill='%23ff8647'/%3E%3Cpath d='M32 27v12' stroke='%237ed7ff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='m26 34 6 6 6-6' fill='none' stroke='%237ed7ff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link
+    rel="icon"
+    type="image/png"
+    href="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/unpackerr.png"
+  >
   <style>
     :root {
       color-scheme: dark;
@@ -1120,11 +1221,27 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	        <div class="hero-copy">
 	          <div class="title-row">
 	            <h1>Unpackerr Status</h1>
-	            <a class="repo-link" href="https://github.com/TheBadFella/UnpackUI" target="_blank" rel="noreferrer" aria-label="Open the UnpackUI repository on GitHub">
-	              <svg viewBox="0 0 16 16" aria-hidden="true">
-	                <path d="M8 0C3.58 0 0 3.73 0 8.33c0 3.68 2.29 6.8 5.47 7.9.4.08.55-.18.55-.4 0-.2-.01-.86-.01-1.56-2.01.45-2.53-.51-2.69-.98-.09-.25-.48-.99-.82-1.19-.28-.16-.68-.57-.01-.58.63-.01 1.08.6 1.23.85.72 1.28 1.87.92 2.33.7.07-.54.28-.92.51-1.13-1.78-.21-3.64-.92-3.64-4.08 0-.9.31-1.64.82-2.22-.08-.21-.36-1.06.08-2.21 0 0 .67-.22 2.2.85a7.3 7.3 0 0 1 4 0c1.53-1.08 2.2-.85 2.2-.85.44 1.15.16 2 .08 2.21.51.58.82 1.31.82 2.22 0 3.17-1.87 3.87-3.65 4.08.29.26.54.76.54 1.53 0 1.11-.01 2-.01 2.28 0 .22.14.49.55.4A8.34 8.34 0 0 0 16 8.33C16 3.73 12.42 0 8 0Z"/>
-	              </svg>
-	            </a>
+		            <a
+		              class="repo-link"
+		              href="https://github.com/TheBadFella/UnpackUI"
+		              target="_blank"
+		              rel="noreferrer"
+		              aria-label="Open the UnpackUI repository on GitHub"
+		            >
+		              <svg viewBox="0 0 16 16" aria-hidden="true">
+		                <path
+		                  d="M8 0C3.58 0 0 3.73 0 8.33c0 3.68 2.29 6.8 5.47 7.9
+		                  .4.08.55-.18.55-.4 0-.2-.01-.86-.01-1.56-2.01.45-2.53-.51-2.69-.98
+		                  -.09-.25-.48-.99-.82-1.19-.28-.16-.68-.57-.01-.58.63-.01 1.08.6
+		                  1.23.85.72 1.28 1.87.92 2.33.7.07-.54.28-.92.51-1.13
+		                  -1.78-.21-3.64-.92-3.64-4.08 0-.9.31-1.64.82-2.22-.08-.21-.36-1.06
+		                  .08-2.21 0 0 .67-.22 2.2.85a7.3 7.3 0 0 1 4 0c1.53-1.08 2.2-.85
+		                  2.2-.85.44 1.15.16 2 .08 2.21.51.58.82 1.31.82 2.22 0 3.17-1.87 3.87
+		                  -3.65 4.08.29.26.54.76.54 1.53 0 1.11-.01 2-.01 2.28 0 .22.14.49.55.4
+		                  A8.34 8.34 0 0 0 16 8.33C16 3.73 12.42 0 8 0Z"
+		                />
+		              </svg>
+		            </a>
 	          </div>
 	          <div class="subtle">Live extraction progress.</div>
 	        </div>
@@ -1258,18 +1375,27 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      )).join('');
 	    }
 
-	    function renderMeta(data) {
-	      const counters = data.counters ?? {};
-	      const buffers = data.buffers ?? {};
-	      metaRail.innerHTML = [
-	        ['Uptime', escapeHtml(data.uptime ?? '0s')],
-	        ['Finished', counters.finished ?? 0],
-	        ['Retries', counters.retries ?? 0],
-	        ['Webhooks', (counters.hookOK ?? 0) + ' ok / ' + (counters.hookFail ?? 0) + ' failed'],
-	        ['Cmdhooks', (counters.cmdOK ?? 0) + ' ok / ' + (counters.cmdFail ?? 0) + ' failed'],
-	        ['Buffers', 'fs ' + (buffers.folderEvents ?? 0) + ', updates ' + ((buffers.xtractUpdates ?? 0) + (buffers.folderUpdates ?? 0)) + ', hooks ' + (buffers.hooks ?? 0) + ', deletes ' + (buffers.deletes ?? 0)]
-	      ].map(([label, value]) => '<span class="pill"><strong>' + escapeHtml(label) + '</strong>' + escapeHtml(value) + '</span>').join('');
-	    }
+		    function renderMeta(data) {
+		      const counters = data.counters ?? {};
+		      const buffers = data.buffers ?? {};
+		      const bufferSummary =
+		        'fs ' + (buffers.folderEvents ?? 0) +
+		        ', updates ' + ((buffers.xtractUpdates ?? 0) + (buffers.folderUpdates ?? 0)) +
+		        ', hooks ' + (buffers.hooks ?? 0) +
+		        ', deletes ' + (buffers.deletes ?? 0);
+		      const metaItems = [
+		        ['Uptime', escapeHtml(data.uptime ?? '0s')],
+		        ['Finished', counters.finished ?? 0],
+		        ['Retries', counters.retries ?? 0],
+		        ['Webhooks', (counters.hookOK ?? 0) + ' ok / ' + (counters.hookFail ?? 0) + ' failed'],
+		        ['Cmdhooks', (counters.cmdOK ?? 0) + ' ok / ' + (counters.cmdFail ?? 0) + ' failed'],
+		        ['Buffers', bufferSummary]
+		      ];
+		      metaRail.innerHTML = metaItems.map(([label, value]) => (
+		        '<span class="pill"><strong>' + escapeHtml(label) + '</strong>' +
+		          escapeHtml(value) + '</span>'
+		      )).join('');
+		    }
 
 	    function renderDetailField(label, value, monospace) {
 	      return '<div class="detail-field">' +
@@ -1278,14 +1404,19 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      '</div>';
 	    }
 
-	    function renderDetailList(title, values, monospace) {
-	      return '<div class="detail-list">' +
-	        '<strong>' + escapeHtml(title) + '</strong>' +
-	        '<ul>' +
-	          values.map((value) => '<li>' + (monospace ? '<code>' + escapeHtml(value) + '</code>' : escapeHtml(value)) + '</li>').join('') +
-	        '</ul>' +
-	      '</div>';
-	    }
+		    function renderDetailList(title, values, monospace) {
+		      const renderedValues = values.map((value) => {
+		        const content = monospace ? '<code>' + escapeHtml(value) + '</code>' : escapeHtml(value);
+		        return '<li>' + content + '</li>';
+		      }).join('');
+
+		      return '<div class="detail-list">' +
+		        '<strong>' + escapeHtml(title) + '</strong>' +
+		        '<ul>' +
+		          renderedValues +
+		        '</ul>' +
+		      '</div>';
+		    }
 
 	    function renderTaskDetails(item) {
 	      if (!item) {
@@ -1309,18 +1440,29 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      if (progress && progress.summary) fields.push(renderDetailField('Progress', progress.summary, false));
 	      if (details.bytes) fields.push(renderDetailField('Bytes written', details.bytes, false));
 	      if (details.elapsed) fields.push(renderDetailField('Extract elapsed', details.elapsed, false));
-	      if (details.startedAt) fields.push(renderDetailField('Extract started', new Date(details.startedAt).toLocaleString(), false));
-	      if (item.deleteAt) {
-	        fields.push(
-	          '<div class="detail-field">' +
-	            '<div class="label">Deletes in</div>' +
-	            '<div class="value" data-delete-at="' + escapeHtml(item.deleteAt) + '" data-empty="due now">' + escapeHtml(item.deleteIn || '') + '</div>' +
-	          '</div>'
-	        );
-	      } else if (item.deleteIn) {
-	        fields.push(renderDetailField('Deletes in', item.deleteIn, false));
-	      }
-	      if (item.deleteAt) fields.push(renderDetailField('Deletes at', new Date(item.deleteAt).toLocaleString(), false));
+		      if (details.startedAt) {
+		        fields.push(
+		          renderDetailField(
+		            'Extract started',
+		            new Date(details.startedAt).toLocaleString(),
+		            false
+		          )
+		        );
+		      }
+		      if (item.deleteAt) {
+		        fields.push(
+		          '<div class="detail-field">' +
+		            '<div class="label">Deletes in</div>' +
+		            '<div class="value" data-delete-at="' + escapeHtml(item.deleteAt) +
+		              '" data-empty="due now">' + escapeHtml(item.deleteIn || '') + '</div>' +
+		          '</div>'
+		        );
+		      } else if (item.deleteIn) {
+		        fields.push(renderDetailField('Deletes in', item.deleteIn, false));
+		      }
+		      if (item.deleteAt) {
+		        fields.push(renderDetailField('Deletes at', new Date(item.deleteAt).toLocaleString(), false));
+		      }
 	      if (details.output) fields.push(renderDetailField('Temp folder', details.output, true));
 	      if (details.queue) fields.push(renderDetailField('Queue at start', details.queue, false));
 	      if (item.reason) fields.push(renderDetailField('Reason', item.reason, false));
@@ -1362,55 +1504,99 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	        '<th>Path</th>'
 	      ].join('');
 
-	      if (!items.length) {
-	        itemsBody.innerHTML = '<tr><td colspan="' + (showDeleteIn ? '6' : '5') + '" class="empty">Nothing is queued or being tracked right now.</td></tr>';
-	        detailCard.hidden = true;
-	        return;
-	      }
+		      if (!items.length) {
+		        itemsBody.innerHTML =
+		          '<tr><td colspan="' + (showDeleteIn ? '6' : '5') +
+		          '" class="empty">Nothing is queued or being tracked right now.</td></tr>';
+		        detailCard.hidden = true;
+		        return;
+		      }
 
-	      itemsBody.innerHTML = items.map((item) => {
-	        const progress = item.progress;
-	        const progressHtml = progress ? (
-	          '<div class="progress">' +
-	            '<div><strong>' + escapeHtml((progress.percent || 0).toFixed(0)) + '%</strong> / ' + escapeHtml(progress.archiveIndex || 1) + ' of ' + escapeHtml(progress.archiveCount || 1) + ' archive' + ((progress.archiveCount || 1) === 1 ? '' : 's') + '</div>' +
-	            '<div class="progress-bar"><span style="width:' + Math.max(0, Math.min(100, progress.percent || 0)) + '%"></span></div>' +
-	            '<div class="muted">' + escapeHtml((progress.percent || 0).toFixed(0)) + '% - ' + escapeHtml(progress.writtenBytes || '0B') + ' / ' + escapeHtml(progress.totalBytes || '0B') + '</div>' +
-	            (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
-	          '</div>'
-	        ) : '<span class="muted">' + (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') + '</span>';
+		      itemsBody.innerHTML = items.map((item) => {
+		        const notes = renderItemNotes(item);
+		        const progressHtml = renderProgress(item);
+		        const deleteInHtml = renderDeleteInCell(item, showDeleteIn);
+		        const rowClass = selectedItemId === item.id ? ' is-selected' : '';
+		        const rowId = escapeHtml(item.id);
+		        const statusClass = escapeHtml(item.status);
+		        const statusText = escapeHtml(item.statusText);
 
-		        const notes = [
-		          item.reason ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>' : '',
-		          item.error ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>' : '',
-		          item.completed ? '<div class="muted">Retained until cleared</div>' : ''
-		        ].join('');
-		        const deleteInHtml = showDeleteIn
-		          ? '<td>' + (item.deleteAt
-		            ? '<div data-delete-at="' + escapeHtml(item.deleteAt) + '" data-empty="-">' + escapeHtml(item.deleteIn || '-') + '</div>'
-		            : item.deleteIn
-		              ? '<div>' + escapeHtml(item.deleteIn) + '</div>'
-		              : '<span class="muted">-</span>') + '</td>'
-		          : '';
-
-		        return (
-		          '<tr class="items-row' + (selectedItemId === item.id ? ' is-selected' : '') + '" data-item-id="' + escapeHtml(item.id) + '">' +
-		            '<td>' +
-		              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
-	              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
-	              notes +
-		            '</td>' +
-		            '<td><span class="status ' + escapeHtml(item.status) + '">' + escapeHtml(item.statusText) + '</span></td>' +
-		            '<td>' + progressHtml + '</td>' +
-		            deleteInHtml +
+			        return (
+			          '<tr class="items-row' + rowClass + '" data-item-id="' + rowId + '">' +
+			            '<td>' +
+			              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
+		              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
+		              notes +
+			            '</td>' +
+			            '<td><span class="status ' + statusClass + '">' + statusText + '</span></td>' +
+			            '<td>' + progressHtml + '</td>' +
+			            deleteInHtml +
 		            '<td>' +
 		              '<div>' + escapeHtml(item.elapsed) + '</div>' +
 		              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
 		            '</td>' +
 	            '<td><div class="path">' + escapeHtml(item.path) + '</div></td>' +
 	          '</tr>'
-	        );
-	      }).join('');
-	    }
+		        );
+		      }).join('');
+		    }
+
+		    function renderProgress(item) {
+		      const progress = item.progress;
+		      if (!progress) {
+		        return '<span class="muted">' +
+		          (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') +
+		          '</span>';
+		      }
+
+		      const percentText = escapeHtml((progress.percent || 0).toFixed(0));
+		      const archiveIndex = escapeHtml(progress.archiveIndex || 1);
+		      const archiveCount = progress.archiveCount || 1;
+		      const archiveCountText = escapeHtml(archiveCount);
+		      const archiveLabel = archiveCount === 1 ? 'archive' : 'archives';
+		      const width = Math.max(0, Math.min(100, progress.percent || 0));
+		      const byteSummary =
+		        percentText + '% - ' +
+		        escapeHtml(progress.writtenBytes || '0B') + ' / ' +
+		        escapeHtml(progress.totalBytes || '0B');
+
+		      return '<div class="progress">' +
+		        '<div><strong>' + percentText + '%</strong> / ' + archiveIndex +
+		          ' of ' + archiveCountText + ' ' + archiveLabel + '</div>' +
+		        '<div class="progress-bar"><span style="width:' + width + '%"></span></div>' +
+		        '<div class="muted">' + byteSummary + '</div>' +
+		        (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
+		      '</div>';
+		    }
+
+		    function renderItemNotes(item) {
+		      return [
+		        item.reason
+		          ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>'
+		          : '',
+		        item.error
+		          ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>'
+		          : '',
+		        item.completed ? '<div class="muted">Retained until cleared</div>' : ''
+		      ].join('');
+		    }
+
+		    function renderDeleteInCell(item, showDeleteIn) {
+		      if (!showDeleteIn) {
+		        return '';
+		      }
+
+		      if (item.deleteAt) {
+		        return '<td><div data-delete-at="' + escapeHtml(item.deleteAt) +
+		          '" data-empty="-">' + escapeHtml(item.deleteIn || '-') + '</div></td>';
+		      }
+
+		      if (item.deleteIn) {
+		        return '<td><div>' + escapeHtml(item.deleteIn) + '</div></td>';
+		      }
+
+		      return '<td><span class="muted">-</span></td>';
+		    }
 
 	    function renderSnapshot(data) {
 	      lastSnapshot = data ?? { items: [] };
@@ -1487,4 +1673,4 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	    setInterval(refresh, 2000);
 	  </script>
 </body>
-</html>`))
+</html>`
