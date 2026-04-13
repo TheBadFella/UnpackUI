@@ -78,8 +78,10 @@ func (u *Unpackerr) startWebServer() {
 
 	// Make a multiplexer because websockets can't use apache log.
 	smx := http.NewServeMux()
-	smx.Handle(path.Join(u.Webserver.URLBase, "ws"), u.fixForwardedFor(u.Webserver.router))
-	smx.Handle("/", u.fixForwardedFor(apache.Wrap(u.Webserver.router, u.Logger.HTTP.Writer())))
+	wsHandler := u.fixForwardedFor(u.Webserver.router)
+	accessLogHandler := u.fixForwardedFor(apache.Wrap(u.Webserver.router, u.Logger.HTTP.Writer()))
+	smx.Handle(path.Join(u.Webserver.URLBase, "ws"), wsHandler)
+	smx.Handle("/", u.skipWebAccessLog(accessLogHandler, wsHandler))
 	u.webRoutes()
 
 	u.Webserver.server = &http.Server{
@@ -135,6 +137,20 @@ func (u *Unpackerr) runWebServer() {
 
 func Index(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 	fmt.Fprint(w, "Welcome!\n")
+}
+
+// skipWebAccessLog suppresses noisy UI polling from the access log while still serving the route.
+func (u *Unpackerr) skipWebAccessLog(withAccessLog, withoutAccessLog http.Handler) http.Handler {
+	statusPath := path.Join(u.Webserver.URLBase, "/api/status")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == statusPath {
+			withoutAccessLog.ServeHTTP(w, r)
+			return
+		}
+
+		withAccessLog.ServeHTTP(w, r)
+	})
 }
 
 // fixForwardedFor sets the X-Forwarded-For header to the client IP

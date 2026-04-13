@@ -1,4 +1,10 @@
-<img style="max-width:840px;" src="https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/unpackerr-logo-text.png">
+> [!IMPORTANT]
+> This fork is maintained for personal use only and is not an official Unpackerr release.
+
+> [!NOTE]
+> UnpackUI primarily adds a lightweight UI for monitoring extraction status, while keeping Unpackerr's core behavior intact aside from a few targeted fixes and quality-of-life improvements.
+
+<img width="128" height="128" alt="UnpackUI" src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/unpackerr.png">
 
 ## About
 

@@ -180,6 +180,70 @@ func TestBuildWebStateIncludesDeleteCountdownForImportedItems(t *testing.T) {
 	}
 }
 
+func TestBuildWebStateDoesNotDuplicateCompletedItemsAcrossRefreshes(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 21, 53, 46, 0, time.UTC)
+	u := New()
+	u.folders = &Folders{
+		Folders: map[string]*Folder{
+			"/downloads/sample-large-zip-file.zip": {
+				updated: now,
+				status:  EXTRACTED,
+				config: &FolderConfig{
+					DeleteAfter: &cnfg.Duration{Duration: 5 * time.Minute},
+				},
+			},
+		},
+	}
+	u.Map["/downloads/sample-large-zip-file.zip"] = &Extract{
+		App:     FolderString,
+		Path:    "/downloads/sample-large-zip-file.zip",
+		Status:  EXTRACTED,
+		Updated: now,
+		IDs:     map[string]any{"title": "/downloads/sample-large-zip-file.zip"},
+	}
+
+	u.refreshWebState(now.Add(5 * time.Second))
+	snapshot := u.buildWebState(now.Add(10 * time.Second))
+
+	if len(snapshot.Items) != 1 {
+		t.Fatalf("expected exactly one completed item after repeated refreshes, got %d", len(snapshot.Items))
+	}
+
+	if snapshot.CompletedCount != 1 {
+		t.Fatalf("expected one completed item, got %d", snapshot.CompletedCount)
+	}
+}
+
+func TestBuildWebStateReplacesCompletedItemWhenStatusChanges(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 21, 53, 46, 0, time.UTC)
+	u := New()
+	path := "/downloads/sample-large-zip-file.zip"
+	u.Map[path] = &Extract{
+		App:     FolderString,
+		Path:    path,
+		Status:  EXTRACTED,
+		Updated: now,
+		IDs:     map[string]any{"title": path},
+	}
+
+	u.refreshWebState(now)
+	u.Map[path].Status = DELETED
+	u.Map[path].Updated = now.Add(time.Minute)
+
+	snapshot := u.buildWebState(now.Add(65 * time.Second))
+	if len(snapshot.Items) != 1 {
+		t.Fatalf("expected one logical item after status change, got %d", len(snapshot.Items))
+	}
+
+	if snapshot.Items[0].Status != DELETED.String() {
+		t.Fatalf("expected retained item status to update to deleted, got %q", snapshot.Items[0].Status)
+	}
+}
+
 func TestWebStatusAPI(t *testing.T) {
 	t.Parallel()
 
