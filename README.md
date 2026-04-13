@@ -41,6 +41,15 @@ documentation support. This project succeeds because of them. Thank you!
 
 Yes, please. Just make a pull request and lets chat about it in the PR or on Discord.
 
+## Local Testing
+
+For quick local testing on Windows with the local UI config:
+
+```powershell
+& 'C:\Program Files\Go\bin\go.exe' build -o unpackerr.exe .
+.\unpackerr.exe -c .\unpackerr.local.conf
+```
+
 ## License
 
 [MIT](https://unpackerr.zip/docs/unpackerr/license)
