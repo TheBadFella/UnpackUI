@@ -1000,7 +1000,7 @@ const statusPageHTML = `<!doctype html>
 	      overflow-x: auto;
 	      padding: 0 18px 18px;
 	    }
-    table {
+	    table {
       width: 100%;
       border-collapse: collapse;
       min-width: 760px;
@@ -1086,11 +1086,11 @@ const statusPageHTML = `<!doctype html>
       word-break: break-all;
       line-height: 1.55;
     }
-    .progress {
-      display: grid;
-      gap: 10px;
-      min-width: 220px;
-    }
+	    .progress {
+	      display: grid;
+	      gap: 10px;
+	      min-width: 220px;
+	    }
     .progress-bar {
       position: relative;
       width: 100%;
@@ -1185,20 +1185,91 @@ const statusPageHTML = `<!doctype html>
         transform: translateX(120%);
       }
     }
-	    @media (max-width: 720px) {
-	      .shell {
-	        padding: 24px 16px 48px;
+		    @media (max-width: 720px) {
+		      .shell {
+		        padding: 24px 16px 48px;
+		      }
+	      .headline-actions {
+	        justify-content: flex-start;
 	      }
-      .headline-actions {
-        justify-content: flex-start;
-      }
-      .table-head {
-        display: grid;
-      }
-	      .hero {
-	        padding: 22px;
+	      .table-head {
+	        display: grid;
 	      }
-	    }
+	      .table-wrap {
+	        overflow-x: visible;
+	        padding: 0 14px 14px;
+	      }
+	      table {
+	        min-width: 0;
+	      }
+	      thead {
+	        display: none;
+	      }
+	      #items {
+	        display: grid;
+	        gap: 14px;
+	      }
+	      .items-row,
+	      .empty-row {
+	        display: block;
+	      }
+	      .items-row {
+	        border: 1px solid var(--border);
+	        border-radius: 24px;
+	        background:
+	          linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+	          linear-gradient(135deg, rgba(255, 176, 74, 0.08), transparent 55%);
+	        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+	        overflow: hidden;
+	      }
+	      .items-row td {
+	        display: grid;
+	        gap: 8px;
+	        padding: 15px 16px 16px;
+	        border-top: 1px solid var(--border);
+	        background: transparent;
+	      }
+	      .items-row td:first-child {
+	        border-top: 0;
+	        padding-top: 18px;
+	      }
+	      .items-row td::before {
+	        content: attr(data-label);
+	        color: var(--muted);
+	        font-size: 0.72rem;
+	        font-weight: 700;
+	        letter-spacing: 0.1em;
+	        line-height: 1.2;
+	        text-transform: uppercase;
+	      }
+	      .items-row td:first-child::before {
+	        color: var(--heading);
+	      }
+	      .items-row.is-selected {
+	        border-color: rgba(255, 176, 74, 0.4);
+	        box-shadow:
+	          0 0 0 1px rgba(255, 176, 74, 0.16),
+	          inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	      }
+	      .items-row:hover td,
+	      .items-row.is-selected td {
+	        background: transparent;
+	      }
+	      .progress {
+	        min-width: 0;
+	      }
+	      .empty-row td {
+	        display: block;
+	        border-top: 0;
+	        padding: 34px 18px 38px;
+	      }
+	      .empty-row td::before {
+	        content: none;
+	      }
+		      .hero {
+		        padding: 22px;
+		      }
+		    }
 	    @media (min-width: 760px) {
 	      .rail {
 	        grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1397,12 +1468,18 @@ const statusPageHTML = `<!doctype html>
 		      )).join('');
 		    }
 
-	    function renderDetailField(label, value, monospace) {
-	      return '<div class="detail-field">' +
-	        '<div class="label">' + escapeHtml(label) + '</div>' +
-	        '<div class="value' + (monospace ? ' path' : '') + '">' + escapeHtml(value) + '</div>' +
-	      '</div>';
-	    }
+		    function renderDetailField(label, value, monospace) {
+		      return '<div class="detail-field">' +
+		        '<div class="label">' + escapeHtml(label) + '</div>' +
+		        '<div class="value' + (monospace ? ' path' : '') + '">' + escapeHtml(value) + '</div>' +
+		      '</div>';
+		    }
+
+		    function renderItemCell(label, content, className) {
+		      return '<td data-label="' + escapeHtml(label) + '"' +
+		        (className ? ' class="' + className + '"' : '') +
+		        '>' + content + '</td>';
+		    }
 
 		    function renderDetailList(title, values, monospace) {
 		      const renderedValues = values.map((value) => {
@@ -1504,13 +1581,13 @@ const statusPageHTML = `<!doctype html>
 	        '<th>Path</th>'
 	      ].join('');
 
-		      if (!items.length) {
-		        itemsBody.innerHTML =
-		          '<tr><td colspan="' + (showDeleteIn ? '6' : '5') +
-		          '" class="empty">Nothing is queued or being tracked right now.</td></tr>';
-		        detailCard.hidden = true;
-		        return;
-		      }
+			      if (!items.length) {
+			        itemsBody.innerHTML =
+			          '<tr class="empty-row"><td colspan="' + (showDeleteIn ? '6' : '5') +
+			          '" class="empty">Nothing is queued or being tracked right now.</td></tr>';
+			        detailCard.hidden = true;
+			        return;
+			      }
 
 		      itemsBody.innerHTML = items.map((item) => {
 		        const notes = renderItemNotes(item);
@@ -1521,25 +1598,32 @@ const statusPageHTML = `<!doctype html>
 		        const statusClass = escapeHtml(item.status);
 		        const statusText = escapeHtml(item.statusText);
 
-			        return (
-			          '<tr class="items-row' + rowClass + '" data-item-id="' + rowId + '">' +
-			            '<td>' +
-			              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
-		              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
-		              notes +
-			            '</td>' +
-			            '<td><span class="status ' + statusClass + '">' + statusText + '</span></td>' +
-			            '<td>' + progressHtml + '</td>' +
-			            deleteInHtml +
-		            '<td>' +
-		              '<div>' + escapeHtml(item.elapsed) + '</div>' +
-		              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
-		            '</td>' +
-	            '<td><div class="path">' + escapeHtml(item.path) + '</div></td>' +
-	          '</tr>'
-		        );
-		      }).join('');
-		    }
+				        return (
+				          '<tr class="items-row' + rowClass + '" data-item-id="' + rowId + '">' +
+				            renderItemCell('Item', '' +
+				              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
+			              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
+			              notes, 'items-cell items-cell-item') +
+				            renderItemCell(
+				              'Status',
+				              '<span class="status ' + statusClass + '">' + statusText + '</span>',
+				              'items-cell items-cell-status'
+				            ) +
+				            renderItemCell('Progress', progressHtml, 'items-cell items-cell-progress') +
+				            deleteInHtml +
+			            renderItemCell('Updated', '' +
+			              '<div>' + escapeHtml(item.elapsed) + '</div>' +
+			              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
+			            '', 'items-cell items-cell-updated') +
+		            renderItemCell(
+		              'Path',
+		              '<div class="path">' + escapeHtml(item.path) + '</div>',
+		              'items-cell items-cell-path'
+		            ) +
+		          '</tr>'
+			        );
+			      }).join('');
+			    }
 
 		    function renderProgress(item) {
 		      const progress = item.progress;
@@ -1581,22 +1665,34 @@ const statusPageHTML = `<!doctype html>
 		      ].join('');
 		    }
 
-		    function renderDeleteInCell(item, showDeleteIn) {
-		      if (!showDeleteIn) {
-		        return '';
-		      }
+			    function renderDeleteInCell(item, showDeleteIn) {
+			      if (!showDeleteIn) {
+			        return '';
+			      }
 
-		      if (item.deleteAt) {
-		        return '<td><div data-delete-at="' + escapeHtml(item.deleteAt) +
-		          '" data-empty="-">' + escapeHtml(item.deleteIn || '-') + '</div></td>';
-		      }
+			      if (item.deleteAt) {
+			        return renderItemCell(
+			          'Deletes In',
+			          '<div data-delete-at="' + escapeHtml(item.deleteAt) +
+			            '" data-empty="-">' + escapeHtml(item.deleteIn || '-') + '</div>',
+			          'items-cell items-cell-delete'
+			        );
+			      }
 
-		      if (item.deleteIn) {
-		        return '<td><div>' + escapeHtml(item.deleteIn) + '</div></td>';
-		      }
+			      if (item.deleteIn) {
+			        return renderItemCell(
+			          'Deletes In',
+			          '<div>' + escapeHtml(item.deleteIn) + '</div>',
+			          'items-cell items-cell-delete'
+			        );
+			      }
 
-		      return '<td><span class="muted">-</span></td>';
-		    }
+			      return renderItemCell(
+			        'Deletes In',
+			        '<span class="muted">-</span>',
+			        'items-cell items-cell-delete'
+			      );
+			    }
 
 	    function renderSnapshot(data) {
 	      lastSnapshot = data ?? { items: [] };
