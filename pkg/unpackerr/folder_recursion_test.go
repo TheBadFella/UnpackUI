@@ -76,6 +76,73 @@ func TestFolderExcludeSuffixesArchiveExcludesAllWhenDisableRecursion(t *testing.
 	}
 }
 
+func TestFolderDerivedOutputPathRemovesArchiveExtension(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"/downloads/movie.zip":         "/downloads/movie",
+		"/downloads/album.7z.001":      "/downloads/album",
+		"/downloads/archive.part1.rar": "/downloads/archive.part1",
+		"/downloads/plain-folder":      "",
+	}
+
+	for input, want := range cases {
+		expected := want
+		if expected != "" {
+			expected = filepath.Clean(expected)
+		}
+		if got := folderDerivedOutputPath(input); got != expected {
+			t.Fatalf("folderDerivedOutputPath(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestProcessEventIgnoresGeneratedExtractOutput(t *testing.T) {
+	t.Parallel()
+
+	watchDir := t.TempDir()
+	archivePath := filepath.Join(watchDir, "sample-large-zip-file.zip")
+	outputDir := filepath.Join(watchDir, "sample-large-zip-file")
+	now := time.Now()
+	u := New()
+	u.folders = &Folders{
+		Logs:    u.Logger,
+		Folders: make(map[string]*Folder),
+		Outputs: map[string]string{outputDir: archivePath},
+	}
+	u.Map[archivePath] = &Extract{
+		App:     FolderString,
+		Path:    archivePath,
+		Status:  EXTRACTING,
+		Updated: now,
+		IDs:     map[string]any{"title": archivePath},
+	}
+
+	if err := os.Mkdir(outputDir, 0o755); err != nil {
+		t.Fatalf("creating extracted output folder: %v", err)
+	}
+
+	u.processEvent(&eventData{
+		cnfg: &FolderConfig{Path: watchDir},
+		name: filepath.Base(outputDir),
+		file: outputDir,
+		op:   "f CREATE",
+	}, now)
+
+	if len(u.folders.Folders) != 0 {
+		t.Fatalf("expected generated output folder to be ignored, tracked %d items", len(u.folders.Folders))
+	}
+
+	delete(u.Map, archivePath)
+
+	if u.folders.shouldIgnoreExtractOutput(outputDir, u.Map) {
+		t.Fatal("expected output suppression to clear when the source archive is no longer tracked")
+	}
+	if len(u.folders.Outputs) != 0 {
+		t.Fatalf("expected stale output suppression to be removed, found %d entries", len(u.folders.Outputs))
+	}
+}
+
 func runExtraction(t *testing.T, archivePath string, disableRecursion bool) *xtractr.Response {
 	t.Helper()
 
