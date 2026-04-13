@@ -102,3 +102,71 @@ func TestWebStatusAPI(t *testing.T) {
 		t.Fatal("expected stats in payload")
 	}
 }
+
+func TestBuildWebStateKeepsCompletedItemsAfterRemoval(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
+	u := New()
+	u.Map["Example.Release"] = &Extract{
+		App:     FolderString,
+		Path:    "/downloads/Example.Release",
+		Status:  DELETED,
+		Updated: now,
+		IDs:     map[string]any{"title": "Example Release"},
+	}
+
+	u.refreshWebState(now)
+	delete(u.Map, "Example.Release")
+
+	snapshot := u.buildWebState(now.Add(45 * time.Second))
+	if len(snapshot.Items) != 1 {
+		t.Fatalf("expected completed item to remain in snapshot, got %d items", len(snapshot.Items))
+	}
+
+	if !snapshot.Items[0].Completed {
+		t.Fatal("expected persisted item to be marked completed")
+	}
+
+	if snapshot.CompletedCount != 1 || snapshot.ActiveCount != 0 {
+		t.Fatalf("unexpected counts: active=%d completed=%d", snapshot.ActiveCount, snapshot.CompletedCount)
+	}
+}
+
+func TestWebClearCompletedAPI(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
+	u := New()
+	u.Map["Example.Release"] = &Extract{
+		App:     FolderString,
+		Path:    "/downloads/Example.Release",
+		Status:  DELETED,
+		Updated: now,
+		IDs:     map[string]any{"title": "Example Release"},
+	}
+	u.refreshWebState(now)
+	delete(u.Map, "Example.Release")
+	u.refreshWebState(now.Add(time.Minute))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/status/clear-completed", nil)
+	rec := httptest.NewRecorder()
+	u.webClearCompletedAPI(rec, req, nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var snapshot webStatusSnapshot
+	if err := json.Unmarshal(rec.Body.Bytes(), &snapshot); err != nil {
+		t.Fatalf("failed to decode clear payload: %v", err)
+	}
+
+	if snapshot.CompletedCount != 0 {
+		t.Fatalf("expected completed items to be cleared, got %d", snapshot.CompletedCount)
+	}
+
+	if len(snapshot.Items) != 0 {
+		t.Fatalf("expected no items after clear, got %d", len(snapshot.Items))
+	}
+}

@@ -99,6 +99,7 @@ func (u *Unpackerr) webRoutes() {
 	if u.Webserver.UI {
 		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), u.webIndex)
 		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/api/status"), u.webStatusAPI)
+		u.Webserver.router.POST(path.Join(u.Webserver.URLBase, "/api/status/clear-completed"), u.webClearCompletedAPI)
 	} else {
 		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), Index)
 	}
