@@ -13,6 +13,7 @@ import (
 const (
 	minimumProgressInterval = time.Second
 	defaultProgressInterval = 15 * time.Second
+	noProgressText          = "no progress yet"
 )
 
 // ExtractProgress holds the progress for an entire Extract.
@@ -30,7 +31,7 @@ type ExtractProgress struct {
 
 func (p *ExtractProgress) String() string {
 	if p == nil || p.Progress == nil {
-		return "no progress yet"
+		return noProgressText
 	}
 
 	var wrote, total uint64
@@ -69,7 +70,7 @@ func (u *Unpackerr) printProgress(now time.Time) {
 			continue
 		}
 
-		if prog := data.XProg.String(); prog != "no progress yet" {
+		if prog := data.XProg.String(); prog != noProgressText {
 			u.Printf("[%s] Status: %s (%v, elapsed: %v) %s", data.App, name, data.Status.Desc(),
 				now.Sub(data.Updated).Round(time.Second), prog)
 		}

@@ -143,13 +143,13 @@ func Index(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 func (u *Unpackerr) skipWebAccessLog(withAccessLog, withoutAccessLog http.Handler) http.Handler {
 	statusPath := path.Join(u.Webserver.URLBase, "/api/status")
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == statusPath {
-			withoutAccessLog.ServeHTTP(w, r)
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodGet && request.URL.Path == statusPath {
+			withoutAccessLog.ServeHTTP(writer, request)
 			return
 		}
 
-		withAccessLog.ServeHTTP(w, r)
+		withAccessLog.ServeHTTP(writer, request)
 	})
 }
 
