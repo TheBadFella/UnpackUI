@@ -8,6 +8,43 @@ import (
 	"golift.io/xtractr"
 )
 
+func TestBuildWebhookPayloadUsesFriendlyTitles(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		status ExtractStatus
+		want   string
+	}{
+		{name: "queued", status: QUEUED, want: "New Archive Detected"},
+		{name: "extracting", status: EXTRACTING, want: "Extraction Started"},
+		{name: "extracted", status: EXTRACTED, want: "Extraction Complete"},
+		{name: "deleted", status: DELETED, want: "Source Deleted"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			payload := buildWebhookPayload(&Extract{
+				App:     FolderString,
+				Path:    "/downloads/test-item",
+				Status:  tt.status,
+				Updated: time.Date(2026, 4, 12, 21, 33, 0, 0, time.UTC),
+				IDs:     map[string]any{"title": "test-item"},
+			})
+
+			if payload.Title != tt.want {
+				t.Fatalf("expected title %q, got %q", tt.want, payload.Title)
+			}
+
+			if payload.Event != tt.status {
+				t.Fatalf("expected event %s, got %s", tt.status, payload.Event)
+			}
+		})
+	}
+}
+
 func TestBuildWebhookPayloadKeepsDataForImportedFolder(t *testing.T) {
 	t.Parallel()
 

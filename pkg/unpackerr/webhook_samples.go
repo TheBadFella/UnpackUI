@@ -44,6 +44,8 @@ func (u *Unpackerr) sampleWebhook(e ExtractStatus) error {
 		payload.Data.Error = "unable to delete files"
 	}
 
+	payload.Title = friendlyEventTitle(payload.Event)
+
 	for _, hook := range u.Webhook {
 		u.sendWebhookWithLog(hook, payload)
 	}
@@ -61,6 +63,7 @@ func samplePayload() *WebhookPayload {
 			"otherId":    "another-id-here-like-imdb",
 		},
 		Time:     time.Now(),
+		Title:    friendlyEventTitle(EXTRACTED),
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
 		Arch:     runtime.GOARCH,

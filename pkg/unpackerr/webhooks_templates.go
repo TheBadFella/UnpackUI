@@ -19,6 +19,7 @@ type WebhookPayload struct {
 	App    starr.App      `json:"app"`                 // Application Triggering Event
 	IDs    map[string]any `json:"ids,omitempty"`       // Arbitrary IDs from each app.
 	Event  ExtractStatus  `json:"unpackerr_eventtype"` // The type of the event.
+	Title  string         `json:"event_title"`         // Friendly event title for human-facing notifications.
 	Time   time.Time      `json:"time"`                // Time of this event.
 	Data   *XtractPayload `json:"data,omitempty"`      // Payload from extraction process.
 	Config *WebhookConfig `json:"-"`                   // Payload from extraction process.
@@ -55,6 +56,7 @@ const WebhookTemplateNotifiarr = `{
     {{$s := separator ",\n"}}{{range $key, $value := .IDs}}{{call $s}}"{{$key}}": {{encode $value}}{{end}}
   },
   "unpackerr_eventtype": "{{.Event}}",
+  "event_title": {{encode .Title}},
   "time": "{{.Time}}",
 {{ if .Data }}    "data": {
     "error": {{encode .Data.Error}},
@@ -79,7 +81,7 @@ const WebhookTemplateTelegram = `{
   "chat_id": "{{nickname}}",
   "parse_mode": "HTML",
   "disable_web_page_preview": true,
-  "text": "<b><a href=\"https://github.com/Unpackerr/unpackerr/releases\">Unpackerr</a></b>: {{.Event.Desc -}}
+  "text": "<b><a href=\"https://github.com/Unpackerr/unpackerr/releases\">Unpackerr</a></b>: {{.Title -}}
     \n<b>Title</b>: {{rawencode (index .IDs "title") -}}
     \n<b>App</b>: {{.App -}}
     \n\n<b>Path</b>: <code>{{rawencode .Path}}</code>
@@ -97,7 +99,7 @@ const WebhookTemplateTelegram = `{
 // The extra spaces before the newlines here are required to make this look good on web and on android.
 
 const WebhookTemplateGotify = `{
-  "title": "{{if nickname}}{{nickname}}{{else}}Unpackerr{{end}}: {{.Event.Desc}}",
+  "title": "{{if nickname}}{{nickname}}{{else}}Unpackerr{{end}}: {{.Title}}",
   "message": "**App**: {{.App}}  \n**Name**: {{rawencode (index .IDs "title")}}  \n**Path**: {{rawencode .Path -}}
     {{ if .Data.Elapsed.Duration }}  \n**Elapsed**: {{.Data.Elapsed}}{{end -}}
     {{ if .Data.Archives }}  \n**RARs**: {{len .Data.Archives}}{{end -}}
@@ -124,13 +126,13 @@ const WebhookTemplateDiscord = `{
   "username": "{{nickname}}",
   "avatar_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
   "embeds": [{
-    "title": {{encode (index .IDs "title")}},
-    "timestamp": "{{timestamp .Time}}",
-    "author": {
-     "name": "Unpackerr: {{.Event.Desc}}",
-     "icon_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
-     "url": "https://github.com/Unpackerr/unpackerr/releases"
-    },
+	    "title": {{encode (index .IDs "title")}},
+	    "timestamp": "{{timestamp .Time}}",
+	    "author": {
+	     "name": "Unpackerr: {{.Title}}",
+	     "icon_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
+	     "url": "https://github.com/Unpackerr/unpackerr/releases"
+	    },
     "color": {{ if (eq 1 .Event)}}1752220
             {{- else if (eq 2 .Event)}}16384255
             {{- else if(eq 3 .Event)}}10038562
@@ -161,7 +163,7 @@ const WebhookTemplateDiscord = `{
 }
 `
 
-const WebhookTemplatePushover = `token={{token}}&user={{channel}}&html=1&title={{formencode .Event.Desc}}&` +
+const WebhookTemplatePushover = `token={{token}}&user={{channel}}&html=1&title={{formencode .Title}}&` +
 	`{{if nickname}}device={{nickname}}&{{end}}message=<pre><b>App</b>: {{.App}}
 <b>Name</b>: {{formencode (index .IDs "title")}}
 <b>Path</b>: {{formencode .Path}}
@@ -182,13 +184,13 @@ const WebhookTemplateSlack = `
   {{if channel}}"channel": "{{channel}}",{{end}}
   "icon_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
   "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "Unpackerr: {{.Event.Desc}}"
-      }
-    },
+	    {
+	      "type": "header",
+	      "text": {
+	        "type": "plain_text",
+	        "text": "Unpackerr: {{.Title}}"
+	      }
+	    },
     {
       "type": "section",
       "text": {
@@ -340,4 +342,19 @@ func humanbytes(size int64) string {
 	}
 
 	return fmt.Sprintf("%.1f%ciB", float64(size)/float64(div), "KMGTPE"[exp])
+}
+
+func friendlyEventTitle(status ExtractStatus) string {
+	switch status {
+	case QUEUED:
+		return "New Archive Detected"
+	case EXTRACTING:
+		return "Extraction Started"
+	case EXTRACTED:
+		return "Extraction Complete"
+	case DELETED:
+		return "Source Deleted"
+	default:
+		return status.Desc()
+	}
 }

@@ -113,6 +113,7 @@ func buildWebhookPayload(item *Extract) *WebhookPayload {
 		Time:  item.Updated,
 		Data:  nil,
 		Event: item.Status,
+		Title: friendlyEventTitle(item.Status),
 		// Application Metadata.
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
