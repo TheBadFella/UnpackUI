@@ -494,48 +494,32 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Unpackerr Status</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23000'/%3E%3Cpath d='M18 21h28l-4 22H22z' fill='%23121518' stroke='%23ffb04a' stroke-width='3'/%3E%3Cpath d='M24 16h16l6 7H18z' fill='%23ff8647'/%3E%3Cpath d='M32 27v12' stroke='%237ed7ff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='m26 34 6 6 6-6' fill='none' stroke='%237ed7ff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <style>
     :root {
       color-scheme: dark;
-      --bg-top: #0d1419;
-      --bg-bottom: #15222d;
-      --panel: rgba(20, 31, 41, 0.78);
-      --panel-strong: rgba(27, 41, 53, 0.92);
-      --panel-soft: rgba(255, 255, 255, 0.07);
-      --panel-softer: rgba(255, 255, 255, 0.04);
-      --text: #edf4f8;
+      --bg: #000000;
+      --panel: rgba(10, 10, 10, 0.96);
+      --panel-strong: rgba(18, 18, 18, 0.98);
+      --panel-soft: rgba(255, 255, 255, 0.06);
+      --panel-softer: rgba(255, 255, 255, 0.03);
+      --panel-accent: rgba(255, 176, 74, 0.12);
+      --panel-cool: rgba(126, 215, 255, 0.1);
+      --text: #f3f6fb;
       --heading: #ffffff;
-      --muted: #9eb2c0;
-      --accent: #ffb84d;
-      --accent-strong: #ff9453;
-      --good: #54d293;
-      --warn: #ffb84d;
-      --bad: #ff6b6b;
+      --muted: #a8b0bc;
+      --accent: #ffb04a;
+      --accent-strong: #ff8647;
+      --accent-cool: #7ed7ff;
+      --accent-violet: #b79cff;
+      --good: #7de7a9;
+      --warn: #ffd166;
+      --bad: #ff7b8f;
       --border: rgba(255, 255, 255, 0.1);
       --border-strong: rgba(255, 255, 255, 0.18);
-      --shadow: 0 20px 52px rgba(0, 0, 0, 0.28);
+      --shadow: 0 28px 72px rgba(0, 0, 0, 0.55);
       --font: "Segoe UI Variable Display", "Aptos", "Segoe UI", sans-serif;
       --mono: Consolas, "SFMono-Regular", monospace;
-    }
-    html[data-theme="light"] {
-      color-scheme: light;
-      --bg-top: #f7efe4;
-      --bg-bottom: #eef4f6;
-      --panel: rgba(255, 255, 255, 0.82);
-      --panel-strong: rgba(255, 255, 255, 0.96);
-      --panel-soft: rgba(21, 34, 45, 0.05);
-      --panel-softer: rgba(21, 34, 45, 0.03);
-      --text: #173041;
-      --heading: #122330;
-      --muted: #63798a;
-      --accent: #cf6f16;
-      --accent-strong: #ad5311;
-      --good: #1e8b60;
-      --warn: #c98210;
-      --bad: #c44949;
-      --border: rgba(21, 34, 45, 0.11);
-      --border-strong: rgba(21, 34, 45, 0.18);
-      --shadow: 0 18px 38px rgba(29, 55, 75, 0.12);
     }
     * { box-sizing: border-box; }
     body {
@@ -543,90 +527,149 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       min-height: 100vh;
       font-family: var(--font);
       background:
-        radial-gradient(circle at top left, rgba(255, 184, 77, 0.2), transparent 28%),
-        radial-gradient(circle at top right, rgba(84, 210, 147, 0.13), transparent 24%),
-        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+        radial-gradient(circle at 12% 0%, rgba(255, 176, 74, 0.18), transparent 24%),
+        radial-gradient(circle at 88% 6%, rgba(126, 215, 255, 0.16), transparent 18%),
+        radial-gradient(circle at 50% 100%, rgba(183, 156, 255, 0.08), transparent 24%),
+        var(--bg);
       color: var(--text);
-      transition: background 160ms ease, color 160ms ease;
+      transition: color 160ms ease;
     }
     .shell {
-      max-width: 1200px;
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 28px 18px 52px;
+      padding: 34px 20px 60px;
     }
     .hero {
       display: grid;
-      gap: 16px;
-      margin-bottom: 22px;
-      padding: 22px;
+      gap: 22px;
+      margin-bottom: 28px;
+      padding: 28px;
       border: 1px solid var(--border);
-      border-radius: 24px;
-      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      border-radius: 32px;
+      background:
+        linear-gradient(180deg, rgba(20, 20, 20, 0.98), rgba(8, 8, 8, 0.98)),
+        linear-gradient(135deg, var(--panel-accent), transparent 35%);
       box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      top: -180px;
+      right: -80px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 176, 74, 0.22), transparent 70%);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      bottom: -180px;
+      left: -60px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(126, 215, 255, 0.14), transparent 72%);
+      pointer-events: none;
     }
     .headline {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 18px;
       align-items: flex-start;
       justify-content: space-between;
+      position: relative;
+      z-index: 1;
+    }
+    .hero-copy {
+      display: grid;
+      gap: 14px;
+      max-width: 720px;
     }
     .headline-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
       justify-content: flex-end;
     }
     h1 {
       margin: 0;
-      font-size: clamp(2rem, 4.8vw, 3.2rem);
-      line-height: 0.96;
-      letter-spacing: -0.03em;
+      font-size: clamp(2.3rem, 5vw, 3.8rem);
+      line-height: 0.92;
+      letter-spacing: -0.045em;
       color: var(--heading);
     }
     .subtle {
       color: var(--muted);
-      font-size: 0.96rem;
-      line-height: 1.5;
+      font-size: 1rem;
+      line-height: 1.65;
     }
-    .theme-toggle {
+    .stamp-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 15px;
+      min-height: 44px;
+      border-radius: 18px;
+      border: 1px solid rgba(126, 215, 255, 0.18);
+      background: linear-gradient(180deg, rgba(126, 215, 255, 0.1), rgba(126, 215, 255, 0.05));
+      color: var(--text);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .stamp-chip::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-cool);
+      box-shadow: 0 0 0 6px rgba(126, 215, 255, 0.1);
+      flex: 0 0 auto;
+    }
+    .action-button {
       appearance: none;
       border: 1px solid var(--border-strong);
-      background: var(--panel-soft);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
       color: var(--text);
-      border-radius: 999px;
-      padding: 10px 14px;
+      border-radius: 18px;
+      padding: 10px 16px;
       font: inherit;
       font-size: 0.9rem;
+      font-weight: 600;
       cursor: pointer;
-      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
     }
-	    .theme-toggle:hover {
-	      transform: translateY(-1px);
-	      border-color: var(--accent);
-	      background: rgba(255, 184, 77, 0.12);
-	    }
-	    .theme-toggle:disabled {
-	      opacity: 0.45;
-	      cursor: default;
-	      transform: none;
-	    }
-	    .grid {
-	      display: grid;
-	      gap: 14px;
-      grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+    .action-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 176, 74, 0.36);
+      background: linear-gradient(180deg, rgba(255, 176, 74, 0.15), rgba(255, 134, 71, 0.08));
+      box-shadow: 0 0 0 1px rgba(255, 176, 74, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    .action-button:disabled {
+      opacity: 0.45;
+      cursor: default;
+      transform: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
     .card, .table-card {
-      background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+      background:
+        linear-gradient(180deg, rgba(18, 18, 18, 0.98), rgba(8, 8, 8, 0.98)),
+        linear-gradient(135deg, rgba(255, 176, 74, 0.04), transparent 45%);
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 28px;
       box-shadow: var(--shadow);
-      backdrop-filter: blur(8px);
     }
     .card {
-      padding: 18px;
+      padding: 20px;
       position: relative;
       overflow: hidden;
     }
@@ -634,7 +677,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       content: "";
       position: absolute;
       inset: 0 auto 0 0;
-      width: 4px;
+      width: 6px;
       background: var(--muted);
       opacity: 0.72;
     }
@@ -647,8 +690,8 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
     .card .value {
       margin-top: 12px;
       color: var(--heading);
-      font-size: 2.2rem;
-      font-weight: 800;
+      font-size: 2.35rem;
+      font-weight: 900;
       letter-spacing: -0.04em;
       line-height: 1;
     }
@@ -670,16 +713,18 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
     .rail {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 8px;
+      gap: 12px;
+      margin-top: 4px;
+      position: relative;
+      z-index: 1;
     }
     .pill {
-      background: var(--panel-soft);
+      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
       border: 1px solid var(--border);
       color: var(--muted);
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-size: 0.88rem;
+      border-radius: 16px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
     }
     .pill strong {
       color: var(--text);
@@ -688,18 +733,18 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
     }
     .table-card {
       overflow: hidden;
-      margin-top: 18px;
+      margin-top: 20px;
     }
     .table-head {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
       align-items: center;
-      padding: 18px 18px 12px;
+      padding: 22px 22px 14px;
     }
     .table-wrap {
       overflow-x: auto;
-      padding: 0 10px 10px;
+      padding: 0 14px 14px;
     }
     table {
       width: 100%;
@@ -708,7 +753,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
     }
     th, td {
       text-align: left;
-      padding: 16px 14px;
+      padding: 18px 16px;
       border-top: 1px solid var(--border);
       vertical-align: top;
     }
@@ -719,23 +764,23 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       letter-spacing: 0.08em;
       font-weight: 600;
     }
-	    tr:hover td {
-	      background: var(--panel-softer);
-	    }
-	    .items-row {
-	      cursor: pointer;
-	    }
-	    .items-row.is-selected td {
-	      background: rgba(255, 184, 77, 0.08);
-	    }
-	    .status {
-	      display: inline-flex;
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.028);
+    }
+    .items-row {
+      cursor: pointer;
+    }
+    .items-row.is-selected td {
+      background: rgba(255, 176, 74, 0.08);
+    }
+    .status {
+      display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: var(--panel-soft);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid transparent;
       border-radius: 999px;
-      padding: 7px 12px;
+      padding: 7px 13px;
       white-space: nowrap;
       font-size: 0.86rem;
     }
@@ -745,32 +790,32 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       height: 9px;
       border-radius: 50%;
       background: currentColor;
-      box-shadow: 0 0 0 4px rgba(255,255,255,0.06);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.05);
     }
     .status.extracting {
       color: var(--accent);
-      background: rgba(255, 184, 77, 0.14);
-      border-color: rgba(255, 184, 77, 0.2);
+      background: rgba(255, 176, 74, 0.16);
+      border-color: rgba(255, 176, 74, 0.24);
     }
     .status.queued,
     .status.waiting {
       color: var(--warn);
-      background: rgba(255, 184, 77, 0.14);
-      border-color: rgba(255, 184, 77, 0.2);
+      background: rgba(255, 209, 102, 0.14);
+      border-color: rgba(255, 209, 102, 0.24);
     }
     .status.extractfailed,
     .status.deletefailed {
       color: var(--bad);
-      background: rgba(255, 107, 107, 0.14);
-      border-color: rgba(255, 107, 107, 0.2);
+      background: rgba(255, 123, 143, 0.14);
+      border-color: rgba(255, 123, 143, 0.24);
     }
     .status.extracted,
     .status.imported,
     .status.deleted,
     .status.deleting {
       color: var(--good);
-      background: rgba(84, 210, 147, 0.14);
-      border-color: rgba(84, 210, 147, 0.2);
+      background: rgba(125, 231, 169, 0.14);
+      border-color: rgba(125, 231, 169, 0.24);
     }
     .status.extractednothing {
       color: var(--muted);
@@ -797,7 +842,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       width: 100%;
       height: 12px;
       border-radius: 999px;
-      background: var(--panel-soft);
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border);
       overflow: hidden;
     }
@@ -805,7 +850,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       position: relative;
       display: block;
       height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+      background: linear-gradient(90deg, var(--accent), var(--accent-strong) 52%, var(--accent-cool));
       border-radius: inherit;
       transition: width 360ms cubic-bezier(0.22, 1, 0.36, 1);
     }
@@ -817,70 +862,70 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       transform: translateX(-120%);
       animation: shimmer 2.2s linear infinite;
     }
-	    .empty {
-	      padding: 36px 18px 40px;
-	      text-align: center;
-	      color: var(--muted);
-	    }
-	    .detail-card {
-	      padding-bottom: 18px;
-	    }
-	    .detail-grid {
-	      display: grid;
-	      gap: 12px;
-	      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-	      padding: 8px;
-	    }
-	    .detail-field {
-	      border: 1px solid var(--border);
-	      border-radius: 16px;
-	      padding: 14px;
-	      background: var(--panel-soft);
-	    }
-	    .detail-field .label {
-	      color: var(--muted);
-	      font-size: 0.78rem;
-	      letter-spacing: 0.08em;
-	      text-transform: uppercase;
-	      margin-bottom: 8px;
-	    }
-	    .detail-field .value {
-	      color: var(--text);
-	      line-height: 1.55;
-	      word-break: break-word;
-	    }
-	    .detail-lists {
-	      display: grid;
-	      gap: 14px;
-	      padding: 8px;
-	    }
-	    .detail-list {
-	      border: 1px solid var(--border);
-	      border-radius: 16px;
-	      background: var(--panel-soft);
-	      padding: 14px;
-	    }
-	    .detail-list strong {
-	      display: block;
-	      margin-bottom: 10px;
-	      color: var(--heading);
-	    }
-	    .detail-list ul {
-	      margin: 0;
-	      padding-left: 18px;
-	    }
-	    .detail-list li {
-	      margin: 0 0 8px;
-	      line-height: 1.45;
-	      word-break: break-word;
-	    }
-	    .detail-list code {
-	      font-family: var(--mono);
-	      font-size: 0.82rem;
-	    }
-	    @keyframes shimmer {
-	      from {
-	        transform: translateX(-120%);
+    .empty {
+      padding: 40px 18px 44px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .detail-card {
+      padding-bottom: 18px;
+    }
+    .detail-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      padding: 8px;
+    }
+    .detail-field {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 16px;
+      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
+    }
+    .detail-field .label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .detail-field .value {
+      color: var(--text);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .detail-lists {
+      display: grid;
+      gap: 14px;
+      padding: 8px;
+    }
+    .detail-list {
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
+      padding: 16px;
+    }
+    .detail-list strong {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--heading);
+    }
+    .detail-list ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .detail-list li {
+      margin: 0 0 8px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .detail-list code {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+    }
+    @keyframes shimmer {
+      from {
+        transform: translateX(-120%);
       }
       to {
         transform: translateX(120%);
@@ -896,6 +941,9 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       .table-head {
         display: grid;
       }
+      .hero {
+        padding: 22px;
+      }
     }
   </style>
 </head>
@@ -903,13 +951,12 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
   <div class="shell">
     <section class="hero">
       <div class="headline">
-        <div>
+        <div class="hero-copy">
           <h1>Unpackerr Status</h1>
           <div class="subtle">Live extraction progress.</div>
         </div>
         <div class="headline-actions">
-          <button class="theme-toggle" id="theme-toggle" type="button">Use light theme</button>
-          <div class="subtle" id="stamp">Loading...</div>
+          <div class="stamp-chip" id="stamp">Loading...</div>
         </div>
       </div>
       <div class="grid" id="stat-grid"></div>
@@ -922,7 +969,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	          <div class="subtle">Current queue plus completed items that stay visible until you clear them.</div>
 	        </div>
 	        <div class="headline-actions">
-	          <button class="theme-toggle" id="clear-completed" type="button">Clear completed</button>
+	          <button class="action-button" id="clear-completed" type="button">Clear completed</button>
 	          <div class="subtle" id="item-count"></div>
 	        </div>
 	      </div>
@@ -950,7 +997,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	          <div class="subtle" id="detail-subtitle">Click a task row to inspect its details.</div>
 	        </div>
 	        <div class="headline-actions">
-	          <button class="theme-toggle" id="detail-close" type="button">Close</button>
+	          <button class="action-button" id="detail-close" type="button">Close</button>
 	        </div>
 	      </div>
 	      <div class="table-wrap">
@@ -973,7 +1020,6 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	    const statGrid = document.getElementById('stat-grid');
 	    const metaRail = document.getElementById('meta-rail');
 	    const stamp = document.getElementById('stamp');
-	    const themeToggle = document.getElementById('theme-toggle');
 	    const clearCompletedButton = document.getElementById('clear-completed');
 	    const itemCount = document.getElementById('item-count');
 	    const itemsBody = document.getElementById('items');
@@ -984,7 +1030,6 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	    const detailClose = document.getElementById('detail-close');
 	    const statusUrl = new URL('api/status', window.location.href);
 	    const clearCompletedUrl = new URL('api/status/clear-completed', window.location.href);
-	    const themeKey = 'unpackerr-theme';
 	    let lastSnapshot = { items: [] };
 	    let selectedItemId = '';
 
@@ -996,21 +1041,6 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	        '"': '&quot;',
 	        "'": '&#39;'
 	      })[char]);
-	    }
-
-	    function applyTheme(theme) {
-	      document.documentElement.setAttribute('data-theme', theme);
-	      themeToggle.textContent = theme === 'light' ? 'Use dark theme' : 'Use light theme';
-	    }
-
-	    function initTheme() {
-	      const savedTheme = localStorage.getItem(themeKey);
-	      if (savedTheme === 'light' || savedTheme === 'dark') {
-	        applyTheme(savedTheme);
-	        return;
-	      }
-
-	      applyTheme(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 	    }
 
 	    function renderStats(stats = {}) {
@@ -1178,12 +1208,6 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      }
 	    }
 
-	    themeToggle.addEventListener('click', () => {
-	      const nextTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-	      localStorage.setItem(themeKey, nextTheme);
-	      applyTheme(nextTheme);
-	    });
-
 	    detailClose.addEventListener('click', () => {
 	      selectedItemId = '';
 	      detailCard.hidden = true;
@@ -1222,7 +1246,6 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      renderTaskDetails(item);
 	    });
 
-	    initTheme();
 	    refresh();
 	    setInterval(refresh, 2000);
 	  </script>
