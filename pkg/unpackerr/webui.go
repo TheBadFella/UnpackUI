@@ -16,12 +16,15 @@ import (
 )
 
 type webStatusSnapshot struct {
-	GeneratedAt string            `json:"generatedAt"`
-	Uptime      string            `json:"uptime"`
-	Stats       *Stats            `json:"stats"`
-	Buffers     webStatusBuffers  `json:"buffers"`
-	Counters    webStatusCounters `json:"counters"`
-	Items       []webStatusItem   `json:"items"`
+	GeneratedAt    string              `json:"generatedAt"`
+	Uptime         string              `json:"uptime"`
+	Stats          *Stats              `json:"stats"`
+	Buffers        webStatusBuffers    `json:"buffers"`
+	Counters       webStatusCounters   `json:"counters"`
+	ActiveCount    int                 `json:"activeCount"`
+	CompletedCount int                 `json:"completedCount"`
+	Items          []webStatusItem     `json:"items"`
+	dismissed      map[string]struct{} `json:"-"`
 }
 
 type webStatusBuffers struct {
@@ -42,9 +45,13 @@ type webStatusCounters struct {
 }
 
 type webStatusItem struct {
+	ID          string             `json:"id"`
+	Active      bool               `json:"active"`
+	Completed   bool               `json:"completed"`
 	App         string             `json:"app"`
 	CurrentFile string             `json:"currentFile,omitempty"`
 	Elapsed     string             `json:"elapsed"`
+	Details     *webStatusDetails  `json:"details,omitempty"`
 	Error       string             `json:"error,omitempty"`
 	Name        string             `json:"name"`
 	Path        string             `json:"path"`
@@ -53,6 +60,18 @@ type webStatusItem struct {
 	Status      string             `json:"status"`
 	StatusText  string             `json:"statusText"`
 	UpdatedAt   string             `json:"updatedAt"`
+}
+
+type webStatusDetails struct {
+	Title     string            `json:"title,omitempty"`
+	Bytes     string            `json:"bytes,omitempty"`
+	Elapsed   string            `json:"elapsed,omitempty"`
+	Output    string            `json:"output,omitempty"`
+	StartedAt string            `json:"startedAt,omitempty"`
+	Queue     int               `json:"queue,omitempty"`
+	Archives  []string          `json:"archives,omitempty"`
+	Files     []string          `json:"files,omitempty"`
+	IDs       map[string]string `json:"ids,omitempty"`
 }
 
 type webStatusProgress struct {
@@ -70,11 +89,23 @@ func (u *Unpackerr) refreshWebState(now time.Time) {
 }
 
 func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
+	prev := u.webState.Load()
 	stats := u.currentStats()
 	items := make([]webStatusItem, 0, len(u.Map))
+	currentNames := make(map[string]struct{}, len(u.Map))
+	dismissed := webStatusDismissedItems(prev)
 
 	for name, item := range u.Map {
-		items = append(items, buildWebStatusItem(name, item, now))
+		currentNames[name] = struct{}{}
+
+		webItem := buildWebStatusItem(name, item, now)
+		if webItem.Completed {
+			if _, skip := dismissed[webItem.ID]; skip {
+				continue
+			}
+		}
+
+		items = append(items, webItem)
 	}
 
 	if u.folders != nil {
@@ -83,12 +114,33 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 				continue
 			}
 
+			currentNames[name] = struct{}{}
 			items = append(items, buildWaitingFolderStatusItem(name, folder, now))
+		}
+	}
+
+	if prev != nil {
+		for _, item := range prev.Items {
+			if !item.Completed {
+				continue
+			}
+			if _, ok := currentNames[item.Name]; ok {
+				continue
+			}
+			if _, skip := dismissed[item.ID]; skip {
+				continue
+			}
+
+			item.Elapsed = webStatusElapsed(item.UpdatedAt, now)
+			items = append(items, item)
 		}
 	}
 
 	sort.Slice(items, func(i, j int) bool {
 		left, right := items[i], items[j]
+		if left.Completed != right.Completed {
+			return !left.Completed
+		}
 		if a, b := webStatusRank(left.Status), webStatusRank(right.Status); a != b {
 			return a < b
 		}
@@ -106,11 +158,22 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 	buffers.Hooks = len(u.hookChan)
 	buffers.XtractUpdates = len(u.updates)
 
+	var activeCount, completedCount int
+	for _, item := range items {
+		if item.Completed {
+			completedCount++
+		} else {
+			activeCount++
+		}
+	}
+
 	return &webStatusSnapshot{
-		GeneratedAt: now.Format(time.RFC3339),
-		Uptime:      durafmt.Parse(now.Sub(version.Started)).LimitFirstN(3).Format(durafmtUnits),
-		Stats:       stats,
-		Buffers:     buffers,
+		GeneratedAt:    now.Format(time.RFC3339),
+		Uptime:         durafmt.Parse(now.Sub(version.Started)).LimitFirstN(3).Format(durafmtUnits),
+		Stats:          stats,
+		Buffers:        buffers,
+		ActiveCount:    activeCount,
+		CompletedCount: completedCount,
 		Counters: webStatusCounters{
 			CmdFail:  stats.CmdFail,
 			CmdOK:    stats.CmdOK,
@@ -119,14 +182,19 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 			HookOK:   stats.HookOK,
 			Retries:  u.Retries,
 		},
-		Items: items,
+		Items:     items,
+		dismissed: dismissed,
 	}
 }
 
 func buildWebStatusItem(name string, item *Extract, now time.Time) webStatusItem {
 	output := webStatusItem{
+		ID:         webStatusItemID(name, item.Status, item.Updated),
+		Active:     !webStatusIsCompleted(item.Status.String()),
+		Completed:  webStatusIsCompleted(item.Status.String()),
 		App:        string(item.App),
 		Elapsed:    now.Sub(item.Updated).Round(time.Second).String(),
+		Details:    buildWebStatusDetails(item),
 		Name:       name,
 		Path:       item.Path,
 		Status:     item.Status.String(),
@@ -159,6 +227,9 @@ func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) we
 	}
 
 	return webStatusItem{
+		ID:         webStatusItemID(name, folder.status, folder.updated),
+		Active:     true,
+		Completed:  false,
 		App:        FolderString,
 		Elapsed:    now.Sub(folder.updated).Round(time.Second).String(),
 		Name:       name,
@@ -168,6 +239,52 @@ func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) we
 		StatusText: folder.status.Desc(),
 		UpdatedAt:  folder.updated.Format(time.RFC3339),
 	}
+}
+
+func buildWebStatusDetails(item *Extract) *webStatusDetails {
+	details := &webStatusDetails{}
+	if title, ok := item.IDs["title"]; ok {
+		details.Title = fmt.Sprint(title)
+	}
+
+	if len(item.IDs) > 0 {
+		details.IDs = make(map[string]string, len(item.IDs))
+		for key, value := range item.IDs {
+			details.IDs[key] = fmt.Sprint(value)
+		}
+	}
+
+	if item.Resp != nil {
+		if item.Resp.Started.Unix() > 0 {
+			details.StartedAt = item.Resp.Started.Format(time.RFC3339)
+		}
+		if item.Resp.Output != "" {
+			details.Output = item.Resp.Output
+		}
+		if item.Resp.Size > 0 {
+			details.Bytes = bytefmt.ByteSize(item.Resp.Size) + "B"
+		}
+		if item.Resp.Elapsed > 0 {
+			details.Elapsed = item.Resp.Elapsed.Round(time.Second).String()
+		}
+		details.Queue = item.Resp.Queued
+
+		for _, archiveGroup := range item.Resp.Archives {
+			details.Archives = append(details.Archives, archiveGroup...)
+		}
+		for _, extraGroup := range item.Resp.Extras {
+			details.Archives = append(details.Archives, extraGroup...)
+		}
+		details.Files = append(details.Files, item.Resp.NewFiles...)
+	}
+
+	if details.Title == "" && details.Bytes == "" && details.Elapsed == "" && details.Output == "" &&
+		details.StartedAt == "" && details.Queue == 0 && len(details.Archives) == 0 &&
+		len(details.Files) == 0 && len(details.IDs) == 0 {
+		return nil
+	}
+
+	return details
 }
 
 func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
@@ -233,6 +350,45 @@ func webStatusRank(status string) int {
 	default:
 		return 8
 	}
+}
+
+func webStatusItemID(name string, status ExtractStatus, updated time.Time) string {
+	return fmt.Sprintf("%s|%s|%s", name, status.String(), updated.Format(time.RFC3339Nano))
+}
+
+func webStatusIsCompleted(status string) bool {
+	switch status {
+	case EXTRACTED.String(), IMPORTED.String(), DELETING.String(), DELETED.String(), EXTRACTEDNOTHING.String():
+		return true
+	default:
+		return false
+	}
+}
+
+func webStatusElapsed(updatedAt string, now time.Time) string {
+	if updatedAt == "" {
+		return ""
+	}
+
+	lastUpdated, err := time.Parse(time.RFC3339, updatedAt)
+	if err != nil {
+		return ""
+	}
+
+	return now.Sub(lastUpdated).Round(time.Second).String()
+}
+
+func webStatusDismissedItems(snapshot *webStatusSnapshot) map[string]struct{} {
+	if snapshot == nil || len(snapshot.dismissed) == 0 {
+		return make(map[string]struct{})
+	}
+
+	output := make(map[string]struct{}, len(snapshot.dismissed))
+	for item := range snapshot.dismissed {
+		output[item] = struct{}{}
+	}
+
+	return output
 }
 
 func (u *Unpackerr) snapshotStats() *Stats {
@@ -301,6 +457,35 @@ func (u *Unpackerr) webStatusAPI(w http.ResponseWriter, _ *http.Request, _ httpr
 	}
 
 	_ = json.NewEncoder(w).Encode(snapshot)
+}
+
+func (u *Unpackerr) webClearCompletedAPI(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	snapshot := u.webState.Load()
+	if snapshot == nil {
+		snapshot = &webStatusSnapshot{Stats: &Stats{}, dismissed: make(map[string]struct{})}
+	}
+
+	next := *snapshot
+	next.dismissed = webStatusDismissedItems(snapshot)
+	next.Items = make([]webStatusItem, 0, len(snapshot.Items))
+	next.ActiveCount = 0
+	next.CompletedCount = 0
+
+	for _, item := range snapshot.Items {
+		if item.Completed {
+			next.dismissed[item.ID] = struct{}{}
+			continue
+		}
+
+		next.Items = append(next.Items, item)
+		next.ActiveCount++
+	}
+
+	u.webState.Store(&next)
+	_ = json.NewEncoder(w).Encode(&next)
 }
 
 var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
@@ -418,14 +603,19 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       cursor: pointer;
       transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
     }
-    .theme-toggle:hover {
-      transform: translateY(-1px);
-      border-color: var(--accent);
-      background: rgba(255, 184, 77, 0.12);
-    }
-    .grid {
-      display: grid;
-      gap: 14px;
+	    .theme-toggle:hover {
+	      transform: translateY(-1px);
+	      border-color: var(--accent);
+	      background: rgba(255, 184, 77, 0.12);
+	    }
+	    .theme-toggle:disabled {
+	      opacity: 0.45;
+	      cursor: default;
+	      transform: none;
+	    }
+	    .grid {
+	      display: grid;
+	      gap: 14px;
       grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
     }
     .card, .table-card {
@@ -529,11 +719,17 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       letter-spacing: 0.08em;
       font-weight: 600;
     }
-    tr:hover td {
-      background: var(--panel-softer);
-    }
-    .status {
-      display: inline-flex;
+	    tr:hover td {
+	      background: var(--panel-softer);
+	    }
+	    .items-row {
+	      cursor: pointer;
+	    }
+	    .items-row.is-selected td {
+	      background: rgba(255, 184, 77, 0.08);
+	    }
+	    .status {
+	      display: inline-flex;
       align-items: center;
       gap: 8px;
       background: var(--panel-soft);
@@ -621,14 +817,70 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       transform: translateX(-120%);
       animation: shimmer 2.2s linear infinite;
     }
-    .empty {
-      padding: 36px 18px 40px;
-      text-align: center;
-      color: var(--muted);
-    }
-    @keyframes shimmer {
-      from {
-        transform: translateX(-120%);
+	    .empty {
+	      padding: 36px 18px 40px;
+	      text-align: center;
+	      color: var(--muted);
+	    }
+	    .detail-card {
+	      padding-bottom: 18px;
+	    }
+	    .detail-grid {
+	      display: grid;
+	      gap: 12px;
+	      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	      padding: 8px;
+	    }
+	    .detail-field {
+	      border: 1px solid var(--border);
+	      border-radius: 16px;
+	      padding: 14px;
+	      background: var(--panel-soft);
+	    }
+	    .detail-field .label {
+	      color: var(--muted);
+	      font-size: 0.78rem;
+	      letter-spacing: 0.08em;
+	      text-transform: uppercase;
+	      margin-bottom: 8px;
+	    }
+	    .detail-field .value {
+	      color: var(--text);
+	      line-height: 1.55;
+	      word-break: break-word;
+	    }
+	    .detail-lists {
+	      display: grid;
+	      gap: 14px;
+	      padding: 8px;
+	    }
+	    .detail-list {
+	      border: 1px solid var(--border);
+	      border-radius: 16px;
+	      background: var(--panel-soft);
+	      padding: 14px;
+	    }
+	    .detail-list strong {
+	      display: block;
+	      margin-bottom: 10px;
+	      color: var(--heading);
+	    }
+	    .detail-list ul {
+	      margin: 0;
+	      padding-left: 18px;
+	    }
+	    .detail-list li {
+	      margin: 0 0 8px;
+	      line-height: 1.45;
+	      word-break: break-word;
+	    }
+	    .detail-list code {
+	      font-family: var(--mono);
+	      font-size: 0.82rem;
+	    }
+	    @keyframes shimmer {
+	      from {
+	        transform: translateX(-120%);
       }
       to {
         transform: translateX(120%);
@@ -653,7 +905,7 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       <div class="headline">
         <div>
           <h1>Unpackerr Status</h1>
-          <div class="subtle">Live extraction progress without opening Dozzle.</div>
+          <div class="subtle">Live extraction progress.</div>
         </div>
         <div class="headline-actions">
           <button class="theme-toggle" id="theme-toggle" type="button">Use light theme</button>
@@ -663,16 +915,19 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       <div class="grid" id="stat-grid"></div>
       <div class="rail" id="meta-rail"></div>
     </section>
-    <section class="table-card">
-      <div class="table-head">
-        <div>
-          <strong>Tracked Items</strong>
-          <div class="subtle">Current queue, active extractions, and recent post-extract states.</div>
-        </div>
-        <div class="subtle" id="item-count"></div>
-      </div>
-      <div class="table-wrap">
-        <table>
+	    <section class="table-card">
+	      <div class="table-head">
+	        <div>
+	          <strong>Tracked Items</strong>
+	          <div class="subtle">Current queue plus completed items that stay visible until you clear them.</div>
+	        </div>
+	        <div class="headline-actions">
+	          <button class="theme-toggle" id="clear-completed" type="button">Clear completed</button>
+	          <div class="subtle" id="item-count"></div>
+	        </div>
+	      </div>
+	      <div class="table-wrap">
+	        <table>
           <thead>
             <tr>
               <th>Item</th>
@@ -685,143 +940,291 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
           <tbody id="items">
             <tr><td colspan="5" class="empty">Waiting for status data...</td></tr>
           </tbody>
-        </table>
-      </div>
-    </section>
-  </div>
-  <script>
-    const statOrder = [
-      ["extracting", "Extracting"],
-      ["queued", "Queued"],
-      ["waiting", "Waiting"],
-      ["failed", "Failed"],
-      ["extracted", "Extracted"],
-      ["imported", "Imported"],
-      ["deleted", "Deleted"]
-    ];
+	        </table>
+	      </div>
+	    </section>
+	    <section class="table-card detail-card" id="detail-card" hidden>
+	      <div class="table-head">
+	        <div>
+	          <strong>Task Details</strong>
+	          <div class="subtle" id="detail-subtitle">Click a task row to inspect its details.</div>
+	        </div>
+	        <div class="headline-actions">
+	          <button class="theme-toggle" id="detail-close" type="button">Close</button>
+	        </div>
+	      </div>
+	      <div class="table-wrap">
+	        <div class="detail-grid" id="detail-grid"></div>
+	        <div class="detail-lists" id="detail-lists"></div>
+	      </div>
+	    </section>
+	  </div>
+	  <script>
+	    const statOrder = [
+	      ['extracting', 'Extracting'],
+	      ['queued', 'Queued'],
+	      ['waiting', 'Waiting'],
+	      ['failed', 'Failed'],
+	      ['extracted', 'Extracted'],
+	      ['imported', 'Imported'],
+	      ['deleted', 'Deleted']
+	    ];
 
-    const statGrid = document.getElementById("stat-grid");
-    const metaRail = document.getElementById("meta-rail");
-    const stamp = document.getElementById("stamp");
-    const themeToggle = document.getElementById("theme-toggle");
-    const itemCount = document.getElementById("item-count");
-    const itemsBody = document.getElementById("items");
-    const statusUrl = new URL("api/status", window.location.href);
-    const themeKey = "unpackerr-theme";
+	    const statGrid = document.getElementById('stat-grid');
+	    const metaRail = document.getElementById('meta-rail');
+	    const stamp = document.getElementById('stamp');
+	    const themeToggle = document.getElementById('theme-toggle');
+	    const clearCompletedButton = document.getElementById('clear-completed');
+	    const itemCount = document.getElementById('item-count');
+	    const itemsBody = document.getElementById('items');
+	    const detailCard = document.getElementById('detail-card');
+	    const detailSubtitle = document.getElementById('detail-subtitle');
+	    const detailGrid = document.getElementById('detail-grid');
+	    const detailLists = document.getElementById('detail-lists');
+	    const detailClose = document.getElementById('detail-close');
+	    const statusUrl = new URL('api/status', window.location.href);
+	    const clearCompletedUrl = new URL('api/status/clear-completed', window.location.href);
+	    const themeKey = 'unpackerr-theme';
+	    let lastSnapshot = { items: [] };
+	    let selectedItemId = '';
 
-    function escapeHtml(value) {
-      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        "\"": "&quot;",
-        "'": "&#39;"
-      })[char]);
-    }
+	    function escapeHtml(value) {
+	      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+	        '&': '&amp;',
+	        '<': '&lt;',
+	        '>': '&gt;',
+	        '"': '&quot;',
+	        "'": '&#39;'
+	      })[char]);
+	    }
 
-    function applyTheme(theme) {
-      document.documentElement.setAttribute("data-theme", theme);
-      themeToggle.textContent = theme === "light" ? "Use dark theme" : "Use light theme";
-    }
+	    function applyTheme(theme) {
+	      document.documentElement.setAttribute('data-theme', theme);
+	      themeToggle.textContent = theme === 'light' ? 'Use dark theme' : 'Use light theme';
+	    }
 
-    function initTheme() {
-      const savedTheme = localStorage.getItem(themeKey);
-      if (savedTheme === "light" || savedTheme === "dark") {
-        applyTheme(savedTheme);
-        return;
-      }
+	    function initTheme() {
+	      const savedTheme = localStorage.getItem(themeKey);
+	      if (savedTheme === 'light' || savedTheme === 'dark') {
+	        applyTheme(savedTheme);
+	        return;
+	      }
 
-      applyTheme(window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    }
+	      applyTheme(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+	    }
 
-    themeToggle.addEventListener("click", () => {
-      const nextTheme = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
-      localStorage.setItem(themeKey, nextTheme);
-      applyTheme(nextTheme);
-    });
+	    function renderStats(stats = {}) {
+	      statGrid.innerHTML = statOrder.map(([key, label]) => (
+	        '<article class="card tone-' + key + '">' +
+	          '<div class="label">' + label + '</div>' +
+	          '<div class="value">' + (stats[key.charAt(0).toUpperCase() + key.slice(1)] ?? 0) + '</div>' +
+	        '</article>'
+	      )).join('');
+	    }
 
-    function renderStats(stats = {}) {
-      statGrid.innerHTML = statOrder.map(([key, label]) => (
-        '<article class="card tone-' + key + '">' +
-          '<div class="label">' + label + '</div>' +
-          '<div class="value">' + (stats[key.charAt(0).toUpperCase() + key.slice(1)] ?? 0) + '</div>' +
-        '</article>'
-      )).join("");
-    }
+	    function renderMeta(data) {
+	      const counters = data.counters ?? {};
+	      const buffers = data.buffers ?? {};
+	      metaRail.innerHTML = [
+	        ['Uptime', escapeHtml(data.uptime ?? '0s')],
+	        ['Finished', counters.finished ?? 0],
+	        ['Retries', counters.retries ?? 0],
+	        ['Webhooks', (counters.hookOK ?? 0) + ' ok / ' + (counters.hookFail ?? 0) + ' failed'],
+	        ['Cmdhooks', (counters.cmdOK ?? 0) + ' ok / ' + (counters.cmdFail ?? 0) + ' failed'],
+	        ['Buffers', 'fs ' + (buffers.folderEvents ?? 0) + ', updates ' + ((buffers.xtractUpdates ?? 0) + (buffers.folderUpdates ?? 0)) + ', hooks ' + (buffers.hooks ?? 0) + ', deletes ' + (buffers.deletes ?? 0)]
+	      ].map(([label, value]) => '<span class="pill"><strong>' + escapeHtml(label) + '</strong>' + escapeHtml(value) + '</span>').join('');
+	    }
 
-    function renderMeta(data) {
-      const counters = data.counters ?? {};
-      const buffers = data.buffers ?? {};
-      metaRail.innerHTML = [
-        ['Uptime', escapeHtml(data.uptime ?? "0s")],
-        ['Finished', counters.finished ?? 0],
-        ['Retries', counters.retries ?? 0],
-        ['Webhooks', (counters.hookOK ?? 0) + ' ok / ' + (counters.hookFail ?? 0) + ' failed'],
-        ['Cmdhooks', (counters.cmdOK ?? 0) + ' ok / ' + (counters.cmdFail ?? 0) + ' failed'],
-        ['Buffers', 'fs ' + (buffers.folderEvents ?? 0) + ', updates ' + ((buffers.xtractUpdates ?? 0) + (buffers.folderUpdates ?? 0)) + ', hooks ' + (buffers.hooks ?? 0) + ', deletes ' + (buffers.deletes ?? 0)]
-      ].map(([label, value]) => '<span class="pill"><strong>' + escapeHtml(label) + '</strong>' + escapeHtml(value) + '</span>').join("");
-    }
+	    function renderDetailField(label, value, monospace) {
+	      return '<div class="detail-field">' +
+	        '<div class="label">' + escapeHtml(label) + '</div>' +
+	        '<div class="value' + (monospace ? ' path' : '') + '">' + escapeHtml(value) + '</div>' +
+	      '</div>';
+	    }
 
-    function renderItems(items = []) {
-      itemCount.textContent = items.length + ' tracked item' + (items.length === 1 ? "" : "s");
-      if (!items.length) {
-        itemsBody.innerHTML = '<tr><td colspan="5" class="empty">Nothing is queued or being tracked right now.</td></tr>';
-        return;
-      }
+	    function renderDetailList(title, values, monospace) {
+	      return '<div class="detail-list">' +
+	        '<strong>' + escapeHtml(title) + '</strong>' +
+	        '<ul>' +
+	          values.map((value) => '<li>' + (monospace ? '<code>' + escapeHtml(value) + '</code>' : escapeHtml(value)) + '</li>').join('') +
+	        '</ul>' +
+	      '</div>';
+	    }
 
-      itemsBody.innerHTML = items.map((item) => {
-        const progress = item.progress;
-        const progressHtml = progress ? (
-          '<div class="progress">' +
-            '<div><strong>' + escapeHtml((progress.percent || 0).toFixed(0)) + '%</strong> / ' + escapeHtml(progress.archiveIndex || 1) + ' of ' + escapeHtml(progress.archiveCount || 1) + ' archive' + ((progress.archiveCount || 1) === 1 ? "" : "s") + '</div>' +
-            '<div class="progress-bar"><span style="width:' + Math.max(0, Math.min(100, progress.percent || 0)) + '%"></span></div>' +
-            '<div class="muted">' + escapeHtml((progress.percent || 0).toFixed(0)) + '% - ' + escapeHtml(progress.writtenBytes || "0B") + ' / ' + escapeHtml(progress.totalBytes || "0B") + '</div>' +
-            (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
-          '</div>'
-        ) : '<span class="muted">No byte-level progress yet</span>';
+	    function renderTaskDetails(item) {
+	      if (!item) {
+	        detailCard.hidden = true;
+	        return;
+	      }
 
-        const reasons = [
-          item.reason ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>' : '',
-          item.error ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>' : ''
-        ].join("");
+	      const details = item.details ?? {};
+	      const progress = item.progress ?? null;
+	      const fields = [
+	        renderDetailField('Item', item.name, false),
+	        renderDetailField('App', item.app, false),
+	        renderDetailField('Status', item.statusText, false),
+	        renderDetailField('Updated', new Date(item.updatedAt).toLocaleString(), false),
+	        renderDetailField('Age', item.elapsed, false),
+	        renderDetailField('Path', item.path, true)
+	      ];
 
-        return (
-          '<tr>' +
-            '<td>' +
-              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
-              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
-              reasons +
-            '</td>' +
-            '<td><span class="status ' + escapeHtml(item.status) + '">' + escapeHtml(item.statusText) + '</span></td>' +
-            '<td>' + progressHtml + '</td>' +
-            '<td>' +
-              '<div>' + escapeHtml(item.elapsed) + '</div>' +
-              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
-            '</td>' +
-            '<td><div class="path">' + escapeHtml(item.path) + '</div></td>' +
-          '</tr>'
-        );
-      }).join("");
-    }
+	      if (details.title) fields.push(renderDetailField('Title', details.title, false));
+	      if (item.currentFile) fields.push(renderDetailField('Current archive', item.currentFile, true));
+	      if (progress && progress.summary) fields.push(renderDetailField('Progress', progress.summary, false));
+	      if (details.bytes) fields.push(renderDetailField('Bytes written', details.bytes, false));
+	      if (details.elapsed) fields.push(renderDetailField('Extract elapsed', details.elapsed, false));
+	      if (details.startedAt) fields.push(renderDetailField('Extract started', new Date(details.startedAt).toLocaleString(), false));
+	      if (details.output) fields.push(renderDetailField('Temp folder', details.output, true));
+	      if (details.queue) fields.push(renderDetailField('Queue at start', details.queue, false));
+	      if (item.reason) fields.push(renderDetailField('Reason', item.reason, false));
+	      if (item.error) fields.push(renderDetailField('Error', item.error, false));
 
-    async function refresh() {
-      try {
-        const response = await fetch(statusUrl, { cache: "no-store" });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const data = await response.json();
-        renderStats(data.stats);
-        renderMeta(data);
-        renderItems(data.items);
-        const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "just now";
-        stamp.textContent = 'Updated ' + generated;
-      } catch (error) {
-        stamp.textContent = 'Status unavailable: ' + error.message;
-      }
-    }
+	      const lists = [];
+	      if ((details.archives ?? []).length) {
+	        lists.push(renderDetailList('Archives', details.archives, true));
+	      }
+	      if ((details.files ?? []).length) {
+	        lists.push(renderDetailList('Extracted files', details.files, true));
+	      }
+	      if (details.ids && Object.keys(details.ids).length) {
+	        const pairs = Object.entries(details.ids).map(([key, value]) => key + ': ' + value);
+	        lists.push(renderDetailList('Metadata', pairs, false));
+	      }
 
-    initTheme();
-    refresh();
-    setInterval(refresh, 2000);
-  </script>
+	      detailGrid.innerHTML = fields.join('');
+	      detailLists.innerHTML = lists.join('');
+	      detailSubtitle.textContent = item.completed
+	        ? 'Completed task retained in the UI until you clear it.'
+	        : 'Live task details and extraction context.';
+	      detailCard.hidden = false;
+	    }
+
+	    function renderItems(data) {
+	      const items = data.items ?? [];
+	      const activeCount = data.activeCount ?? 0;
+	      const completedCount = data.completedCount ?? 0;
+	      itemCount.textContent = activeCount + ' active / ' + completedCount + ' completed';
+	      clearCompletedButton.disabled = completedCount === 0;
+
+	      if (!items.length) {
+	        itemsBody.innerHTML = '<tr><td colspan="5" class="empty">Nothing is queued or being tracked right now.</td></tr>';
+	        detailCard.hidden = true;
+	        return;
+	      }
+
+	      itemsBody.innerHTML = items.map((item) => {
+	        const progress = item.progress;
+	        const progressHtml = progress ? (
+	          '<div class="progress">' +
+	            '<div><strong>' + escapeHtml((progress.percent || 0).toFixed(0)) + '%</strong> / ' + escapeHtml(progress.archiveIndex || 1) + ' of ' + escapeHtml(progress.archiveCount || 1) + ' archive' + ((progress.archiveCount || 1) === 1 ? '' : 's') + '</div>' +
+	            '<div class="progress-bar"><span style="width:' + Math.max(0, Math.min(100, progress.percent || 0)) + '%"></span></div>' +
+	            '<div class="muted">' + escapeHtml((progress.percent || 0).toFixed(0)) + '% - ' + escapeHtml(progress.writtenBytes || '0B') + ' / ' + escapeHtml(progress.totalBytes || '0B') + '</div>' +
+	            (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
+	          '</div>'
+	        ) : '<span class="muted">' + (item.completed ? 'Click for extracted-file details' : 'No byte-level progress yet') + '</span>';
+
+	        const notes = [
+	          item.reason ? '<div class="muted"><strong>Reason</strong> ' + escapeHtml(item.reason) + '</div>' : '',
+	          item.error ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>' : '',
+	          item.completed ? '<div class="muted">Retained until cleared</div>' : ''
+	        ].join('');
+
+	        return (
+	          '<tr class="items-row' + (selectedItemId === item.id ? ' is-selected' : '') + '" data-item-id="' + escapeHtml(item.id) + '">' +
+	            '<td>' +
+	              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
+	              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
+	              notes +
+	            '</td>' +
+	            '<td><span class="status ' + escapeHtml(item.status) + '">' + escapeHtml(item.statusText) + '</span></td>' +
+	            '<td>' + progressHtml + '</td>' +
+	            '<td>' +
+	              '<div>' + escapeHtml(item.elapsed) + '</div>' +
+	              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
+	            '</td>' +
+	            '<td><div class="path">' + escapeHtml(item.path) + '</div></td>' +
+	          '</tr>'
+	        );
+	      }).join('');
+	    }
+
+	    function renderSnapshot(data) {
+	      lastSnapshot = data ?? { items: [] };
+	      renderStats(lastSnapshot.stats);
+	      renderMeta(lastSnapshot);
+	      renderItems(lastSnapshot);
+
+	      if (selectedItemId) {
+	        const selectedItem = (lastSnapshot.items ?? []).find((item) => item.id === selectedItemId);
+	        if (selectedItem) {
+	          renderTaskDetails(selectedItem);
+	        } else {
+	          selectedItemId = '';
+	          detailCard.hidden = true;
+	        }
+	      }
+	    }
+
+	    async function refresh() {
+	      try {
+	        const response = await fetch(statusUrl, { cache: 'no-store' });
+	        if (!response.ok) throw new Error('HTTP ' + response.status);
+	        const data = await response.json();
+	        renderSnapshot(data);
+	        const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : 'just now';
+	        stamp.textContent = 'Updated ' + generated;
+	      } catch (error) {
+	        stamp.textContent = 'Status unavailable: ' + error.message;
+	      }
+	    }
+
+	    themeToggle.addEventListener('click', () => {
+	      const nextTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+	      localStorage.setItem(themeKey, nextTheme);
+	      applyTheme(nextTheme);
+	    });
+
+	    detailClose.addEventListener('click', () => {
+	      selectedItemId = '';
+	      detailCard.hidden = true;
+	      renderItems(lastSnapshot);
+	    });
+
+	    clearCompletedButton.addEventListener('click', async () => {
+	      try {
+	        const response = await fetch(clearCompletedUrl, { method: 'POST', cache: 'no-store' });
+	        if (!response.ok) throw new Error('HTTP ' + response.status);
+	        const data = await response.json();
+	        if (selectedItemId && !(data.items ?? []).some((item) => item.id === selectedItemId)) {
+	          selectedItemId = '';
+	          detailCard.hidden = true;
+	        }
+	        renderSnapshot(data);
+	        stamp.textContent = 'Cleared completed items';
+	      } catch (error) {
+	        stamp.textContent = 'Unable to clear completed items: ' + error.message;
+	      }
+	    });
+
+	    itemsBody.addEventListener('click', (event) => {
+	      const row = event.target.closest('tr[data-item-id]');
+	      if (!row) {
+	        return;
+	      }
+
+	      const item = (lastSnapshot.items ?? []).find((candidate) => candidate.id === row.dataset.itemId);
+	      if (!item) {
+	        return;
+	      }
+
+	      selectedItemId = item.id;
+	      renderItems(lastSnapshot);
+	      renderTaskDetails(item);
+	    });
+
+	    initTheme();
+	    refresh();
+	    setInterval(refresh, 2000);
+	  </script>
 </body>
 </html>`))
