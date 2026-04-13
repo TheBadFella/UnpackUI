@@ -684,6 +684,40 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      gap: 18px;
 	      max-width: 780px;
 	    }
+	    .title-row {
+	      display: flex;
+	      flex-wrap: wrap;
+	      align-items: center;
+	      align-content: center;
+	      gap: 14px;
+	    }
+	    .repo-link {
+	      display: inline-flex;
+	      align-items: center;
+	      justify-content: center;
+	      width: 44px;
+	      height: 44px;
+	      align-self: center;
+	      margin-top: 12px;
+	      border-radius: 14px;
+	      border: 1px solid var(--border);
+	      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+	      color: var(--text);
+	      text-decoration: none;
+	      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+	    }
+	    .repo-link:hover {
+	      transform: translateY(-1px);
+	      border-color: rgba(126, 215, 255, 0.34);
+	      background: linear-gradient(180deg, rgba(126, 215, 255, 0.15), rgba(255, 255, 255, 0.05));
+	      box-shadow: 0 0 0 1px rgba(126, 215, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	    }
+	    .repo-link svg {
+	      width: 21px;
+	      height: 21px;
+	      fill: currentColor;
+	    }
 	    .headline-actions {
 	      display: flex;
 	      flex-wrap: wrap;
@@ -691,13 +725,15 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      align-items: center;
 	      justify-content: flex-end;
 	    }
-    h1 {
-      margin: 0;
-      font-size: clamp(2.3rem, 5vw, 3.8rem);
-      line-height: 0.92;
-      letter-spacing: -0.045em;
-      color: var(--heading);
-    }
+	    h1 {
+	      margin: 0;
+	      font-size: clamp(2.3rem, 5vw, 3.8rem);
+	      line-height: 0.92;
+	      letter-spacing: -0.045em;
+	      color: var(--heading);
+	      display: flex;
+	      align-items: center;
+	    }
     .subtle {
       color: var(--muted);
       font-size: 1rem;
@@ -1063,12 +1099,19 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 </head>
 <body>
   <div class="shell">
-    <section class="hero">
-      <div class="headline">
-        <div class="hero-copy">
-          <h1>Unpackerr Status</h1>
-          <div class="subtle">Live extraction progress.</div>
-        </div>
+	    <section class="hero">
+	      <div class="headline">
+	        <div class="hero-copy">
+	          <div class="title-row">
+	            <h1>Unpackerr Status</h1>
+	            <a class="repo-link" href="https://github.com/TheBadFella/UnpackUI" target="_blank" rel="noreferrer" aria-label="Open the UnpackUI repository on GitHub">
+	              <svg viewBox="0 0 16 16" aria-hidden="true">
+	                <path d="M8 0C3.58 0 0 3.73 0 8.33c0 3.68 2.29 6.8 5.47 7.9.4.08.55-.18.55-.4 0-.2-.01-.86-.01-1.56-2.01.45-2.53-.51-2.69-.98-.09-.25-.48-.99-.82-1.19-.28-.16-.68-.57-.01-.58.63-.01 1.08.6 1.23.85.72 1.28 1.87.92 2.33.7.07-.54.28-.92.51-1.13-1.78-.21-3.64-.92-3.64-4.08 0-.9.31-1.64.82-2.22-.08-.21-.36-1.06.08-2.21 0 0 .67-.22 2.2.85a7.3 7.3 0 0 1 4 0c1.53-1.08 2.2-.85 2.2-.85.44 1.15.16 2 .08 2.21.51.58.82 1.31.82 2.22 0 3.17-1.87 3.87-3.65 4.08.29.26.54.76.54 1.53 0 1.11-.01 2-.01 2.28 0 .22.14.49.55.4A8.34 8.34 0 0 0 16 8.33C16 3.73 12.42 0 8 0Z"/>
+	              </svg>
+	            </a>
+	          </div>
+	          <div class="subtle">Live extraction progress.</div>
+	        </div>
         <div class="headline-actions">
           <div class="stamp-chip" id="stamp">Loading...</div>
         </div>
