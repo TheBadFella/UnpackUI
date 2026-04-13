@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,6 +48,7 @@ type Folders struct {
 	Interval time.Duration
 	Config   []*FolderConfig
 	Folders  map[string]*Folder
+	Outputs  map[string]string
 	Events   chan *eventData
 	Updates  chan *xtractr.Response
 	FSNotify *fsnotify.Watcher
@@ -243,6 +245,7 @@ func (c FoldersConfig) newWatcher(folderConfig []*FolderConfig, log Logs) (*Fold
 		Interval: c.Interval.Duration,
 		Config:   folderConfig,
 		Folders:  make(map[string]*Folder),
+		Outputs:  make(map[string]string),
 		Events:   make(chan *eventData, c.Buffer),
 		Updates:  make(chan *xtractr.Response, updateChanBuf),
 		Logs:     log,
@@ -311,6 +314,10 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 	u.folders.Folders[name].updated = now
 	u.folders.Folders[name].status = QUEUED
 
+	if outputPath := folderDerivedOutputPath(name); outputPath != "" {
+		u.folders.Outputs[filepath.Clean(outputPath)] = filepath.Clean(name)
+	}
+
 	// Do not extract r00 file if rar file with same name exists.
 	if strings.HasSuffix(strings.ToLower(name), ".r00") &&
 		xtractr.CheckR00ForRarFile(getFileList(filepath.Dir(name)), filepath.Base(name)) {
@@ -347,6 +354,50 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 	}
 
 	u.Printf("[Folder] Queued: %s, queue size: %d", name, queueSize)
+}
+
+func folderDerivedOutputPath(path string) string {
+	if path == "" || !xtractr.IsArchiveFile(path) {
+		return ""
+	}
+
+	extensions := xtractr.SupportedExtensions()
+	sort.Slice(extensions, func(i, j int) bool {
+		return len(extensions[i]) > len(extensions[j])
+	})
+
+	lower := strings.ToLower(path)
+	for _, ext := range extensions {
+		if strings.HasSuffix(lower, strings.ToLower(ext)) {
+			return filepath.Clean(path[:len(path)-len(ext)])
+		}
+	}
+
+	return ""
+}
+
+func (f *Folders) shouldIgnoreExtractOutput(path string, items map[string]*Extract) bool {
+	if f == nil || len(f.Outputs) == 0 || path == "" {
+		return false
+	}
+
+	path = filepath.Clean(path)
+	source, ok := f.Outputs[path]
+	if !ok {
+		return false
+	}
+
+	if _, tracked := f.Folders[source]; tracked {
+		return true
+	}
+
+	if _, tracked := items[source]; tracked {
+		return true
+	}
+
+	delete(f.Outputs, path)
+
+	return false
 }
 
 // folderExcludeSuffixes returns archive suffixes to ignore when scanning for items to extract.
@@ -496,6 +547,12 @@ func (f *Folders) handleFileEvent(name, operation string) {
 func (u *Unpackerr) processEvent(event *eventData, now time.Time) {
 	// Do not watch our own log file.
 	if event.file == u.Config.LogFile || event.file == u.Config.Webserver.LogFile {
+		return
+	}
+
+	dirPath := filepath.Join(event.cnfg.Path, event.name)
+	if u.folders.shouldIgnoreExtractOutput(dirPath, u.Map) {
+		u.folders.Debugf("Folder: Ignored File Event (%s) '%s' (extract output)", event.op, event.file)
 		return
 	}
 

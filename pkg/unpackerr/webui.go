@@ -716,22 +716,27 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	      margin-top: 6px;
 	      position: relative;
 	      z-index: 1;
-	      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	      grid-template-columns: minmax(0, 1fr);
 	    }
 	    .pill {
+	      display: flex;
+	      align-items: center;
+	      gap: 6px;
+	      flex-wrap: nowrap;
 	      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
 	      border: 1px solid var(--border);
 	      color: var(--muted);
 	      border-radius: 16px;
 	      padding: 12px 16px;
-	      font-size: 0.92rem;
+	      font-size: 0.9rem;
 	      min-width: 0;
+	      white-space: nowrap;
 	    }
     .pill strong {
-      color: var(--text);
-      font-weight: 700;
-      margin-right: 6px;
-    }
+	      color: var(--text);
+	      font-weight: 700;
+	      flex: 0 0 auto;
+	    }
 	    .table-card {
 	      overflow: hidden;
 	      margin-top: 26px;
@@ -946,12 +951,17 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
 	        padding: 22px;
 	      }
 	    }
+	    @media (min-width: 760px) {
+	      .rail {
+	        grid-template-columns: repeat(2, minmax(0, 1fr));
+	      }
+	    }
 	    @media (min-width: 1120px) {
 	      .grid {
 	        grid-template-columns: repeat(7, minmax(0, 1fr));
 	      }
 	      .rail {
-	        grid-template-columns: repeat(6, minmax(0, 1fr));
+	        grid-template-columns: repeat(3, minmax(0, 1fr));
 	      }
 	    }
 	  </style>
