@@ -534,16 +534,16 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       color: var(--text);
       transition: color 160ms ease;
     }
-    .shell {
-      max-width: 1240px;
-      margin: 0 auto;
-      padding: 34px 20px 60px;
-    }
-    .hero {
-      display: grid;
-      gap: 22px;
-      margin-bottom: 28px;
-      padding: 28px;
+	    .shell {
+	      max-width: 1480px;
+	      margin: 0 auto;
+	      padding: 42px 28px 72px;
+	    }
+	    .hero {
+	      display: grid;
+	      gap: 28px;
+	      margin-bottom: 34px;
+	      padding: 34px;
       border: 1px solid var(--border);
       border-radius: 32px;
       background:
@@ -575,27 +575,27 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       background: radial-gradient(circle, rgba(126, 215, 255, 0.14), transparent 72%);
       pointer-events: none;
     }
-    .headline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 18px;
+	    .headline {
+	      display: flex;
+	      flex-wrap: wrap;
+	      gap: 24px;
       align-items: flex-start;
       justify-content: space-between;
       position: relative;
       z-index: 1;
     }
-    .hero-copy {
-      display: grid;
-      gap: 14px;
-      max-width: 720px;
-    }
-    .headline-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: flex-end;
-    }
+	    .hero-copy {
+	      display: grid;
+	      gap: 18px;
+	      max-width: 780px;
+	    }
+	    .headline-actions {
+	      display: flex;
+	      flex-wrap: wrap;
+	      gap: 16px;
+	      align-items: center;
+	      justify-content: flex-end;
+	    }
     h1 {
       margin: 0;
       font-size: clamp(2.3rem, 5vw, 3.8rem);
@@ -608,13 +608,13 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       font-size: 1rem;
       line-height: 1.65;
     }
-    .stamp-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 11px 15px;
-      min-height: 44px;
-      border-radius: 18px;
+	    .stamp-chip {
+	      display: inline-flex;
+	      align-items: center;
+	      gap: 10px;
+	      padding: 13px 18px;
+	      min-height: 48px;
+	      border-radius: 18px;
       border: 1px solid rgba(126, 215, 255, 0.18);
       background: linear-gradient(180deg, rgba(126, 215, 255, 0.1), rgba(126, 215, 255, 0.05));
       color: var(--text);
@@ -629,13 +629,13 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       box-shadow: 0 0 0 6px rgba(126, 215, 255, 0.1);
       flex: 0 0 auto;
     }
-    .action-button {
+	    .action-button {
       appearance: none;
       border: 1px solid var(--border-strong);
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
       color: var(--text);
       border-radius: 18px;
-      padding: 10px 16px;
+	      padding: 12px 18px;
       font: inherit;
       font-size: 0.9rem;
       font-weight: 600;
@@ -655,11 +655,11 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       transform: none;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
-    .grid {
-      display: grid;
-      gap: 18px;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    }
+	    .grid {
+	      display: grid;
+	      gap: 22px;
+	      grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+	    }
     .card, .table-card {
       background:
         linear-gradient(180deg, rgba(18, 18, 18, 0.98), rgba(8, 8, 8, 0.98)),
@@ -668,11 +668,11 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       border-radius: 28px;
       box-shadow: var(--shadow);
     }
-    .card {
-      padding: 20px;
-      position: relative;
-      overflow: hidden;
-    }
+	    .card {
+	      padding: 24px;
+	      position: relative;
+	      overflow: hidden;
+	    }
     .card::before {
       content: "";
       position: absolute;
@@ -687,8 +687,8 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
-    .card .value {
-      margin-top: 12px;
+	    .card .value {
+	      margin-top: 16px;
       color: var(--heading);
       font-size: 2.35rem;
       font-weight: 900;
@@ -710,53 +710,54 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
     .card.tone-deleted::before {
       background: var(--good);
     }
-    .rail {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 4px;
-      position: relative;
-      z-index: 1;
-    }
-    .pill {
-      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
-      border: 1px solid var(--border);
-      color: var(--muted);
-      border-radius: 16px;
-      padding: 10px 14px;
-      font-size: 0.9rem;
-    }
+	    .rail {
+	      display: grid;
+	      gap: 16px;
+	      margin-top: 6px;
+	      position: relative;
+	      z-index: 1;
+	      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	    }
+	    .pill {
+	      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
+	      border: 1px solid var(--border);
+	      color: var(--muted);
+	      border-radius: 16px;
+	      padding: 12px 16px;
+	      font-size: 0.92rem;
+	      min-width: 0;
+	    }
     .pill strong {
       color: var(--text);
       font-weight: 700;
       margin-right: 6px;
     }
-    .table-card {
-      overflow: hidden;
-      margin-top: 20px;
-    }
-    .table-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: center;
-      padding: 22px 22px 14px;
-    }
-    .table-wrap {
-      overflow-x: auto;
-      padding: 0 14px 14px;
-    }
+	    .table-card {
+	      overflow: hidden;
+	      margin-top: 26px;
+	    }
+	    .table-head {
+	      display: flex;
+	      justify-content: space-between;
+	      gap: 18px;
+	      align-items: center;
+	      padding: 28px 28px 18px;
+	    }
+	    .table-wrap {
+	      overflow-x: auto;
+	      padding: 0 18px 18px;
+	    }
     table {
       width: 100%;
       border-collapse: collapse;
       min-width: 760px;
     }
-    th, td {
-      text-align: left;
-      padding: 18px 16px;
-      border-top: 1px solid var(--border);
-      vertical-align: top;
-    }
+	    th, td {
+	      text-align: left;
+	      padding: 22px 18px;
+	      border-top: 1px solid var(--border);
+	      vertical-align: top;
+	    }
     th {
       color: var(--muted);
       font-size: 0.82rem;
@@ -862,26 +863,26 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       transform: translateX(-120%);
       animation: shimmer 2.2s linear infinite;
     }
-    .empty {
-      padding: 40px 18px 44px;
-      text-align: center;
-      color: var(--muted);
-    }
+	    .empty {
+	      padding: 48px 22px 54px;
+	      text-align: center;
+	      color: var(--muted);
+	    }
     .detail-card {
       padding-bottom: 18px;
     }
-    .detail-grid {
-      display: grid;
-      gap: 14px;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      padding: 8px;
-    }
-    .detail-field {
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      padding: 16px;
-      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
-    }
+	    .detail-grid {
+	      display: grid;
+	      gap: 18px;
+	      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	      padding: 12px;
+	    }
+	    .detail-field {
+	      border: 1px solid var(--border);
+	      border-radius: 22px;
+	      padding: 18px;
+	      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
+	    }
     .detail-field .label {
       color: var(--muted);
       font-size: 0.78rem;
@@ -894,17 +895,17 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
       line-height: 1.55;
       word-break: break-word;
     }
-    .detail-lists {
-      display: grid;
-      gap: 14px;
-      padding: 8px;
-    }
-    .detail-list {
-      border: 1px solid var(--border);
-      border-radius: 22px;
-      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
-      padding: 16px;
-    }
+	    .detail-lists {
+	      display: grid;
+	      gap: 18px;
+	      padding: 12px;
+	    }
+	    .detail-list {
+	      border: 1px solid var(--border);
+	      border-radius: 22px;
+	      background: linear-gradient(180deg, var(--panel-soft), rgba(255, 255, 255, 0.03));
+	      padding: 18px;
+	    }
     .detail-list strong {
       display: block;
       margin-bottom: 10px;
@@ -931,21 +932,29 @@ var statusTemplate = template.Must(template.New("status").Parse(`<!doctype html>
         transform: translateX(120%);
       }
     }
-    @media (max-width: 720px) {
-      .shell {
-        padding-top: 22px;
-      }
+	    @media (max-width: 720px) {
+	      .shell {
+	        padding: 24px 16px 48px;
+	      }
       .headline-actions {
         justify-content: flex-start;
       }
       .table-head {
         display: grid;
       }
-      .hero {
-        padding: 22px;
-      }
-    }
-  </style>
+	      .hero {
+	        padding: 22px;
+	      }
+	    }
+	    @media (min-width: 1120px) {
+	      .grid {
+	        grid-template-columns: repeat(7, minmax(0, 1fr));
+	      }
+	      .rail {
+	        grid-template-columns: repeat(6, minmax(0, 1fr));
+	      }
+	    }
+	  </style>
 </head>
 <body>
   <div class="shell">
