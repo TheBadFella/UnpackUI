@@ -135,8 +135,32 @@ func TestProcessEventIgnoresGeneratedExtractOutput(t *testing.T) {
 
 	delete(unpackerr.Map, archivePath)
 
+	if !unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
+		t.Fatal("expected output suppression to continue while the generated output folder still exists")
+	}
+
+	unpackerr.processEvent(&eventData{
+		cnfg: &FolderConfig{Path: watchDir},
+		name: filepath.Base(outputDir),
+		file: outputDir,
+		op:   "f WRITE",
+	}, now.Add(time.Second))
+
+	if len(unpackerr.folders.Folders) != 0 {
+		t.Fatalf("expected generated output folder writes to stay ignored after source removal, tracked %d items",
+			len(unpackerr.folders.Folders))
+	}
+
+	if len(unpackerr.folders.Outputs) != 1 {
+		t.Fatalf("expected output suppression to remain while folder exists, found %d entries", len(unpackerr.folders.Outputs))
+	}
+
+	if err := os.RemoveAll(outputDir); err != nil {
+		t.Fatalf("removing generated output folder: %v", err)
+	}
+
 	if unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
-		t.Fatal("expected output suppression to clear when the source archive is no longer tracked")
+		t.Fatal("expected output suppression to clear once the generated output folder is gone")
 	}
 	if len(unpackerr.folders.Outputs) != 0 {
 		t.Fatalf("expected stale output suppression to be removed, found %d entries", len(unpackerr.folders.Outputs))
