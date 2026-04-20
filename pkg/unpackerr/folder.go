@@ -387,6 +387,11 @@ func (f *Folders) shouldIgnoreExtractOutput(path string, items map[string]*Extra
 		return false
 	}
 
+	if _, err := os.Stat(path); err != nil {
+		delete(f.Outputs, path)
+		return false
+	}
+
 	if _, tracked := f.Folders[source]; tracked {
 		return true
 	}
@@ -395,9 +400,10 @@ func (f *Folders) shouldIgnoreExtractOutput(path string, items map[string]*Extra
 		return true
 	}
 
-	delete(f.Outputs, path)
-
-	return false
+	// Keep suppressing generated extraction output while it still exists on disk.
+	// Otherwise a later write inside the extracted folder can be mistaken for a
+	// brand-new watched item and produce a duplicate "Nothing Extracted" record.
+	return true
 }
 
 // folderExcludeSuffixes returns archive suffixes to ignore when scanning for items to extract.

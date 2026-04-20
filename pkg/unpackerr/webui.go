@@ -1392,8 +1392,12 @@ const statusPageHTML = `<!doctype html>
 	    const detailClose = document.getElementById('detail-close');
 	    const statusUrl = new URL('api/status', window.location.href);
 	    const clearCompletedUrl = new URL('api/status/clear-completed', window.location.href);
+	    const activeRefreshMs = 2000;
+	    const idleRefreshMs = 30000;
+	    const errorRefreshMs = 10000;
 	    let lastSnapshot = { items: [] };
 	    let selectedItemId = '';
+	    let refreshTimer = 0;
 
 	    function escapeHtml(value) {
 	      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -1481,10 +1485,10 @@ const statusPageHTML = `<!doctype html>
 		        '>' + content + '</td>';
 		    }
 
-		    function renderDetailList(title, values, monospace) {
-		      const renderedValues = values.map((value) => {
-		        const content = monospace ? '<code>' + escapeHtml(value) + '</code>' : escapeHtml(value);
-		        return '<li>' + content + '</li>';
+	    function renderDetailList(title, values, monospace) {
+	      const renderedValues = values.map((value) => {
+	        const content = monospace ? '<code>' + escapeHtml(value) + '</code>' : escapeHtml(value);
+	        return '<li>' + content + '</li>';
 		      }).join('');
 
 		      return '<div class="detail-list">' +
@@ -1502,15 +1506,16 @@ const statusPageHTML = `<!doctype html>
 	      }
 
 	      const details = item.details ?? {};
-	      const progress = item.progress ?? null;
-	      const fields = [
-	        renderDetailField('Item', item.name, false),
-	        renderDetailField('App', item.app, false),
-	        renderDetailField('Status', item.statusText, false),
-	        renderDetailField('Updated', new Date(item.updatedAt).toLocaleString(), false),
-	        renderDetailField('Age', item.elapsed, false),
-	        renderDetailField('Path', item.path, true)
-	      ];
+		      const progress = item.progress ?? null;
+		      const fields = [
+		        renderDetailField('Item', item.name, false),
+		        renderDetailField('App', item.app, false),
+		        renderDetailField('Status', item.statusText, false),
+		        renderDetailField('Updated', new Date(item.updatedAt).toLocaleString(), false),
+		        renderDetailField('Path', item.path, true)
+		      ];
+
+	      if (!item.completed) fields.push(renderDetailField('Age', item.elapsed, false));
 
 	      if (details.title) fields.push(renderDetailField('Title', details.title, false));
 	      if (item.currentFile) fields.push(renderDetailField('Current archive', item.currentFile, true));
@@ -1562,7 +1567,18 @@ const statusPageHTML = `<!doctype html>
 	      detailSubtitle.textContent = item.completed
 	        ? 'Completed task retained in the UI until you clear it.'
 	        : 'Live task details and extraction context.';
-	      detailCard.hidden = false;
+		      detailCard.hidden = false;
+		    }
+
+	    function renderUpdatedCellContent(item) {
+	      const updatedAt = escapeHtml(new Date(item.updatedAt).toLocaleString());
+	      if (item.completed) {
+	        return '<div>' + updatedAt + '</div>' +
+	          '<div class="muted">Last event</div>';
+	      }
+
+	      return '<div>' + escapeHtml(item.elapsed) + '</div>' +
+	        '<div class="muted">' + updatedAt + '</div>';
 	    }
 
 	    function renderItems(data) {
@@ -1611,10 +1627,7 @@ const statusPageHTML = `<!doctype html>
 				            ) +
 				            renderItemCell('Progress', progressHtml, 'items-cell items-cell-progress') +
 				            deleteInHtml +
-			            renderItemCell('Updated', '' +
-			              '<div>' + escapeHtml(item.elapsed) + '</div>' +
-			              '<div class="muted">' + escapeHtml(new Date(item.updatedAt).toLocaleString()) + '</div>' +
-			            '', 'items-cell items-cell-updated') +
+			            renderItemCell('Updated', renderUpdatedCellContent(item), 'items-cell items-cell-updated') +
 		            renderItemCell(
 		              'Path',
 		              '<div class="path">' + escapeHtml(item.path) + '</div>',
@@ -1713,6 +1726,16 @@ const statusPageHTML = `<!doctype html>
 	      updateDeleteCountdowns();
 	    }
 
+	    function hasLiveActivity(data) {
+	      const items = data?.items ?? [];
+	      return items.some((item) => !item.completed || Boolean(item.deleteAt));
+	    }
+
+	    function scheduleRefresh(delay) {
+	      window.clearTimeout(refreshTimer);
+	      refreshTimer = window.setTimeout(refresh, delay);
+	    }
+
 	    async function refresh() {
 	      try {
 	        const response = await fetch(statusUrl, { cache: 'no-store' });
@@ -1721,8 +1744,10 @@ const statusPageHTML = `<!doctype html>
 	        renderSnapshot(data);
 	        const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : 'just now';
 	        stamp.textContent = 'Updated ' + generated;
+	        scheduleRefresh(hasLiveActivity(data) ? activeRefreshMs : idleRefreshMs);
 	      } catch (error) {
 	        stamp.textContent = 'Status unavailable: ' + error.message;
+	        scheduleRefresh(errorRefreshMs);
 	      }
 	    }
 
@@ -1743,6 +1768,7 @@ const statusPageHTML = `<!doctype html>
 	        }
 	        renderSnapshot(data);
 	        stamp.textContent = 'Cleared completed items';
+	        scheduleRefresh(hasLiveActivity(data) ? activeRefreshMs : idleRefreshMs);
 	      } catch (error) {
 	        stamp.textContent = 'Unable to clear completed items: ' + error.message;
 	      }
@@ -1766,7 +1792,6 @@ const statusPageHTML = `<!doctype html>
 
 	    refresh();
 	    setInterval(updateDeleteCountdowns, 1000);
-	    setInterval(refresh, 2000);
 	  </script>
 </body>
 </html>`
