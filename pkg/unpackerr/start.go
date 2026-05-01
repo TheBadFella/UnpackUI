@@ -68,6 +68,7 @@ type Unpackerr struct {
 	rotatorr *rotatorr.Logger
 	menu     map[string]ui.MenuItem
 	webState atomic.Pointer[webStatusSnapshot]
+	recovery *recoveryState
 }
 
 type fileDeleteReq struct {
@@ -107,6 +108,7 @@ func New() *Unpackerr {
 		updates:  make(chan *xtractr.Response, updateChanBuf),
 		progChan: make(chan *ExtractProgress),
 		menu:     make(map[string]ui.MenuItem),
+		recovery: newRecoveryState(),
 		Config: &Config{
 			KeepHistory: defaultHistory,
 			LogQueues:   cnfg.Duration{Duration: time.Minute + time.Second},
@@ -173,6 +175,7 @@ func Start() error {
 		return err
 	}
 
+	unpackerr.setupRecoveryState()
 	unpackerr.logStartupInfo(msg, output)
 
 	if unpackerr.Flags.webhook > 0 {
@@ -360,8 +363,9 @@ func (u *Unpackerr) Run() {
 		u.Printf("No Starr apps or folders configured. Shut down and add some apps or folders to your config file.")
 	}
 
-	u.PollFolders()          // This initializes channel(s) used below.
-	u.retrieveAppQueues(now) // Get in-app queues on startup.
+	u.PollFolders()                 // This initializes channel(s) used below.
+	u.recoverInterruptedFolders(now) // Re-queue watched folder items that were active before shutdown.
+	u.retrieveAppQueues(now)        // Get in-app queues on startup.
 	u.refreshWebState(now)
 
 	// This is the "main go routine" in start.go.

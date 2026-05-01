@@ -55,6 +55,7 @@ type Config struct {
 	LogFiles    int              `json:"logFiles"           toml:"log_files"     xml:"log_files"     yaml:"logFiles"`
 	LogFileMb   int              `json:"logFileMb"          toml:"log_file_mb"   xml:"log_file_mb"   yaml:"logFileMb"`
 	LogFileMode string           `json:"logFileMode"        toml:"log_file_mode" xml:"log_file_mode" yaml:"logFileMode"`
+	StateFile   string           `json:"stateFile"          toml:"state_file"    xml:"state_file"    yaml:"stateFile"`
 	MaxRetries  uint             `json:"maxRetries"         toml:"max_retries"   xml:"max_retries"   yaml:"maxRetries"`
 	FileMode    string           `json:"fileMode"           toml:"file_mode"     xml:"file_mode"     yaml:"fileMode"`
 	DirMode     string           `json:"dirMode"            toml:"dir_mode"      xml:"dir_mode"      yaml:"dirMode"`
