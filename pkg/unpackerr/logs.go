@@ -280,6 +280,10 @@ func (u *Unpackerr) logStartupInfo(msg string, externalFiles map[string]string) 
 		u.Printf(" => Log File: %s (%s, mode: %s)", u.LogFile, msg, u.LogFileMode)
 	}
 
+	if u.Config.StateFile != "" {
+		u.Printf(" => State File: %s", u.StateFile)
+	}
+
 	u.logWebhook()
 	u.logCmdhook()
 	u.logWebserver()

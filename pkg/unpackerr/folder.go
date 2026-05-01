@@ -323,12 +323,14 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 		xtractr.CheckR00ForRarFile(getFileList(filepath.Dir(name)), filepath.Base(name)) {
 		u.Printf("[Folder] Removing tracked item without extraction: %v (rar file exists)", name)
 		u.folders.Folders[name].status = EXTRACTEDNOTHING
+		u.recoveryClearFolder(name)
 
 		return
 	}
 
 	// create a queue counter in the main history; add to u.Map and send webhook for a new folder.
 	item := u.updateQueueStatus(&newStatus{Name: name, Status: QUEUED}, u.folders.Folders[name].updated, true)
+	u.recoveryTrackFolder(name, folder.config, QUEUED, u.folders.Folders[name].updated)
 	u.updateHistory(FolderString + ": " + name)
 
 	exclude := folderExcludeSuffixes(name, folder.config)
@@ -453,6 +455,7 @@ func (u *Unpackerr) folderXtractrCallback(resp *xtractr.Response) {
 	switch item := u.Map[resp.X.Name]; {
 	case !ok, item == nil:
 		// It doesn't exist? weird. delete it and bail out.
+		u.recoveryClearFolder(resp.X.Name)
 		delete(u.folders.Folders, resp.X.Name)
 		delete(u.Map, resp.X.Name)
 
@@ -482,6 +485,7 @@ func (u *Unpackerr) folderXtractrCallback(resp *xtractr.Response) {
 	}
 
 	folder.updated = resp.Started.Add(resp.Elapsed)
+	u.recoveryTrackFolder(resp.X.Name, folder.config, folder.status, folder.updated)
 	u.updateQueueStatus(&newStatus{Name: resp.X.Name, Resp: resp, Status: folder.status}, folder.updated, true)
 }
 
@@ -562,7 +566,13 @@ func (u *Unpackerr) processEvent(event *eventData, now time.Time) {
 		return
 	}
 
+	_, trackedBefore := u.folders.Folders[dirPath]
 	u.folders.processEvent(event, now)
+	if folder := u.folders.Folders[dirPath]; folder != nil {
+		u.recoveryTrackFolder(dirPath, folder.config, folder.status, folder.updated)
+	} else if trackedBefore {
+		u.recoveryClearFolder(dirPath)
+	}
 }
 
 // processEvent processes the event that was received.
@@ -632,6 +642,7 @@ func (u *Unpackerr) checkFolderStats(now time.Time) {
 			// Wait until this item hasn't been touched for a while, so it doesn't re-queue.
 			if now.Sub(folder.updated) > u.StartDelay.Duration {
 				// Ignore "no compressed files" errors for folders.
+				u.recoveryClearFolder(name)
 				delete(u.Map, name)
 				delete(u.folders.Folders, name)
 			}
@@ -641,6 +652,7 @@ func (u *Unpackerr) checkFolderStats(now time.Time) {
 			folder.retries++
 			folder.updated = now
 			folder.status = WAITING
+			u.recoveryTrackFolder(name, folder.config, folder.status, folder.updated)
 			u.Printf("[Folder] Re-starting Failed Extraction: %s (%d/%d, failed %v ago)",
 				folder.config.Path, folder.retries, u.MaxRetries, elapsed.Round(time.Second))
 		case EXTRACTFAILED == folder.status && folder.retries < u.MaxRetries:
@@ -648,6 +660,7 @@ func (u *Unpackerr) checkFolderStats(now time.Time) {
 		case folder.status > EXTRACTING && folder.config.DeleteAfter.Duration <= 0:
 			// if DeleteAfter is 0 we don't delete anything. we are done.
 			u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: nil}, now, false)
+			u.recoveryClearFolder(name)
 			delete(u.folders.Folders, name)
 		case EXTRACTED == folder.status && elapsed >= folder.config.DeleteAfter.Duration:
 			u.deleteAfterReached(name, now, folder)
@@ -677,6 +690,7 @@ func (u *Unpackerr) deleteAfterReached(name string, now time.Time, folder *Folde
 
 	u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: nil}, now, webhook)
 	// Folder reached delete delay (after extraction), nuke it.
+	u.recoveryClearFolder(name)
 	delete(u.folders.Folders, name)
 }
 

@@ -294,6 +294,17 @@ sections:
           - value: '0644'
           - value: '0664'
         short: 'POSIX mode used for new log files; not for Windows'
+      - name: state_file
+        envvar: STATE_FILE
+        default: ''
+        example: /downloads/unpackerr.state.json
+        short: Write restart recovery state for interrupted extractions.
+        desc: |
+          Write a small JSON state file so watched-folder extractions that were queued
+          or running before a restart can be retried automatically on startup.
+          The default path is /config/unpackerr.state.json in Docker when /config exists,
+          otherwise next to the log file when log_file is set, otherwise ~/.unpackerr.
+          Set this to "off" to disable restart recovery.
       - name: interval
         envvar: INTERVAL
         default: 2m
