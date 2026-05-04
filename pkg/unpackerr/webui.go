@@ -83,7 +83,9 @@ type webStatusProgress struct {
 	Archive      string  `json:"archive"`
 	ArchiveCount int     `json:"archiveCount"`
 	ArchiveIndex int     `json:"archiveIndex"`
+	ETA          string  `json:"eta,omitempty"`
 	Percent      float64 `json:"percent"`
+	Speed        string  `json:"speed,omitempty"`
 	Summary      string  `json:"summary"`
 	TotalBytes   string  `json:"totalBytes"`
 	WrittenBytes string  `json:"writtenBytes"`
@@ -289,7 +291,7 @@ func buildWebStatusItem(name string, item *Extract, folder *Folder, now time.Tim
 	}
 
 	if item.XProg != nil {
-		output.Progress = buildWebStatusProgress(item.XProg)
+		output.Progress = buildWebStatusProgress(item.XProg, now, item.Status == EXTRACTING)
 		if output.Progress != nil {
 			output.CurrentFile = output.Progress.Archive
 		}
@@ -474,17 +476,12 @@ func webStatusShouldHideFile(path string) bool {
 	return strings.HasPrefix(base, "_unpackerred.") && strings.HasSuffix(base, ".txt")
 }
 
-func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
+func buildWebStatusProgress(progress *ExtractProgress, now time.Time, live bool) *webStatusProgress {
 	if progress == nil || progress.Progress == nil {
 		return nil
 	}
 
-	var wrote, total uint64
-	if progress.Total > 0 {
-		wrote, total = progress.Wrote, progress.Total
-	} else {
-		wrote, total = progress.Read, progress.Compressed
-	}
+	wrote, total := progress.Bytes()
 
 	basePath := ""
 	if progress.Extract != nil {
@@ -505,7 +502,7 @@ func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
 			progress.Percent(), archive)
 	}
 
-	return &webStatusProgress{
+	output := &webStatusProgress{
 		Archive:      archive,
 		ArchiveCount: progress.Archives,
 		ArchiveIndex: progress.Extracted + 1,
@@ -514,6 +511,16 @@ func buildWebStatusProgress(progress *ExtractProgress) *webStatusProgress {
 		TotalBytes:   bytefmt.ByteSize(total) + "B",
 		WrittenBytes: bytefmt.ByteSize(wrote) + "B",
 	}
+
+	if speed, ok := progress.Speed(now); live && ok {
+		output.Speed = bytefmt.ByteSize(speed) + "B/s"
+	}
+
+	if eta, ok := progress.ETA(now); live && ok {
+		output.ETA = eta.String()
+	}
+
+	return output
 }
 
 func webStatusRank(status string) int {
@@ -731,7 +738,7 @@ const statusPageHTML = `<!doctype html>
       --border-strong: rgba(255, 255, 255, 0.18);
       --shadow: 0 28px 72px rgba(0, 0, 0, 0.55);
       --font: "Segoe UI Variable Display", "Aptos", "Segoe UI", sans-serif;
-      --mono: Consolas, "SFMono-Regular", monospace;
+      --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
     }
     * { box-sizing: border-box; }
     body {
@@ -1520,6 +1527,8 @@ const statusPageHTML = `<!doctype html>
 	      if (details.title) fields.push(renderDetailField('Title', details.title, false));
 	      if (item.currentFile) fields.push(renderDetailField('Current archive', item.currentFile, true));
 	      if (progress && progress.summary) fields.push(renderDetailField('Progress', progress.summary, false));
+	      if (progress && progress.speed) fields.push(renderDetailField('Speed', progress.speed, false));
+	      if (progress && progress.eta) fields.push(renderDetailField('ETA', progress.eta, false));
 	      if (details.bytes) fields.push(renderDetailField('Bytes written', details.bytes, false));
 	      if (details.elapsed) fields.push(renderDetailField('Extract elapsed', details.elapsed, false));
 		      if (details.startedAt) {
@@ -1656,12 +1665,17 @@ const statusPageHTML = `<!doctype html>
 		        percentText + '% - ' +
 		        escapeHtml(progress.writtenBytes || '0B') + ' / ' +
 		        escapeHtml(progress.totalBytes || '0B');
+		      const progressStats = [
+		        progress.speed ? 'Speed ' + escapeHtml(progress.speed) : '',
+		        progress.eta ? 'ETA ' + escapeHtml(progress.eta) : ''
+		      ].filter(Boolean).join(' | ');
 
 		      return '<div class="progress">' +
 		        '<div><strong>' + percentText + '%</strong> / ' + archiveIndex +
 		          ' of ' + archiveCountText + ' ' + archiveLabel + '</div>' +
 		        '<div class="progress-bar"><span style="width:' + width + '%"></span></div>' +
 		        '<div class="muted">' + byteSummary + '</div>' +
+		        (progressStats ? '<div class="muted">' + progressStats + '</div>' : '') +
 		        (progress.archive ? '<div class="path">' + escapeHtml(progress.archive) + '</div>' : '') +
 		      '</div>';
 		    }

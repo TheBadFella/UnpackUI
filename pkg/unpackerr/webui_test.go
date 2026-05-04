@@ -56,6 +56,8 @@ func TestBuildWebStateIncludesProgress(t *testing.T) {
 		XProg: &ExtractProgress{
 			Archives:  3,
 			Extracted: 1,
+			StartedAt: now.Add(-10 * time.Second),
+			UpdatedAt: now,
 			Progress: &xtractr.Progress{
 				Total:      200,
 				Wrote:      50,
@@ -88,6 +90,14 @@ func TestBuildWebStateIncludesProgress(t *testing.T) {
 
 	if progress.Percent != 25 {
 		t.Fatalf("expected 25 percent, got %.0f", progress.Percent)
+	}
+
+	if progress.Speed == "" {
+		t.Fatal("expected extraction speed to be present")
+	}
+
+	if progress.ETA != "30s" {
+		t.Fatalf("expected 30s ETA, got %q", progress.ETA)
 	}
 }
 
