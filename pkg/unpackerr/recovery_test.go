@@ -68,7 +68,7 @@ func TestRecoverInterruptedFolders(t *testing.T) {
 	unpackerr.recovery = &recoveryState{
 		Version: recoveryStateVersion,
 		Folders: map[string]*recoveryFolder{
-			archivePath: &recoveryFolder{
+			archivePath: {
 				Path:      archivePath,
 				WatchPath: watchPath,
 				Status:    EXTRACTING.String(),
@@ -112,7 +112,7 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 	unpackerr.recovery = &recoveryState{
 		Version: recoveryStateVersion,
 		Folders: map[string]*recoveryFolder{
-			archivePath: &recoveryFolder{
+			archivePath: {
 				Path:      archivePath,
 				WatchPath: watchPath,
 				Status:    WAITING.String(),

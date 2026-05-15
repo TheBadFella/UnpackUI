@@ -363,9 +363,9 @@ func (u *Unpackerr) Run() {
 		u.Printf("No Starr apps or folders configured. Shut down and add some apps or folders to your config file.")
 	}
 
-	u.PollFolders()                 // This initializes channel(s) used below.
+	u.PollFolders()                  // This initializes channel(s) used below.
 	u.recoverInterruptedFolders(now) // Re-queue watched folder items that were active before shutdown.
-	u.retrieveAppQueues(now)        // Get in-app queues on startup.
+	u.retrieveAppQueues(now)         // Get in-app queues on startup.
 	u.refreshWebState(now)
 
 	// This is the "main go routine" in start.go.
