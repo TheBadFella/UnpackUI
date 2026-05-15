@@ -4,6 +4,8 @@
 > [!NOTE]
 > UnpackUI primarily adds a lightweight UI for monitoring extraction status, while keeping Unpackerr's core behavior intact aside from a few targeted fixes and quality-of-life improvements.
 
+<img width="960" alt="UnpackUI status dashboard" src="pkg/ui/UnpackUI.png">
+
 <img width="128" height="128" alt="UnpackUI" src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/unpackerr.png">
 
 ## About
