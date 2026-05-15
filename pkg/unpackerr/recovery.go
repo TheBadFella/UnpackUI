@@ -207,11 +207,7 @@ func (u *Unpackerr) recoverInterruptedFolders(now time.Time) {
 			continue
 		}
 
-		item.Path = filepath.Clean(item.Path)
-		if item.Path != path {
-			delete(u.recovery.Folders, path)
-			u.recovery.Folders[item.Path] = item
-		}
+		u.recoverNormalizeFolder(path, item)
 
 		cfg := u.recoveryFolderConfig(item.Path, item.WatchPath)
 		if cfg == nil {
@@ -257,6 +253,16 @@ func (u *Unpackerr) recoverInterruptedFolders(now time.Time) {
 	if recovered > 0 || skipped > 0 {
 		u.saveRecoveryState()
 	}
+}
+
+func (u *Unpackerr) recoverNormalizeFolder(path string, item *recoveryFolder) {
+	item.Path = filepath.Clean(item.Path)
+	if item.Path == path {
+		return
+	}
+
+	delete(u.recovery.Folders, path)
+	u.recovery.Folders[item.Path] = item
 }
 
 func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {

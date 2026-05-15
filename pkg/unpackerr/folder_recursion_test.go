@@ -104,6 +104,49 @@ func TestProcessEventIgnoresGeneratedExtractOutput(t *testing.T) {
 	archivePath := filepath.Join(watchDir, "sample-large-zip-file.zip")
 	outputDir := filepath.Join(watchDir, "sample-large-zip-file")
 	now := time.Now()
+	unpackerr := newOutputTrackingUnpackerr(outputDir, archivePath, now)
+
+	if err := os.Mkdir(outputDir, 0o750); err != nil {
+		t.Fatalf("creating extracted output folder: %v", err)
+	}
+
+	processFolderEvent(unpackerr, watchDir, outputDir, "f CREATE", now)
+
+	if len(unpackerr.folders.Folders) != 0 {
+		t.Fatalf("expected generated output folder to be ignored, tracked %d items", len(unpackerr.folders.Folders))
+	}
+
+	delete(unpackerr.Map, archivePath)
+
+	if !unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
+		t.Fatal("expected output suppression to continue while the generated output folder still exists")
+	}
+
+	processFolderEvent(unpackerr, watchDir, outputDir, "f WRITE", now.Add(time.Second))
+
+	if len(unpackerr.folders.Folders) != 0 {
+		t.Fatalf("expected generated output folder writes to stay ignored after source removal, tracked %d items",
+			len(unpackerr.folders.Folders))
+	}
+
+	if len(unpackerr.folders.Outputs) != 1 {
+		t.Fatalf("expected output suppression to remain while folder exists, found %d entries",
+			len(unpackerr.folders.Outputs))
+	}
+
+	if err := os.RemoveAll(outputDir); err != nil {
+		t.Fatalf("removing generated output folder: %v", err)
+	}
+
+	if unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
+		t.Fatal("expected output suppression to clear once the generated output folder is gone")
+	}
+	if len(unpackerr.folders.Outputs) != 0 {
+		t.Fatalf("expected stale output suppression to be removed, found %d entries", len(unpackerr.folders.Outputs))
+	}
+}
+
+func newOutputTrackingUnpackerr(outputDir, archivePath string, now time.Time) *Unpackerr {
 	unpackerr := New()
 	unpackerr.folders = &Folders{
 		Logs:    unpackerr.Logger,
@@ -118,53 +161,16 @@ func TestProcessEventIgnoresGeneratedExtractOutput(t *testing.T) {
 		IDs:     map[string]any{"title": archivePath},
 	}
 
-	if err := os.Mkdir(outputDir, 0o750); err != nil {
-		t.Fatalf("creating extracted output folder: %v", err)
-	}
+	return unpackerr
+}
 
+func processFolderEvent(unpackerr *Unpackerr, watchDir, outputDir, op string, now time.Time) {
 	unpackerr.processEvent(&eventData{
 		cnfg: &FolderConfig{Path: watchDir},
 		name: filepath.Base(outputDir),
 		file: outputDir,
-		op:   "f CREATE",
+		op:   op,
 	}, now)
-
-	if len(unpackerr.folders.Folders) != 0 {
-		t.Fatalf("expected generated output folder to be ignored, tracked %d items", len(unpackerr.folders.Folders))
-	}
-
-	delete(unpackerr.Map, archivePath)
-
-	if !unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
-		t.Fatal("expected output suppression to continue while the generated output folder still exists")
-	}
-
-	unpackerr.processEvent(&eventData{
-		cnfg: &FolderConfig{Path: watchDir},
-		name: filepath.Base(outputDir),
-		file: outputDir,
-		op:   "f WRITE",
-	}, now.Add(time.Second))
-
-	if len(unpackerr.folders.Folders) != 0 {
-		t.Fatalf("expected generated output folder writes to stay ignored after source removal, tracked %d items",
-			len(unpackerr.folders.Folders))
-	}
-
-	if len(unpackerr.folders.Outputs) != 1 {
-		t.Fatalf("expected output suppression to remain while folder exists, found %d entries", len(unpackerr.folders.Outputs))
-	}
-
-	if err := os.RemoveAll(outputDir); err != nil {
-		t.Fatalf("removing generated output folder: %v", err)
-	}
-
-	if unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
-		t.Fatal("expected output suppression to clear once the generated output folder is gone")
-	}
-	if len(unpackerr.folders.Outputs) != 0 {
-		t.Fatalf("expected stale output suppression to be removed, found %d entries", len(unpackerr.folders.Outputs))
-	}
 }
 
 func runExtraction(t *testing.T, archivePath string, disableRecursion bool) *xtractr.Response {
