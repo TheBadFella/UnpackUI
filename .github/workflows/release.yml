@@ -17,6 +17,11 @@ on:
         required: false
         default: true
         type: boolean
+      extra_image_tag:
+        description: Optional extra image tag to publish in addition to latest and the selected workflow ref, such as 1.0.0.
+        required: false
+        default: ''
+        type: string
   pull_request:
     branches:
     - main
@@ -207,6 +212,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: '0'
 
       - name: Set up QEMU
         if: contains(github.event.inputs.platforms || '', 'arm')
@@ -228,20 +235,56 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set Docker image name
+        id: image_name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "${GITHUB_OUTPUT}"
+
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image_name.outputs.image }}
           tags: |
-            type=semver,pattern=v{{version}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,enable=true,event=branch
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=semver,pattern=v{{version}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=semver,pattern={{major}},enable=${{ github.event_name != 'workflow_dispatch' }}
+            type=ref,enable=${{ github.event_name != 'workflow_dispatch' }},event=branch
+
+      - name: Collect manual Docker tags
+        if: github.event_name == 'workflow_dispatch'
+        id: manual_tags
+        env:
+          IMAGE: ${{ steps.image_name.outputs.image }}
+          REF_NAME: ${{ github.ref_name }}
+          EXTRA_IMAGE_TAG: ${{ inputs.extra_image_tag }}
+        run: |
+          sanitize_tag() {
+            printf '%s' "$1" |
+              sed -E 's#^refs/(heads|tags)/##; s#[^A-Za-z0-9_.-]+#-#g; s#^-+|-+$##g' |
+              tr '[:upper:]' '[:lower:]' |
+              cut -c1-128
+          }
+
+          ref_tag="$(sanitize_tag "${REF_NAME}")"
+          extra_tag="$(sanitize_tag "${EXTRA_IMAGE_TAG}")"
+
+          {
+            [[ -n "${ref_tag}" ]] && echo "${IMAGE}:${ref_tag}"
+            [[ -n "${extra_tag}" ]] && echo "${IMAGE}:${extra_tag}"
+            echo "${IMAGE}:latest"
+          } | sort -u > /tmp/manual-docker-tags.txt
+
+          {
+            echo 'tags<<EOF'
+            cat /tmp/manual-docker-tags.txt
+            echo 'EOF'
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "Manual Docker tags:"
+          cat /tmp/manual-docker-tags.txt
 
       - name: Set docker build-args
         run: >-
@@ -262,7 +305,9 @@ jobs:
           context: .
           file: init/docker/Dockerfile
           push: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || github.event.inputs.push_image == 'true') }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ steps.manual_tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
