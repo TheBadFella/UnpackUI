@@ -228,8 +228,13 @@ func (u *Unpackerr) recoverInterruptedFolders(now time.Time) {
 			continue
 		}
 
+		interrupted := item.Status == QUEUED.String() || item.Status == EXTRACTING.String()
+		if interrupted {
+			u.cleanupInterruptedFolderOutput(item.Path, cfg, now)
+		}
+
 		updated := item.Updated
-		if updated.IsZero() || item.Status == QUEUED.String() || item.Status == EXTRACTING.String() {
+		if updated.IsZero() || interrupted {
 			updated = now.Add(-u.StartDelay.Duration)
 		}
 
@@ -263,6 +268,109 @@ func (u *Unpackerr) recoverNormalizeFolder(path string, item *recoveryFolder) {
 
 	delete(u.recovery.Folders, path)
 	u.recovery.Folders[item.Path] = item
+}
+
+func (u *Unpackerr) cleanupInterruptedFolderOutput(path string, cfg *FolderConfig, now time.Time) {
+	for _, outputPath := range interruptedFolderOutputPaths(path, cfg) {
+		cleaned, err := cleanupInterruptedOutputPath(outputPath, now)
+		if err != nil {
+			u.Errorf("[Folder] Cleaning stale partial output before retry: %s: %v", outputPath, err)
+			continue
+		}
+		if cleaned {
+			u.Printf("[Folder] Cleaned stale partial output before retry: %s", outputPath)
+		}
+	}
+}
+
+func interruptedFolderOutputPaths(path string, cfg *FolderConfig) []string {
+	if path == "" || cfg == nil {
+		return nil
+	}
+
+	outputs := []string{folderTempOutputPath(path, cfg)}
+	if !cfg.MoveBack {
+		outputs = append(outputs, folderFinalOutputPath(path, cfg))
+	}
+
+	deduped := make([]string, 0, len(outputs))
+	seen := make(map[string]struct{}, len(outputs))
+
+	for _, output := range outputs {
+		if output == "" {
+			continue
+		}
+
+		output = filepath.Clean(output)
+		if output == filepath.Clean(path) {
+			continue
+		}
+		if _, ok := seen[output]; ok {
+			continue
+		}
+
+		seen[output] = struct{}{}
+		deduped = append(deduped, output)
+	}
+
+	return deduped
+}
+
+func folderTempOutputPath(path string, cfg *FolderConfig) string {
+	output := strings.TrimRight(path, `/\`) + suffix
+	if cfg.ExtractPath != "" {
+		output = filepath.Join(cfg.ExtractPath, filepath.Base(output))
+	}
+
+	return output
+}
+
+func folderFinalOutputPath(path string, cfg *FolderConfig) string {
+	output := folderDerivedOutputPath(path)
+	if output == "" {
+		return ""
+	}
+	if cfg.ExtractPath != "" {
+		output = filepath.Join(cfg.ExtractPath, filepath.Base(output))
+	}
+
+	return output
+}
+
+func cleanupInterruptedOutputPath(path string, now time.Time) (bool, error) {
+	stat, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("stat partial output: %w", err)
+	}
+	if !stat.IsDir() {
+		return false, nil
+	}
+
+	quarantine := interruptedOutputQuarantinePath(path, now)
+	if err := os.Rename(path, quarantine); err == nil {
+		return true, removeInterruptedQuarantine(quarantine)
+	}
+
+	if err := os.RemoveAll(path); err != nil {
+		return false, fmt.Errorf("remove partial output: %w", err)
+	}
+
+	return true, nil
+}
+
+func interruptedOutputQuarantinePath(path string, now time.Time) string {
+	return fmt.Sprintf("%s.partial-%s", path, now.UTC().Format("20060102T150405.000000000Z"))
+}
+
+func removeInterruptedQuarantine(path string) error {
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("remove quarantined partial output: %w", err)
+	}
+
+	return nil
 }
 
 func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
