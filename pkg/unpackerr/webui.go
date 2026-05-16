@@ -810,7 +810,8 @@ const statusPageHTML = `<!doctype html>
 	      width: 44px;
 	      height: 44px;
 	      align-self: center;
-	      margin-top: 12px;
+	      margin-top: 0;
+	      transform: translateY(-2px);
 	      border-radius: 0;
 	      border: 1px solid var(--border);
 	      background: #111111;
@@ -820,7 +821,7 @@ const statusPageHTML = `<!doctype html>
 	      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 	    }
 	    .repo-link:hover {
-	      transform: translateY(-1px);
+	      transform: translateY(-3px);
 	      border-color: var(--accent);
 	      background: #1c1210;
 	      box-shadow: none;
@@ -964,7 +965,7 @@ const statusPageHTML = `<!doctype html>
 	      display: flex;
 	      align-items: center;
 	      gap: 6px;
-	      flex-wrap: nowrap;
+	      flex-wrap: wrap;
 	      background: #141414;
 	      border: 1px solid var(--border);
 	      color: var(--muted);
@@ -972,7 +973,8 @@ const statusPageHTML = `<!doctype html>
 	      padding: 12px 16px;
 	      font-size: 0.9rem;
 	      min-width: 0;
-	      white-space: nowrap;
+	      overflow-wrap: anywhere;
+	      white-space: normal;
 	    }
     .pill strong {
 	      color: var(--text);
@@ -997,7 +999,8 @@ const statusPageHTML = `<!doctype html>
 	    table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 760px;
+      table-layout: fixed;
+      min-width: 980px;
     }
 	    th, td {
 	      text-align: left;
@@ -1021,6 +1024,22 @@ const statusPageHTML = `<!doctype html>
     .items-row.is-selected td {
       background: rgba(255, 75, 47, 0.1);
     }
+    .items-cell-item {
+      min-width: 0;
+    }
+    .item-title {
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .items-cell-status,
+    .items-cell-progress,
+    .items-cell-updated,
+    .items-cell-delete,
+    .items-cell-path {
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
     .status {
       display: inline-flex;
       align-items: center;
@@ -1030,7 +1049,7 @@ const statusPageHTML = `<!doctype html>
       border-radius: 0;
       padding: 6px 0;
       white-space: nowrap;
-      font-size: 0.82rem;
+      font-size: inherit;
     }
     .status::before {
       content: "";
@@ -1075,15 +1094,15 @@ const statusPageHTML = `<!doctype html>
     }
     .path {
       font-family: var(--mono);
-      font-size: 0.82rem;
+      font-size: inherit;
       color: var(--text);
       word-break: break-all;
-      line-height: 1.55;
+      line-height: inherit;
     }
 	    .progress {
 	      display: grid;
-	      gap: 10px;
-	      min-width: 220px;
+	      gap: 8px;
+	      min-width: 0;
 	    }
     .progress-bar {
       position: relative;
@@ -1116,15 +1135,36 @@ const statusPageHTML = `<!doctype html>
 	    .detail-grid {
 	      display: grid;
 	      gap: 18px;
-	      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	      grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
 	      padding: 12px;
 	    }
-	    .detail-field {
+	    .detail-section {
 	      border: 1px solid var(--border);
 	      border-radius: 0;
 	      padding: 18px;
 	      background: #141414;
+	      min-width: 0;
 	    }
+    .detail-section-wide {
+      grid-column: 1 / -1;
+    }
+    .detail-section-title {
+      color: var(--heading);
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .detail-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 20px;
+      margin-top: 14px;
+    }
+    .detail-meta-item {
+      min-width: 120px;
+    }
+    .detail-label,
     .detail-field .label {
       color: var(--muted);
       font-size: 0.78rem;
@@ -1132,6 +1172,40 @@ const statusPageHTML = `<!doctype html>
       text-transform: uppercase;
       margin-bottom: 8px;
     }
+    .detail-value {
+      color: var(--text);
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .detail-paths {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 18px;
+    }
+    .detail-path-row {
+      min-width: 0;
+    }
+    .detail-path-row-wide {
+      grid-column: 1 / -1;
+    }
+    .detail-path-value {
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      line-height: 1.5;
+      color: var(--text);
+      word-break: break-all;
+    }
+    .detail-lines {
+      display: grid;
+      gap: 12px;
+    }
+	    .detail-field {
+	      border: 1px solid var(--border);
+	      border-radius: 0;
+	      padding: 18px;
+	      background: #141414;
+	    }
     .detail-field .value {
       color: var(--text);
       line-height: 1.55;
@@ -1166,22 +1240,26 @@ const statusPageHTML = `<!doctype html>
       font-family: var(--mono);
       font-size: 0.82rem;
     }
-		    @media (max-width: 720px) {
-		      .shell {
-		        padding: 24px 16px 48px;
-		      }
+		    @media (max-width: 1080px) {
 	      .headline-actions {
 	        justify-content: flex-start;
 	      }
 	      .table-head {
 	        display: grid;
+	        grid-template-columns: minmax(0, 1fr);
 	      }
 	      .table-wrap {
 	        overflow-x: visible;
 	        padding: 0 14px 14px;
 	      }
 	      table {
+	        display: block;
 	        min-width: 0;
+	        width: 100%;
+	      }
+	      tbody {
+	        display: block;
+	        width: 100%;
 	      }
 	      thead {
 	        display: none;
@@ -1189,10 +1267,12 @@ const statusPageHTML = `<!doctype html>
 	      #items {
 	        display: grid;
 	        gap: 14px;
+	        width: 100%;
 	      }
 	      .items-row,
 	      .empty-row {
 	        display: block;
+	        width: 100%;
 	      }
 	      .items-row {
 	        border: 1px solid var(--border);
@@ -1235,6 +1315,15 @@ const statusPageHTML = `<!doctype html>
 	      .progress {
 	        min-width: 0;
 	      }
+	      .detail-grid {
+	        grid-template-columns: minmax(0, 1fr);
+	      }
+	      .detail-paths {
+	        grid-template-columns: minmax(0, 1fr);
+	      }
+	      .detail-section-wide {
+	        grid-column: auto;
+	      }
 	      .empty-row td {
 	        display: block;
 	        border-top: 0;
@@ -1243,6 +1332,11 @@ const statusPageHTML = `<!doctype html>
 	      .empty-row td::before {
 	        content: none;
 	      }
+		    }
+		    @media (max-width: 720px) {
+		      .shell {
+		        padding: 24px 16px 48px;
+		      }
 		      .hero {
 		        padding: 22px;
 		      }
@@ -1313,6 +1407,7 @@ const statusPageHTML = `<!doctype html>
 	      </div>
 	      <div class="table-wrap">
 	        <table>
+	          <colgroup id="items-cols"></colgroup>
 	          <thead>
 	            <tr id="items-head">
 	              <th>Item</th>
@@ -1360,6 +1455,7 @@ const statusPageHTML = `<!doctype html>
 	    const stamp = document.getElementById('stamp');
 	    const clearCompletedButton = document.getElementById('clear-completed');
 	    const itemCount = document.getElementById('item-count');
+	    const itemsCols = document.getElementById('items-cols');
 	    const itemsHead = document.getElementById('items-head');
 	    const itemsBody = document.getElementById('items');
 	    const detailCard = document.getElementById('detail-card');
@@ -1456,6 +1552,90 @@ const statusPageHTML = `<!doctype html>
 		      '</div>';
 		    }
 
+		    function renderDetailMeta(label, value) {
+		      if (!value) {
+		        return '';
+		      }
+
+		      return '<div class="detail-meta-item">' +
+		        '<div class="detail-label">' + escapeHtml(label) + '</div>' +
+		        '<div class="detail-value">' + escapeHtml(value) + '</div>' +
+		      '</div>';
+		    }
+
+		    function renderDetailPath(label, value) {
+		      if (!value) {
+		        return '';
+		      }
+
+		      return '<div class="detail-path-row">' +
+		        '<div class="detail-label">' + escapeHtml(label) + '</div>' +
+		        '<div class="detail-path-value">' + escapeHtml(value) + '</div>' +
+		      '</div>';
+		    }
+
+		    function renderDetailPathWide(label, value) {
+		      if (!value) {
+		        return '';
+		      }
+
+		      return '<div class="detail-path-row detail-path-row-wide">' +
+		        '<div class="detail-label">' + escapeHtml(label) + '</div>' +
+		        '<div class="detail-path-value">' + escapeHtml(value) + '</div>' +
+		      '</div>';
+		    }
+
+		    function renderDetailSection(title, content, wide) {
+		      if (!content) {
+		        return '';
+		      }
+
+		      return '<div class="detail-section' + (wide ? ' detail-section-wide' : '') + '">' +
+		        (title ? '<div class="detail-label">' + escapeHtml(title) + '</div>' : '') +
+		        content +
+		      '</div>';
+		    }
+
+		    function normalizePath(value) {
+		      return String(value ?? '').replaceAll('\\', '/').replace(/\/+$/, '');
+		    }
+
+		    function pathBase(value) {
+		      const normalized = normalizePath(value);
+		      if (!normalized) {
+		        return '';
+		      }
+
+		      const parts = normalized.split('/');
+		      return parts[parts.length - 1] || normalized;
+		    }
+
+		    function pathDir(value) {
+		      const text = String(value ?? '');
+		      const index = Math.max(text.lastIndexOf('\\'), text.lastIndexOf('/'));
+		      return index > -1 ? text.slice(0, index) : '';
+		    }
+
+		    function relativePath(value, root) {
+		      const normalizedValue = normalizePath(value);
+		      const normalizedRoot = normalizePath(root);
+		      if (!normalizedValue || !normalizedRoot || !normalizedValue.startsWith(normalizedRoot + '/')) {
+		        return pathBase(value) || value;
+		      }
+
+		      return normalizedValue.slice(normalizedRoot.length + 1);
+		    }
+
+		    function sameTime(first, second) {
+		      const firstDate = new Date(first);
+		      const secondDate = new Date(second);
+		      if (Number.isNaN(firstDate.getTime()) || Number.isNaN(secondDate.getTime())) {
+		        return false;
+		      }
+
+		      return Math.abs(firstDate.getTime() - secondDate.getTime()) < 1000;
+		    }
+
 		    function renderItemCell(label, content, className) {
 		      return '<td data-label="' + escapeHtml(label) + '"' +
 		        (className ? ' class="' + className + '"' : '') +
@@ -1484,67 +1664,80 @@ const statusPageHTML = `<!doctype html>
 
 	      const details = item.details ?? {};
 		      const progress = item.progress ?? null;
-		      const fields = [
-		        renderDetailField('Item', item.name, false),
-		        renderDetailField('App', item.app, false),
-		        renderDetailField('Status', item.statusText, false),
-		        renderDetailField('Updated', new Date(item.updatedAt).toLocaleString(), false),
-		        renderDetailField('Path', item.path, true)
+		      const updatedAt = new Date(item.updatedAt).toLocaleString();
+		      const showStarted = details.startedAt && !sameTime(details.startedAt, item.updatedAt);
+		      const startedAt = showStarted ? new Date(details.startedAt).toLocaleString() : '';
+		      const deleteAt = item.deleteAt ? new Date(item.deleteAt).toLocaleString() : '';
+		      const title = details.title || item.name;
+		      const location = pathDir(item.path);
+		      const progressSummary = progress
+		        ? (progress.percent || 0).toFixed(0) + '% - ' +
+		          (progress.archiveIndex || 1) + ' of ' + (progress.archiveCount || 1) +
+		          ((progress.archiveCount || 1) === 1 ? ' archive' : ' archives') +
+		          ' - ' + (progress.writtenBytes || details.bytes || '0B') + ' / ' +
+		          (progress.totalBytes || details.bytes || '0B')
+		        : '';
+		      const overviewMeta = [
+		        renderDetailMeta('Status', item.statusText),
+		        renderDetailMeta('Updated', updatedAt),
+		        !item.completed ? renderDetailMeta('Age', item.elapsed) : '',
+		        item.error ? renderDetailMeta('Error', item.error) : ''
+		      ].join('');
+		      const overviewPaths = [
+		        renderDetailPath('Location', location),
+		        item.reason ? renderDetailPath('Reason', item.reason) : '',
+		        renderDetailPathWide('Source archive', pathBase(item.path)),
+		        details.output ? renderDetailPathWide('Output folder', pathBase(details.output)) : '',
+		        item.currentFile ? renderDetailPathWide('Current archive', pathBase(item.currentFile)) : ''
+		      ].join('');
+		      const overview = '<div class="detail-section-title">' + escapeHtml(title) + '</div>' +
+		        '<div class="detail-meta">' + overviewMeta + '</div>' +
+		        '<div class="detail-paths">' + overviewPaths + '</div>';
+		      const extractionLines = [
+		        progressSummary ? '<div class="detail-value">' + escapeHtml(progressSummary) + '</div>' : '',
+		        progress && progress.speed ? renderDetailMeta('Speed', progress.speed) : '',
+		        progress && progress.eta ? renderDetailMeta('ETA', progress.eta) : '',
+		        details.elapsed ? renderDetailMeta('Elapsed', details.elapsed) : '',
+		        startedAt ? renderDetailMeta('Started', startedAt) : '',
+		        details.queue ? renderDetailMeta('Queue at start', details.queue) : ''
+		      ].join('');
+		      const extraction = extractionLines
+		        ? '<div class="detail-lines">' + extractionLines + '</div>'
+		        : '<div class="detail-value">No extraction details yet.</div>';
+		      const cleanup = item.deleteAt
+		        ? '<div class="detail-lines">' +
+		            '<div class="detail-meta-item">' +
+		              '<div class="detail-label">Deletes in</div>' +
+		              '<div class="detail-value" data-delete-at="' + escapeHtml(item.deleteAt) +
+		                '" data-empty="due now">' + escapeHtml(item.deleteIn || '') + '</div>' +
+		            '</div>' +
+		            renderDetailMeta('Scheduled for', deleteAt) +
+		          '</div>'
+		        : (item.deleteIn ? '<div class="detail-value">' + escapeHtml(item.deleteIn) + '</div>' : '');
+		      const sections = [
+		        renderDetailSection('Overview', overview, true),
+		        renderDetailSection('Extraction', extraction, false),
+		        renderDetailSection('Cleanup', cleanup, false)
 		      ];
 
-	      if (!item.completed) fields.push(renderDetailField('Age', item.elapsed, false));
-
-	      if (details.title) fields.push(renderDetailField('Title', details.title, false));
-	      if (item.currentFile) fields.push(renderDetailField('Current archive', item.currentFile, true));
-	      if (progress && progress.summary) fields.push(renderDetailField('Progress', progress.summary, false));
-	      if (progress && progress.speed) fields.push(renderDetailField('Speed', progress.speed, false));
-	      if (progress && progress.eta) fields.push(renderDetailField('ETA', progress.eta, false));
-	      if (details.bytes) fields.push(renderDetailField('Bytes written', details.bytes, false));
-	      if (details.elapsed) fields.push(renderDetailField('Extract elapsed', details.elapsed, false));
-		      if (details.startedAt) {
-		        fields.push(
-		          renderDetailField(
-		            'Extract started',
-		            new Date(details.startedAt).toLocaleString(),
-		            false
-		          )
-		        );
-		      }
-		      if (item.deleteAt) {
-		        fields.push(
-		          '<div class="detail-field">' +
-		            '<div class="label">Deletes in</div>' +
-		            '<div class="value" data-delete-at="' + escapeHtml(item.deleteAt) +
-		              '" data-empty="due now">' + escapeHtml(item.deleteIn || '') + '</div>' +
-		          '</div>'
-		        );
-		      } else if (item.deleteIn) {
-		        fields.push(renderDetailField('Deletes in', item.deleteIn, false));
-		      }
-		      if (item.deleteAt) {
-		        fields.push(renderDetailField('Deletes at', new Date(item.deleteAt).toLocaleString(), false));
-		      }
-	      if (details.output) fields.push(renderDetailField('Temp folder', details.output, true));
-	      if (details.queue) fields.push(renderDetailField('Queue at start', details.queue, false));
-	      if (item.reason) fields.push(renderDetailField('Reason', item.reason, false));
-	      if (item.error) fields.push(renderDetailField('Error', item.error, false));
-
 	      const lists = [];
-	      if ((details.archives ?? []).length) {
-	        lists.push(renderDetailList('Archives (' + details.archives.length + ')', details.archives, true));
+	      const archives = details.archives ?? [];
+	      const files = details.files ?? [];
+	      const duplicateSingleArchive = archives.length === 1 &&
+	        normalizePath(archives[0]) === normalizePath(item.path);
+	      if (archives.length && !duplicateSingleArchive) {
+	        const archiveNames = archives.map((archive) => relativePath(archive, location));
+	        lists.push(renderDetailList('Archives (' + archives.length + ')', archiveNames, true));
 	      }
-	      if ((details.files ?? []).length) {
-	        lists.push(renderDetailList('Extracted files (' + details.files.length + ')', details.files, true));
-	      }
-	      if (details.ids && Object.keys(details.ids).length) {
-	        const pairs = Object.entries(details.ids).map(([key, value]) => key + ': ' + value);
-	        lists.push(renderDetailList('Metadata', pairs, false));
+	      if (files.length) {
+	        const fileNames = files.map((file) => relativePath(file, details.output || location));
+	        lists.push(renderDetailList('Extracted files (' + files.length + ')', fileNames, true));
 	      }
 
-	      detailGrid.innerHTML = fields.join('');
+	      detailGrid.innerHTML = sections.join('');
 	      detailLists.innerHTML = lists.join('');
 	      detailSubtitle.textContent = item.completed
-	        ? 'Completed task retained in the UI until you clear it.'
+	        ? 'Completed task summary.'
 	        : 'Live task details and extraction context.';
 		      detailCard.hidden = false;
 		    }
@@ -1567,6 +1760,10 @@ const statusPageHTML = `<!doctype html>
 	      const showDeleteIn = items.some((item) => Boolean(item.deleteIn));
 	      itemCount.textContent = activeCount + ' active / ' + completedCount + ' completed';
 	      clearCompletedButton.disabled = completedCount === 0;
+	      itemsCols.innerHTML = (showDeleteIn
+	        ? ['35%', '13%', '16%', '10%', '12%', '14%']
+	        : ['42%', '14%', '15%', '13%', '16%']
+	      ).map((width) => '<col style="width:' + width + '">').join('');
 	      itemsHead.innerHTML = [
 	        '<th>Item</th>',
 	        '<th>Status</th>',
@@ -1596,8 +1793,7 @@ const statusPageHTML = `<!doctype html>
 				        return (
 				          '<tr class="items-row' + rowClass + '" data-item-id="' + rowId + '">' +
 				            renderItemCell('Item', '' +
-				              '<div><strong>' + escapeHtml(item.name) + '</strong></div>' +
-			              '<div class="muted">' + escapeHtml(item.app) + '</div>' +
+				              '<div class="item-title"><strong>' + escapeHtml(item.name) + '</strong></div>' +
 			              notes, 'items-cell items-cell-item') +
 				            renderItemCell(
 				              'Status',
@@ -1609,7 +1805,7 @@ const statusPageHTML = `<!doctype html>
 			            renderItemCell('Updated', renderUpdatedCellContent(item), 'items-cell items-cell-updated') +
 		            renderItemCell(
 		              'Path',
-		              '<div class="path">' + escapeHtml(item.path) + '</div>',
+		              '<div class="path">' + escapeHtml(pathDir(item.path) || item.path) + '</div>',
 		              'items-cell items-cell-path'
 		            ) +
 		          '</tr>'
@@ -1657,8 +1853,7 @@ const statusPageHTML = `<!doctype html>
 		          : '',
 		        item.error
 		          ? '<div class="muted"><strong>Error</strong> ' + escapeHtml(item.error) + '</div>'
-		          : '',
-		        item.completed ? '<div class="muted">Retained until cleared</div>' : ''
+		          : ''
 		      ].join('');
 		    }
 
@@ -1766,6 +1961,13 @@ const statusPageHTML = `<!doctype html>
 
 	      const item = (lastSnapshot.items ?? []).find((candidate) => candidate.id === row.dataset.itemId);
 	      if (!item) {
+	        return;
+	      }
+
+	      if (selectedItemId === item.id) {
+	        selectedItemId = '';
+	        detailCard.hidden = true;
+	        renderItems(lastSnapshot);
 	        return;
 	      }
 
