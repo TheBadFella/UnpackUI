@@ -3,7 +3,7 @@ module github.com/Unpackerr/unpackerr
 go 1.26.0
 
 require (
-	code.cloudfoundry.org/bytefmt v0.72.0
+	code.cloudfoundry.org/bytefmt v0.73.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/energye/systray v1.0.3
 	github.com/fsnotify/fsnotify v1.10.1
