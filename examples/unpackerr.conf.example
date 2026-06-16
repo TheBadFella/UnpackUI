@@ -83,9 +83,10 @@ dir_mode = "0755"
 passwords = []
 
 [webserver]
-## Enable the lightweight status page so you can see queue state and extract progress.
+## Enable the built-in status UI at the web server root path.
+## This shows queue state, extraction progress, and recent extraction results.
  ui = false
-## Enable Prometheus metrics on /metrics.
+## Enable the Prometheus metrics endpoint on `/metrics`.
  metrics = false
 ## This may be set to a port or an ip:port to bind a specific IP. 0.0.0.0 binds ALL IPs.
  listen_addr = "0.0.0.0:5656"
@@ -352,4 +353,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 08 MAR 2026 18:55 UTC
+## => Content Auto Generated, 16 JUN 2026 22:44 UTC

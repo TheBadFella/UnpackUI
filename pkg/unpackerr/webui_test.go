@@ -36,6 +36,7 @@ func TestWebServerEnabled(t *testing.T) {
 	}
 
 	server.UI = false
+
 	server.Metrics = true
 	if !server.Enabled() {
 		t.Fatal("expected webserver to enable when metrics are enabled")
@@ -275,6 +276,7 @@ func TestWebStatusAPI(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	unpackerr.webStatusAPI(rec, req, nil)
+
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}

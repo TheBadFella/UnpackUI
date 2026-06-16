@@ -152,6 +152,7 @@ func (u *Unpackerr) buildTrackedWebItems(
 		}
 
 		webItem := buildWebStatusItem(name, item, folderItem, now)
+
 		currentKeys[webItem.Key] = struct{}{}
 		if _, skip := dismissed[webItem.Key]; skip && webItem.Completed {
 			continue
@@ -199,12 +200,15 @@ func mergeRetainedCompletedWebItems(
 		if !item.Completed {
 			continue
 		}
+
 		if _, ok := currentKeys[item.Key]; ok {
 			continue
 		}
+
 		if _, ok := retainedKeys[item.Key]; ok {
 			continue
 		}
+
 		if _, skip := dismissed[item.Key]; skip {
 			continue
 		}
@@ -223,6 +227,7 @@ func sortWebStatusItems(items []webStatusItem) {
 		if left.Completed != right.Completed {
 			return !left.Completed
 		}
+
 		if leftRank, rightRank := webStatusRank(left.Status), webStatusRank(right.Status); leftRank != rightRank {
 			return leftRank < rightRank
 		}
@@ -248,8 +253,10 @@ func (u *Unpackerr) currentWebBuffers() webStatusBuffers {
 }
 
 func webStatusItemCounts(items []webStatusItem) (int, int) {
-	var activeCount int
-	var completedCount int
+	var (
+		activeCount    int
+		completedCount int
+	)
 
 	for _, item := range items {
 		if item.Completed {
@@ -324,6 +331,7 @@ func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) we
 func buildWebStatusDetails(item *Extract) *webStatusDetails {
 	details := &webStatusDetails{}
 	populateWebStatusIdentityDetails(details, item)
+
 	if item.Resp != nil {
 		populateWebStatusResponseDetails(details, item.Resp)
 	}
@@ -339,6 +347,7 @@ func populateWebStatusIdentityDetails(details *webStatusDetails, item *Extract) 
 	if title, ok := item.IDs["title"]; ok {
 		details.Title = fmt.Sprint(title)
 	}
+
 	if details.Title == "" || details.Title == item.Path {
 		details.Title = webStatusDisplayName(item.Path, item)
 	}
@@ -362,23 +371,29 @@ func populateWebStatusResponseDetails(details *webStatusDetails, response *xtrac
 	if response.Started.Unix() > 0 {
 		details.StartedAt = response.Started.Format(time.RFC3339)
 	}
+
 	if response.Output != "" {
 		details.Output = response.Output
 	}
+
 	if response.Size > 0 {
 		details.Bytes = bytefmt.ByteSize(response.Size) + "B"
 	}
+
 	if response.Elapsed > 0 {
 		details.Elapsed = response.Elapsed.Round(time.Second).String()
 	}
+
 	details.Queue = response.Queued
 
 	for _, archiveGroup := range response.Archives {
 		details.Archives = append(details.Archives, archiveGroup...)
 	}
+
 	for _, extraGroup := range response.Extras {
 		details.Archives = append(details.Archives, extraGroup...)
 	}
+
 	for _, file := range response.NewFiles {
 		if webStatusShouldHideFile(file) {
 			continue
@@ -408,6 +423,7 @@ func webStatusDisplayName(name string, item *Extract) string {
 				return display
 			}
 		}
+
 		if item.Path != "" {
 			return webStatusLabel(item.Path)
 		}
@@ -432,6 +448,7 @@ func webStatusDeleteTiming(item *Extract, folder *Folder, now time.Time) (string
 		if item.Status != EXTRACTED || folder == nil || folder.config == nil || folder.config.DeleteAfter == nil {
 			return "", ""
 		}
+
 		return webStatusDeleteWindow(item.Updated, folder.config.DeleteAfter.Duration, now)
 	case item.Status == IMPORTED:
 		return webStatusDeleteWindow(item.Updated, item.DeleteDelay, now)
@@ -446,6 +463,7 @@ func webStatusDeleteWindow(updated time.Time, delay time.Duration, now time.Time
 	}
 
 	deleteAt := updated.Add(delay)
+
 	remaining := deleteAt.Sub(now).Round(time.Second)
 	if remaining <= 0 {
 		return "", deleteAt.Format(time.RFC3339)
@@ -456,6 +474,7 @@ func webStatusDeleteWindow(updated time.Time, delay time.Duration, now time.Time
 
 func webStatusLabel(value string) string {
 	value = filepath.Clean(value)
+
 	label := filepath.Base(value)
 	if label == "." || label == string(filepath.Separator) || label == "" {
 		return value
@@ -482,7 +501,7 @@ func buildWebStatusProgress(progress *ExtractProgress, now time.Time, live bool)
 
 	basePath := ""
 	if progress.Extract != nil {
-		basePath = progress.Extract.Path
+		basePath = progress.Path
 	}
 
 	archive := ""

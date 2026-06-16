@@ -35,14 +35,17 @@ func TestRecoveryTracksAndClearsFolder(t *testing.T) {
 	if item == nil {
 		t.Fatalf("expected recovery item for %s", archivePath)
 	}
+
 	if item.Status != EXTRACTING.String() {
 		t.Fatalf("expected status %q, got %q", EXTRACTING.String(), item.Status)
 	}
+
 	if item.WatchPath != filepath.Clean(watchPath) {
 		t.Fatalf("expected watch path %q, got %q", filepath.Clean(watchPath), item.WatchPath)
 	}
 
 	unpackerr.recoveryClearFolder(archivePath)
+
 	if _, err := os.Stat(stateFile); !os.IsNotExist(err) {
 		t.Fatalf("expected empty recovery state file to be removed, got err=%v", err)
 	}
@@ -52,6 +55,7 @@ func TestRecoverInterruptedFolders(t *testing.T) {
 	t.Parallel()
 
 	watchPath := t.TempDir()
+
 	archivePath := filepath.Join(watchPath, "movie.zip")
 	if err := os.WriteFile(archivePath, []byte("placeholder"), 0o600); err != nil {
 		t.Fatalf("creating archive placeholder: %v", err)
@@ -83,9 +87,11 @@ func TestRecoverInterruptedFolders(t *testing.T) {
 	if folder == nil {
 		t.Fatalf("expected interrupted folder to be restored")
 	}
+
 	if folder.status != WAITING {
 		t.Fatalf("expected restored folder to be waiting, got %s", folder.status)
 	}
+
 	if now.Sub(folder.updated) < unpackerr.StartDelay.Duration {
 		t.Fatalf("expected extracting item to be eligible for immediate retry")
 	}
@@ -103,15 +109,19 @@ func TestRecoverInterruptedFolderCleansPartialOutput(t *testing.T) {
 	if err := os.WriteFile(archivePath, []byte("placeholder"), 0o600); err != nil {
 		t.Fatalf("creating archive placeholder: %v", err)
 	}
+
 	if err := os.MkdirAll(tempOutput, 0o700); err != nil {
 		t.Fatalf("creating temp partial output: %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(tempOutput, "partial.tmp"), []byte("partial"), 0o600); err != nil {
 		t.Fatalf("writing temp partial output: %v", err)
 	}
+
 	if err := os.MkdirAll(finalOutput, 0o700); err != nil {
 		t.Fatalf("creating final partial output: %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(finalOutput, "partial.tmp"), []byte("partial"), 0o600); err != nil {
 		t.Fatalf("writing final partial output: %v", err)
 	}
@@ -125,9 +135,11 @@ func TestRecoverInterruptedFolderCleansPartialOutput(t *testing.T) {
 	if _, err := os.Stat(tempOutput); !os.IsNotExist(err) {
 		t.Fatalf("expected temp partial output to be cleaned, got err=%v", err)
 	}
+
 	if _, err := os.Stat(finalOutput); !os.IsNotExist(err) {
 		t.Fatalf("expected final partial output to be cleaned, got err=%v", err)
 	}
+
 	if folder := unpackerr.folders.Folders[archivePath]; folder == nil || folder.status != WAITING {
 		t.Fatalf("expected interrupted folder to be restored for retry, got %#v", folder)
 	}
@@ -137,6 +149,7 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 	t.Parallel()
 
 	watchPath := t.TempDir()
+
 	archivePath := filepath.Join(watchPath, "movie.zip")
 	if err := os.WriteFile(archivePath, []byte("placeholder"), 0o600); err != nil {
 		t.Fatalf("creating archive placeholder: %v", err)
@@ -169,6 +182,7 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 	if folder == nil {
 		t.Fatalf("expected waiting folder to be restored")
 	}
+
 	if !folder.updated.Equal(updated) {
 		t.Fatalf("expected original updated time %s, got %s", updated, folder.updated)
 	}
@@ -184,6 +198,7 @@ func TestRecoverWaitingFolderDoesNotCleanOutput(t *testing.T) {
 	if err := os.WriteFile(archivePath, []byte("placeholder"), 0o600); err != nil {
 		t.Fatalf("creating archive placeholder: %v", err)
 	}
+
 	if err := os.MkdirAll(finalOutput, 0o700); err != nil {
 		t.Fatalf("creating existing output: %v", err)
 	}
