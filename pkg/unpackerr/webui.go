@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/bytefmt"
-	"github.com/dromara/carbon/v2"
 	"github.com/julienschmidt/httprouter"
 	"golift.io/version"
 	"golift.io/xtractr"
@@ -122,7 +121,7 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 
 	return &webStatusSnapshot{
 		GeneratedAt:    now.Format(time.RFC3339),
-		Uptime:         carbon.CreateFromStdTime(version.Started).DiffAbsInString(carbon.CreateFromStdTime(now)),
+		Uptime:         formatDuration(now.Sub(version.Started)),
 		Stats:          stats,
 		Buffers:        buffers,
 		ActiveCount:    activeCount,
