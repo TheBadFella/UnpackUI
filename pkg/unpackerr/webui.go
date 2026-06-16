@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/bytefmt"
-	"github.com/hako/durafmt"
+	"github.com/dromara/carbon/v2"
 	"github.com/julienschmidt/httprouter"
 	"golift.io/version"
 	"golift.io/xtractr"
@@ -91,8 +91,6 @@ type webStatusProgress struct {
 	WrittenBytes string  `json:"writtenBytes"`
 }
 
-const webStatusUptimeParts = 3
-
 const (
 	webStatusRankExtracting = iota
 	webStatusRankQueued
@@ -124,7 +122,7 @@ func (u *Unpackerr) buildWebState(now time.Time) *webStatusSnapshot {
 
 	return &webStatusSnapshot{
 		GeneratedAt:    now.Format(time.RFC3339),
-		Uptime:         durafmt.Parse(now.Sub(version.Started)).LimitFirstN(webStatusUptimeParts).Format(durafmtUnits),
+		Uptime:         carbon.CreateFromStdTime(version.Started).DiffAbsInString(carbon.CreateFromStdTime(now)),
 		Stats:          stats,
 		Buffers:        buffers,
 		ActiveCount:    activeCount,
