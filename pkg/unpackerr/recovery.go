@@ -46,6 +46,7 @@ func (u *Unpackerr) setupRecoveryState() {
 		u.Errorf("Recovery state disabled, cannot create state file directory %s: %v", filepath.Dir(u.StateFile), err)
 		u.StateFile = ""
 		u.recovery = newRecoveryState()
+
 		return
 	}
 
@@ -53,6 +54,7 @@ func (u *Unpackerr) setupRecoveryState() {
 	if err != nil {
 		u.Errorf("Recovery state unavailable, starting with empty state: %v", err)
 		u.recovery = newRecoveryState()
+
 		return
 	}
 
@@ -92,6 +94,7 @@ func readRecoveryState(path string) (*recoveryState, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return newRecoveryState(), nil
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("read recovery state: %w", err)
 	}
@@ -100,9 +103,11 @@ func readRecoveryState(path string) (*recoveryState, error) {
 	if err := json.Unmarshal(content, state); err != nil {
 		return nil, fmt.Errorf("parse recovery state %s: %w", path, err)
 	}
+
 	if state.Version == 0 {
 		state.Version = recoveryStateVersion
 	}
+
 	if state.Folders == nil {
 		state.Folders = make(map[string]*recoveryFolder)
 	}
@@ -167,6 +172,7 @@ func (u *Unpackerr) recoveryTrackFolder(path string, cfg *FolderConfig, status E
 
 	path = filepath.Clean(path)
 	watchPath := filepath.Clean(cfg.Path)
+
 	statusText := status.String()
 	if existing := u.recovery.Folders[path]; existing != nil &&
 		existing.WatchPath == watchPath &&
@@ -202,62 +208,75 @@ func (u *Unpackerr) recoverInterruptedFolders(now time.Time) {
 	var recovered, skipped int
 
 	for path, item := range u.recovery.Folders {
-		if item == nil {
-			delete(u.recovery.Folders, path)
-			continue
+		r, s := u.recoverInterruptedFolderItem(now, path, item)
+		if r {
+			recovered++
 		}
 
-		u.recoverNormalizeFolder(path, item)
-
-		cfg := u.recoveryFolderConfig(item.Path, item.WatchPath)
-		if cfg == nil {
-			u.Printf("[Folder] Removing stale recovery item outside configured watch folders: %s", item.Path)
-			delete(u.recovery.Folders, item.Path)
+		if s {
 			skipped++
-			continue
 		}
-
-		if _, err := os.Stat(item.Path); err != nil {
-			u.Printf("[Folder] Removing stale recovery item, path no longer exists: %s (%v)", item.Path, err)
-			delete(u.recovery.Folders, item.Path)
-			skipped++
-			continue
-		}
-
-		if _, ok := u.folders.Folders[item.Path]; ok {
-			continue
-		}
-
-		interrupted := item.Status == QUEUED.String() || item.Status == EXTRACTING.String()
-		if interrupted {
-			u.cleanupInterruptedFolderOutput(item.Path, cfg, now)
-		}
-
-		updated := item.Updated
-		if updated.IsZero() || interrupted {
-			updated = now.Add(-u.StartDelay.Duration)
-		}
-
-		u.folders.Folders[item.Path] = &Folder{
-			updated: updated,
-			status:  WAITING,
-			config:  cfg,
-		}
-
-		if outputPath := folderDerivedOutputPath(item.Path); outputPath != "" {
-			u.folders.Outputs[filepath.Clean(outputPath)] = item.Path
-		}
-
-		item.Status = WAITING.String()
-		item.Updated = now
-		item.WatchPath = filepath.Clean(cfg.Path)
-		recovered++
-		u.Printf("[Folder] Recovered interrupted extraction: %s", item.Path)
 	}
 
 	if recovered > 0 || skipped > 0 {
 		u.saveRecoveryState()
 	}
+}
+
+func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, item *recoveryFolder) (bool, bool) {
+	if item == nil {
+		delete(u.recovery.Folders, path)
+		return false, false
+	}
+
+	u.recoverNormalizeFolder(path, item)
+
+	cfg := u.recoveryFolderConfig(item.Path, item.WatchPath)
+	if cfg == nil {
+		u.Printf("[Folder] Removing stale recovery item outside configured watch folders: %s", item.Path)
+		delete(u.recovery.Folders, item.Path)
+
+		return false, true
+	}
+
+	if _, err := os.Stat(item.Path); err != nil {
+		u.Printf("[Folder] Removing stale recovery item, path no longer exists: %s (%v)", item.Path, err)
+		delete(u.recovery.Folders, item.Path)
+
+		return false, true
+	}
+
+	if _, ok := u.folders.Folders[item.Path]; ok {
+		return false, false
+	}
+
+	interrupted := item.Status == QUEUED.String() || item.Status == EXTRACTING.String()
+	if interrupted {
+		u.cleanupInterruptedFolderOutput(item.Path, cfg, now)
+	}
+
+	updated := item.Updated
+	if updated.IsZero() || interrupted {
+		updated = now.Add(-u.StartDelay.Duration)
+	}
+
+	u.folders.Folders[item.Path] = &Folder{
+		updated: updated,
+		status:  WAITING,
+		config:  cfg,
+	}
+
+	if outputPath := folderDerivedOutputPath(item.Path); outputPath != "" {
+		u.folders.Outputs[filepath.Clean(outputPath)] = item.Path
+	}
+
+	item.Status = WAITING.String()
+	item.Updated = now
+	item.WatchPath = filepath.Clean(cfg.Path)
+
+	u.Printf("[Folder] Recovered interrupted extraction: %s", item.Path)
+
+	return true, false
 }
 
 func (u *Unpackerr) recoverNormalizeFolder(path string, item *recoveryFolder) {
@@ -277,6 +296,7 @@ func (u *Unpackerr) cleanupInterruptedFolderOutput(path string, cfg *FolderConfi
 			u.Errorf("[Folder] Cleaning stale partial output before retry: %s: %v", outputPath, err)
 			continue
 		}
+
 		if cleaned {
 			u.Printf("[Folder] Cleaned stale partial output before retry: %s", outputPath)
 		}
@@ -305,6 +325,7 @@ func interruptedFolderOutputPaths(path string, cfg *FolderConfig) []string {
 		if output == filepath.Clean(path) {
 			continue
 		}
+
 		if _, ok := seen[output]; ok {
 			continue
 		}
@@ -330,6 +351,7 @@ func folderFinalOutputPath(path string, cfg *FolderConfig) string {
 	if output == "" {
 		return ""
 	}
+
 	if cfg.ExtractPath != "" {
 		output = filepath.Join(cfg.ExtractPath, filepath.Base(output))
 	}
@@ -342,9 +364,11 @@ func cleanupInterruptedOutputPath(path string, now time.Time) (bool, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
+
 	if err != nil {
 		return false, fmt.Errorf("stat partial output: %w", err)
 	}
+
 	if !stat.IsDir() {
 		return false, nil
 	}

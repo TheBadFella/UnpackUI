@@ -62,6 +62,7 @@ func (p *ExtractProgress) Speed(now time.Time) (uint64, bool) {
 	if elapsed <= 0 && now.After(p.StartedAt) {
 		elapsed = now.Sub(p.StartedAt)
 	}
+
 	if elapsed < time.Second {
 		return 0, false
 	}
@@ -72,6 +73,7 @@ func (p *ExtractProgress) Speed(now time.Time) (uint64, bool) {
 	}
 
 	speed := uint64(float64(wrote) / elapsed.Seconds())
+
 	return speed, speed > 0
 }
 
@@ -87,6 +89,7 @@ func (p *ExtractProgress) ETA(now time.Time) (time.Duration, bool) {
 	}
 
 	remaining := total - wrote
+
 	eta := time.Duration(float64(remaining) / float64(speed) * float64(time.Second)).Round(time.Second)
 	if eta > 0 && eta < time.Second {
 		eta = time.Second
@@ -105,12 +108,13 @@ func (u *Unpackerr) progressUpdateCallback(item *Extract) func(xtractr.Progress)
 // exp.Progress = also what just came in, must set it here.
 // exp.XProg = what is saved in the map, update this one.
 func (u *Unpackerr) handleProgress(exp *ExtractProgress) {
-	if exp == nil || exp.Extract == nil || exp.Extract.XProg == nil || exp.Progress == nil {
+	if exp == nil || exp.Extract == nil || exp.XProg == nil || exp.Progress == nil {
 		return
 	}
 
-	xprog := exp.Extract.XProg
+	xprog := exp.XProg
 	now := time.Now()
+
 	if xprog.Progress != nil && xprog.XFile != exp.XFile {
 		xprog.Extracted++
 		xprog.StartedAt = now
@@ -136,14 +140,14 @@ func (u *Unpackerr) printProgress(now time.Time) {
 }
 
 func (p *ExtractProgress) progressStartedAt(now time.Time) time.Time {
-	if p != nil && p.Extract != nil && p.Extract.Resp != nil && !p.Extract.Resp.Started.IsZero() &&
-		!p.Extract.Resp.Started.After(now) {
-		return p.Extract.Resp.Started
+	if p != nil && p.Extract != nil && p.Resp != nil && !p.Resp.Started.IsZero() &&
+		!p.Resp.Started.After(now) {
+		return p.Resp.Started
 	}
 
-	if p != nil && p.Extract != nil && p.Extract.Status == EXTRACTING && !p.Extract.Updated.IsZero() &&
-		!p.Extract.Updated.After(now) {
-		return p.Extract.Updated
+	if p != nil && p.Extract != nil && p.Status == EXTRACTING && !p.Updated.IsZero() &&
+		!p.Updated.After(now) {
+		return p.Updated
 	}
 
 	return now

@@ -192,6 +192,7 @@ func Start() error {
 	}
 
 	go unpackerr.watchDeleteChannel()
+
 	unpackerr.refreshWebState(version.Started)
 	unpackerr.startWebServer()
 	unpackerr.watchWorkThread()

@@ -55,9 +55,11 @@ func (u *Unpackerr) logWebserver() {
 	if u.Webserver.UI {
 		features = append(features, "status-ui")
 	}
+
 	if u.Webserver.Metrics {
 		features = append(features, "metrics")
 	}
+
 	if u.Webserver.Pprof {
 		features = append(features, "pprof")
 	}
@@ -84,7 +86,7 @@ func (u *Unpackerr) startWebServer() {
 	// Make a multiplexer because websockets can't use apache log.
 	smx := http.NewServeMux()
 	wsHandler := u.fixForwardedFor(u.Webserver.router)
-	accessLogHandler := u.fixForwardedFor(apache.Wrap(u.Webserver.router, u.Logger.HTTP.Writer()))
+	accessLogHandler := u.fixForwardedFor(apache.Wrap(u.Webserver.router, u.HTTP.Writer()))
 	smx.Handle(path.Join(u.Webserver.URLBase, "ws"), wsHandler)
 	smx.Handle("/", u.skipWebAccessLog(accessLogHandler, wsHandler))
 	u.webRoutes()

@@ -91,6 +91,7 @@ func TestFolderDerivedOutputPathRemovesArchiveExtension(t *testing.T) {
 		if expected != "" {
 			expected = filepath.Clean(expected)
 		}
+
 		if got := folderDerivedOutputPath(input); got != expected {
 			t.Fatalf("folderDerivedOutputPath(%q) = %q, want %q", input, got, want)
 		}
@@ -141,6 +142,7 @@ func TestProcessEventIgnoresGeneratedExtractOutput(t *testing.T) {
 	if unpackerr.folders.shouldIgnoreExtractOutput(outputDir, unpackerr.Map) {
 		t.Fatal("expected output suppression to clear once the generated output folder is gone")
 	}
+
 	if len(unpackerr.folders.Outputs) != 0 {
 		t.Fatalf("expected stale output suppression to be removed, found %d entries", len(unpackerr.folders.Outputs))
 	}

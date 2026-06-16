@@ -49,3 +49,5 @@ unpackerr.exe
 /tools
 /tests/.bin/
 /tmp/
+.serena/project.yml
+.serena/.gitignore

@@ -386,6 +386,7 @@ func (f *Folders) shouldIgnoreExtractOutput(path string, items map[string]*Extra
 	}
 
 	path = filepath.Clean(path)
+
 	source, ok := f.Outputs[path]
 	if !ok {
 		return false
@@ -570,6 +571,7 @@ func (u *Unpackerr) processEvent(event *eventData, now time.Time) {
 
 	_, trackedBefore := u.folders.Folders[dirPath]
 	u.folders.processEvent(event, now)
+
 	if folder := u.folders.Folders[dirPath]; folder != nil {
 		u.recoveryTrackFolder(dirPath, folder.config, folder.status, folder.updated)
 	} else if trackedBefore {
