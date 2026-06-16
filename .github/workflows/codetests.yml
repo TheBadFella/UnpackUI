@@ -30,6 +30,35 @@ jobs:
         run: |
           go test ./pkg/...
 
+  golangci-darwin:
+    # description: "Runs golangci-lint on macos against freebsd and macos."
+    strategy:
+      matrix:
+        os: [freebsd, darwin]
+    name: golangci-lint
+    runs-on: macos-latest
+    env:
+      GOOS: ${{ matrix.os }}
+    steps:
+      - name: checkout PR head (pull_request_target)
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: checkout branch (push)
+        if: github.event_name != 'pull_request_target'
+        uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+      - name: go-generate
+        run: GOOS=darwin go generate ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12
+
   golangci-linux:
     name: golangci-lint
     runs-on: ubuntu-latest
@@ -53,4 +82,4 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.11
+          version: v2.12
