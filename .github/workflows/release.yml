@@ -30,7 +30,7 @@ permissions:
 jobs:
   macapp-test:
     # description: "Builds and signs a macOS app then packages it in a notarized DMG."
-    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable') && github.event_name != 'workflow_dispatch'
+    if: github.repository == 'Unpackerr/unpackerr' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable') && github.event_name != 'workflow_dispatch'
     name: Make macOS DMG
     runs-on: macos-latest
     steps:
@@ -81,7 +81,9 @@ jobs:
         run: |
           sudo apt install -y rpm fakeroot zip debsigs gnupg jq libarchive-tools
           sudo gem install --no-document fpm
-          echo "${GPG_SIGNING_KEY}" | gpg --import -
+          if [ -n "${GPG_SIGNING_KEY}" ]; then
+            echo "${GPG_SIGNING_KEY}" | gpg --import -
+          fi
           make release
           source settings.sh ; echo "version=${VERSION}-${ITERATION}" >> $GITHUB_OUTPUT
       - name: upload artifacts
@@ -92,7 +94,7 @@ jobs:
 
   deploy-unstable-unstable:
     # description: "Uploads pre-built binaries to unstable.golift.io."
-    if: (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable') && github.event_name != 'workflow_dispatch'
+    if: github.repository == 'Unpackerr/unpackerr' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable') && github.event_name != 'workflow_dispatch'
     strategy:
       matrix:
         files: [release, dmg-release]
@@ -118,7 +120,7 @@ jobs:
 
   deploy-unstable-packagecloud:
     # description: "Uploads pre-built RPM and DEB packages to packagecloud.io/golift"
-    if: github.ref == 'refs/heads/unstable' && github.event_name != 'workflow_dispatch'
+    if: github.repository == 'Unpackerr/unpackerr' && github.ref == 'refs/heads/unstable' && github.event_name != 'workflow_dispatch'
     needs: release-test
     name: Deploy Unstable PackageCloud
     runs-on: ubuntu-latest
@@ -137,7 +139,7 @@ jobs:
 
   deploy-packagecloud:
     # description: "Uploads pre-built RPM and DEB packages to packagecloud.io/golift"
-    if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch'
+    if: github.repository == 'Unpackerr/unpackerr' && startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch'
     needs: release-test
     name: Deploy Release PackageCloud
     runs-on: ubuntu-latest
@@ -159,10 +161,10 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch'
     permissions:
       contents: write
-    needs: [release-test, macapp-test]
+    needs: release-test
     strategy:
       matrix:
-        files: [release, dmg-release]
+        files: [release]
     name: Deploy GitHub Release
     runs-on: ubuntu-latest
     steps:
@@ -186,6 +188,7 @@ jobs:
 
   archlinux-aur:
     # description: creates and uploads and aur file to the golift/aur repo for arch linux.
+    if: github.repository == 'Unpackerr/unpackerr'
     needs: deploy-github-release
     name: Deploy ArchLinux AUR
     runs-on: ubuntu-latest
