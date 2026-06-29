@@ -1,5 +1,5 @@
-code.cloudfoundry.org/bytefmt v0.77.0 h1:8aY/FI499WTD+MblKsxRDx85AF/KqX6Hq7vHr0Rv0iI=
-code.cloudfoundry.org/bytefmt v0.77.0/go.mod h1:M5UimxrAs0YyyEfSByHD9O0ZFgYKjVid99xeBXjYIXk=
+code.cloudfoundry.org/bytefmt v0.78.0 h1:Aloep0LXiZ7OFviDbdmojNYZH5F10vWA6jpT5x6mwz4=
+code.cloudfoundry.org/bytefmt v0.78.0/go.mod h1:FtdIm5VQRERfop7h8xzQ33hhFZN+mEgz8S5v6xFWCLs=
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAwZ/2OOE=
@@ -88,8 +88,8 @@ github.com/ncruces/zenity v0.10.14 h1:OBFl7qfXcvsdo1NUEGxTlZvAakgWMqz9nG38TuiaGL
 github.com/ncruces/zenity v0.10.14/go.mod h1:ZBW7uVe/Di3IcRYH0Br8X59pi+O6EPnNIOU66YHpOO4=
 github.com/nwaples/rardecode/v2 v2.2.5 h1:L5doqgGfQwI7qADJMqnkrSB86rpPsqQDrHeO0HWa5JY=
 github.com/nwaples/rardecode/v2 v2.2.5/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
-github.com/onsi/ginkgo/v2 v2.31.0 h1:GtuJos5DFUV9EerYJo8RhYxosYNGvOdDE5haKq6Grfs=
-github.com/onsi/ginkgo/v2 v2.31.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
+github.com/onsi/ginkgo/v2 v2.32.0 h1:Hw7s2pVrQo/8Yz5N77qdnpHaoc+c6cC9WIV1Jce+J6E=
+github.com/onsi/ginkgo/v2 v2.32.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.42.0 h1:CJby8u36xb7v34W78F8WKvqTQP7PCMIPB78IVDB73l4=
 github.com/onsi/gomega v1.42.0/go.mod h1:M/Uqpu/8qTjtzCLUA2zJHX9Iilrau25x1PdoSRbWh5A=
 github.com/peterebden/ar v0.0.0-20241106141004-20dc11b778e8 h1:27L3dHkYbeWGU3/5NasAzVDgXG9QzlfKCvcl4cdNW6c=
