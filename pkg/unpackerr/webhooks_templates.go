@@ -58,7 +58,8 @@ const WebhookTemplateNotifiarr = `{
   },
   "unpackerr_eventtype": "{{.Event}}",
   "event_title": {{encode .Title}},
-  "time": "{{.Time}}",
+{{ if .WebURL }}  "web_url": "{{.WebURL}}",
+{{ end }}  "time": "{{.Time}}",
 {{ if .Data }}    "data": {
     "error": {{encode .Data.Error}},
     "archives": [{{$s := separator ","}}{{range $index, $value := .Data.Archives}}{{call $s}}"{{$value}}"{{end}}],
