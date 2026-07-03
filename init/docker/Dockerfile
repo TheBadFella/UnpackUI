@@ -1,9 +1,10 @@
 FROM golang:1-alpine AS builder
 
 WORKDIR /src
-COPY main.go settings.sh go.mod go.sum ./
+COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
+COPY main.go settings.sh ./
 COPY pkg pkg
 COPY examples examples
 RUN go generate ./...
