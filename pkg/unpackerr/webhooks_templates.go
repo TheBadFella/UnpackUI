@@ -23,6 +23,7 @@ type WebhookPayload struct {
 	Time   time.Time      `json:"time"`                // Time of this event.
 	Data   *XtractPayload `json:"data,omitempty"`      // Payload from extraction process.
 	Config *WebhookConfig `json:"-"`                   // Payload from extraction process.
+	WebURL string         `json:"webUrl,omitempty"`    // URL to the UI.
 	// Application Metadata.
 	Go       string    `json:"go"`       // Version of go compiled with
 	OS       string    `json:"os"`       // Operating system: linux, windows, darwin
@@ -159,7 +160,16 @@ const WebhookTemplateDiscord = `{
      "text": "v{{.Version}}-{{.Revision}} ({{.OS}}/{{.Arch}})",
      "icon_url": "https://docs.golift.io/integrations/golift.png"
     }
-  }]
+  }]{{ if .WebURL }},
+  "components": [{
+    "type": 1,
+    "components": [{
+      "type": 2,
+      "style": 5,
+      "label": "Open UI",
+      "url": "{{.WebURL}}"
+    }]
+  }]{{ end }}
 }
 `
 

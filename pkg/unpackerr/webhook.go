@@ -90,7 +90,7 @@ func (statuses *ExtractStatuses) MarshalENV(tag string) (map[string]string, erro
 
 // runAllHooks sends webhooks and executes command hooks.
 func (u *Unpackerr) runAllHooks(item *Extract) {
-	payload := buildWebhookPayload(item)
+	payload := u.buildWebhookPayload(item)
 
 	for _, hook := range u.Webhook {
 		if hook.HasEvent(item.Status) && !hook.Excluded(item.App) {
@@ -105,7 +105,7 @@ func (u *Unpackerr) runAllHooks(item *Extract) {
 	}
 }
 
-func buildWebhookPayload(item *Extract) *WebhookPayload {
+func (u *Unpackerr) buildWebhookPayload(item *Extract) *WebhookPayload {
 	payload := &WebhookPayload{
 		Path:  item.Path,
 		App:   item.App,
@@ -114,6 +114,7 @@ func buildWebhookPayload(item *Extract) *WebhookPayload {
 		Data:  nil,
 		Event: item.Status,
 		Title: friendlyEventTitle(item.Status),
+		WebURL: u.WebURL,
 		// Application Metadata.
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
