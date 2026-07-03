@@ -13,7 +13,7 @@ import (
 func (u *Unpackerr) sampleWebhook(e ExtractStatus) error {
 	u.Printf("Sending sample webhooks and exiting! (-w %d passed)", e)
 
-	payload := samplePayload()
+	payload := u.samplePayload()
 	switch payload.Event = e; payload.Event {
 	default:
 		fallthrough
@@ -53,7 +53,7 @@ func (u *Unpackerr) sampleWebhook(e ExtractStatus) error {
 	return nil
 }
 
-func samplePayload() *WebhookPayload {
+func (u *Unpackerr) samplePayload() *WebhookPayload {
 	return &WebhookPayload{
 		App:  "Starr",
 		Path: "/this/is/a/path",
@@ -64,6 +64,7 @@ func samplePayload() *WebhookPayload {
 		},
 		Time:     time.Now(),
 		Title:    friendlyEventTitle(EXTRACTED),
+		WebURL:   u.WebURL,
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
 		Arch:     runtime.GOARCH,

@@ -25,7 +25,7 @@ func TestBuildWebhookPayloadUsesFriendlyTitles(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			payload := buildWebhookPayload(&Extract{
+			payload := (&Unpackerr{Config: &Config{}}).buildWebhookPayload(&Extract{
 				App:     FolderString,
 				Path:    "/downloads/test-item",
 				Status:  testCase.status,
@@ -67,7 +67,7 @@ func TestBuildWebhookPayloadKeepsDataForImportedFolder(t *testing.T) {
 		},
 	}
 
-	payload := buildWebhookPayload(item)
+	payload := (&Unpackerr{Config: &Config{}}).buildWebhookPayload(item)
 	if payload.Event != IMPORTED {
 		t.Fatalf("expected imported event, got %s", payload.Event)
 	}
@@ -105,7 +105,7 @@ func TestBuildWebhookPayloadKeepsDataForDeletedEvent(t *testing.T) {
 		},
 	}
 
-	payload := buildWebhookPayload(item)
+	payload := (&Unpackerr{Config: &Config{}}).buildWebhookPayload(item)
 	if payload.Event != DELETED {
 		t.Fatalf("expected deleted event, got %s", payload.Event)
 	}
