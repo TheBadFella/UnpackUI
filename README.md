@@ -3,6 +3,8 @@
 
 > [!NOTE]
 > UnpackUI primarily adds a lightweight UI for monitoring extraction status, while keeping Unpackerr's core behavior intact aside from a few targeted fixes and quality-of-life improvements.
+>
+> Native Discord webhooks can edit one message per extract (`update_existing = true`) with richer embeds and an optional **Open UI** button when `web_url` is set. Notifiarr remains fully supported.
 
 <img width="960" alt="UnpackUI status dashboard" src="pkg/ui/UnpackUI.png">
 

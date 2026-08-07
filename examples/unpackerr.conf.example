@@ -82,6 +82,11 @@ dir_mode = "0755"
 ## passwords = [ "filepath:/path/to/passwords.txt" ]
 passwords = []
 
+## Optional URL for the built-in status UI (see [webserver] settings).
+## When set, Discord webhook embeds include an "Open UI" link button that
+## points here. Example: http://192.168.1.10:5656 or https://unpackerr.example.com
+#web_url = "http://127.0.0.1:5656"
+
 [webserver]
 ## Enable the built-in status UI at the web server root path.
 ## This shows queue state, extraction progress, and recent extraction results.
@@ -297,8 +302,8 @@ passwords = []
 ### Webhooks ###
 ################
 # Sends a webhook when an extraction queues, starts, finishes, and/or is deleted.
-# Created to integrate with notifiarr.com.
-# Also works natively with Discord.com, Telegram.org, and Slack.com webhooks.
+# Works with notifiarr.com, or natively with Discord/Telegram/Slack/etc.
+# Discord can edit one message per extract when update_existing = true.
 # Can possibly be used with other services by providing a custom template_path.
 ###### Don't forget to uncomment [[webhook]] and url at a minimum !!!!
 #[[webhook]]
@@ -322,6 +327,13 @@ passwords = []
 # template_path = ''
 ## Override automatic template detection. Values: notifiarr, discord, telegram, gotify, pushover, slack
 # template = ""
+## When true and using the Discord template (URL contains discord.com/discordapp.com,
+## or template = "discord"), Unpackerr creates one Discord message per extract and
+## PATCHes that same message as status changes. Use this instead of Notifiarr when
+## you want native Discord update-in-place notifications with Unpackerr's embed
+## fields. Ignored for Notifiarr and other webhook templates. Message IDs are not
+## persisted across restarts.
+# update_existing = false
 ## Set this to true to ignore the SSL certificate on the server.
 # ignore_ssl = false
 ## You can adjust how long to wait for a server response.
@@ -353,4 +365,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 16 JUN 2026 22:44 UTC
+## => Content Auto Generated, 07 AUG 2026 01:18 UTC
