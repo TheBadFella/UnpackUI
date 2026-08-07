@@ -44,6 +44,7 @@ services:
     - UN_DIR_MODE=0755
     - UN_WEB_URL=http://127.0.0.1:5656
     ## Web Server
+    - UN_WEBSERVER_API=false
     - UN_WEBSERVER_UI=false
     - UN_WEBSERVER_METRICS=false
     - UN_WEBSERVER_LISTEN_ADDR=0.0.0.0:5656

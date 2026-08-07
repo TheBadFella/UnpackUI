@@ -15,6 +15,7 @@ import (
 )
 
 type WebServer struct {
+	API        bool        `json:"api"         toml:"api"           xml:"api"           yaml:"api"`
 	Metrics    bool        `json:"metrics"     toml:"metrics"       xml:"metrics"       yaml:"metrics"`
 	UI         bool        `json:"ui"          toml:"ui"            xml:"ui"            yaml:"ui"`
 	Pprof      bool        `json:"pprof"       toml:"pprof"         xml:"pprof"         yaml:"pprof"`
@@ -32,7 +33,7 @@ type WebServer struct {
 }
 
 func (w *WebServer) Enabled() bool {
-	return w != nil && w.ListenAddr != "" && (w.Metrics || w.UI || w.Pprof)
+	return w != nil && w.ListenAddr != "" && (w.API || w.Metrics || w.UI || w.Pprof)
 }
 
 func (u *Unpackerr) logWebserver() {
@@ -52,6 +53,10 @@ func (u *Unpackerr) logWebserver() {
 	}
 
 	features := []string{}
+	if u.Webserver.API {
+		features = append(features, "json-api")
+	}
+
 	if u.Webserver.UI {
 		features = append(features, "status-ui")
 	}
@@ -105,6 +110,10 @@ func (u *Unpackerr) startWebServer() {
 }
 
 func (u *Unpackerr) webRoutes() {
+	if u.Webserver.API || u.Webserver.UI {
+		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/api/stats"), u.webStatsAPI)
+	}
+
 	if u.Webserver.UI {
 		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), u.webIndex)
 		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/api/status"), u.webStatusAPI)
@@ -173,9 +182,10 @@ func Index(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
 // skipWebAccessLog suppresses noisy UI polling from the access log while still serving the route.
 func (u *Unpackerr) skipWebAccessLog(withAccessLog, withoutAccessLog http.Handler) http.Handler {
 	statusPath := path.Join(u.Webserver.URLBase, "/api/status")
+	statsPath := path.Join(u.Webserver.URLBase, "/api/stats")
 
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method == http.MethodGet && request.URL.Path == statusPath {
+		if request.Method == http.MethodGet && (request.URL.Path == statusPath || request.URL.Path == statsPath) {
 			withoutAccessLog.ServeHTTP(writer, request)
 			return
 		}

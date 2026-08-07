@@ -88,6 +88,9 @@ passwords = []
 #web_url = "http://127.0.0.1:5656"
 
 [webserver]
+## Enable a flat JSON status summary for dashboard clients such as Homepage.
+## This endpoint contains no download paths or Starr application details.
+ api = false
 ## Enable the built-in status UI at the web server root path.
 ## This shows queue state, extraction progress, and recent extraction results.
  ui = false

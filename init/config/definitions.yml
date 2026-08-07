@@ -404,7 +404,7 @@ sections:
     title: Web Server
     docs: |
       :::note Web UI
-      The web server can expose a lightweight status UI for live extraction progress and/or
+      The web server can expose a lightweight status UI, an aggregate JSON API, and/or
       prometheus metrics, which you can display in
       [Grafana](https://grafana.com/grafana/dashboards/18817-unpackerr/).
       Enable only the features you want. The web server was added in v0.12.0.
@@ -413,6 +413,14 @@ sections:
       :::
     envvar_prefix: WEBSERVER_
     params:
+      - name: api
+        envvar: API
+        default: false
+        recommend: *BOOLEAN
+        short: Enable aggregate JSON stats on `/api/stats`.
+        desc: |
+          Enable a flat JSON status summary for dashboard clients such as Homepage.
+          This endpoint contains no download paths or Starr application details.
       - name: ui
         envvar: UI
         default: false

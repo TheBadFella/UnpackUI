@@ -60,6 +60,43 @@ For quick local testing on Windows with the local UI config:
 .\unpackerr.exe -c .\unpackerr.local.conf
 ```
 
+## Homepage widget
+
+Enable either `api = true` or `ui = true` in the `[webserver]` section. The
+`/api/stats` endpoint returns flat aggregate counts and does not expose download
+paths or Sonarr/Radarr details. Homepage decides which values to display through
+its widget mappings; for the five requested status fields:
+
+```yaml
+- Media:
+    - Unpackerr:
+        icon: unpackerr.png
+        href: http://unpackerr:5656
+        widget:
+          type: customapi
+          url: http://unpackerr:5656/api/stats
+          mappings:
+            - field: extracted
+              label: Extracted
+              format: number
+            - field: deleted
+              label: Deleted
+              format: number
+            - field: waiting
+              label: Waiting
+              format: number
+            - field: extracting
+              label: Extracting
+              format: number
+            - field: failed
+              label: Failed
+              format: number
+```
+
+The endpoint also provides `queued`, `imported`, `active`, `completed`,
+`finished`, `retries`, webhook/cmdhook counters, `uptime`, and `generatedAt`, so
+you can add or replace mappings without changing Unpackerr configuration.
+
 ## License
 
 [MIT](https://unpackerr.zip/docs/unpackerr/license)
