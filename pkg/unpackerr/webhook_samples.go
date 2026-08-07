@@ -60,10 +60,12 @@ func (u *Unpackerr) samplePayload() *WebhookPayload {
 		IDs: map[string]any{
 			"title":      "Some Cool Title Name Here",
 			"downloadId": fmt.Sprintf("some-id-goes-here-%d", time.Now().Unix()),
+			"reason":     "Download completed and can be imported",
 			"otherId":    "another-id-here-like-imdb",
 		},
 		Time:     time.Now(),
 		Title:    friendlyEventTitle(EXTRACTED),
+		Retries:  1,
 		WebURL:   u.WebURL,
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
