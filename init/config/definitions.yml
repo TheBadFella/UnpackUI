@@ -391,6 +391,15 @@ sections:
           List of passwords to use for encrypted archives. Must be a list of strings.
           Use this special format as a password to read more passwords from a file:
           passwords = [ "filepath:/path/to/passwords.txt" ]
+      - name: web_url
+        envvar: WEB_URL
+        default: ''
+        example: http://127.0.0.1:5656
+        short: Public URL for the status UI; used by Discord Open UI buttons.
+        desc: |
+          Optional URL for the built-in status UI (see [webserver] settings).
+          When set, Discord webhook embeds include an "Open UI" link button that
+          points here. Example: http://192.168.1.10:5656 or https://unpackerr.example.com
   webserver:
     title: Web Server
     docs: |
@@ -399,6 +408,8 @@ sections:
       prometheus metrics, which you can display in
       [Grafana](https://grafana.com/grafana/dashboards/18817-unpackerr/).
       Enable only the features you want. The web server was added in v0.12.0.
+      Set global `web_url` to the reachable UI address if you want Discord notifications
+      to include an **Open UI** button.
       :::
     envvar_prefix: WEBSERVER_
     params:
@@ -671,21 +682,39 @@ sections:
       ### Webhooks ###
       ################
       # Sends a webhook when an extraction queues, starts, finishes, and/or is deleted.
-      # Created to integrate with notifiarr.com.
-      # Also works natively with Discord.com, Telegram.org, and Slack.com webhooks.
+      # Works with notifiarr.com, or natively with Discord/Telegram/Slack/etc.
+      # Discord can edit one message per extract when update_existing = true.
       # Can possibly be used with other services by providing a custom template_path.
       ###### Don't forget to uncomment [[webhook]] and url at a minimum !!!!
     docs: |
-      This application can send a `POST` webhook to a URL when an extraction begins, and again
-      when it finishes. Configure 1 or more webhook URLs with the parameters below.
-      Works great with [notifiarr.com](https://notifiarr.com). You can use
-      [requestbin.com](https://requestbin.com/r/) to test and _see_ the payload.
+      This application can send a webhook when an extraction queues, starts, finishes,
+      fails, is imported, and/or is deleted. Configure 1 or more webhook URLs below.
+
+      **Notifiarr** and **Discord** are both first-class options:
+
+      - Use a Notifiarr unpackerr URL (or `template = "notifiarr"`) to relay through
+        [notifiarr.com](https://notifiarr.com).
+      - Use a Discord Incoming Webhook URL (or `template = "discord"`) to post embeds
+        directly. Set `update_existing = true` to create one Discord message per extract
+        and edit that same message as status changes (queued → extracting → deleted),
+        similar to Notifiarr's update-in-place Discord behavior.
+
+      The Discord embed includes status, app, path, retries, Starr download ID/reason
+      (when available), output folder, archive/file counts, size, elapsed time, queue
+      depth, and errors. Set global `web_url` to add an **Open UI** button on Discord
+      notifications. Use [requestbin.com](https://requestbin.com/r/) to test payloads.
     notes: |
       - _`Nickname` should equal the `chat_id` value in Telegram webhooks._
       - _`Channel` is used as destination channel for Slack. It's not used in others._
       - _`Nickname` and `Channel` may be used as custom values in custom templates._
       - _`Name` is only used in logs, but it's also available as a template value as `{{name}}`._
       - Built-In Templates: `pushover`, `telegram`, `discord`, `notifiarr`, `slack`, `gotify`.
+      - Set `template` to `discord` or `notifiarr` to force a destination (or let URL auto-detect).
+      - Discord `update_existing = true` edits one message per extract as status changes.
+        Message IDs are kept in memory only; a restart mid-extract starts a new message.
+      - Discord `update_existing` is ignored for Notifiarr and non-Discord templates.
+      - Set global `web_url` (for example `http://host:5656`) so Discord embeds can show
+        an **Open UI** link button. The webserver UI must also be enabled.
     envvar_prefix: WEBHOOK_
     kind: list
     params:
@@ -758,6 +787,18 @@ sections:
           - value: 'slack'
         short: Instead of auto template selection, force a built-in template.
         desc: 'Override automatic template detection. Values: notifiarr, discord, telegram, gotify, pushover, slack'
+      - name: update_existing
+        envvar: UPDATE_EXISTING
+        default: false
+        recommend: *BOOLEAN
+        short: Discord only — edit one message per extract instead of posting new ones.
+        desc: |
+          When true and using the Discord template (URL contains discord.com/discordapp.com,
+          or template = "discord"), Unpackerr creates one Discord message per extract and
+          PATCHes that same message as status changes. Use this instead of Notifiarr when
+          you want native Discord update-in-place notifications with Unpackerr's embed
+          fields. Ignored for Notifiarr and other webhook templates. Message IDs are not
+          persisted across restarts.
       - name: ignore_ssl
         envvar: IGNORE_SSL
         default: false

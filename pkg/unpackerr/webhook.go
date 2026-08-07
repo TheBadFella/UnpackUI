@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"runtime"
 	"strconv"
 	"strings"
@@ -21,25 +23,27 @@ import (
 
 // WebhookConfig defines the data to send webhooks to a server.
 type WebhookConfig struct {
-	Name       string          `json:"name"         toml:"name"          xml:"name"                    yaml:"name"`
-	URL        string          `json:"url"          toml:"url"           xml:"url,omitempty"           yaml:"url"`
-	Command    string          `json:"command"      toml:"command"       xml:"command,omitempty"       yaml:"command"`
-	CType      string          `json:"contentType"  toml:"content_type"  xml:"content_type,omitempty"  yaml:"contentType"`
-	TmplPath   string          `json:"templatePath" toml:"template_path" xml:"template_path,omitempty" yaml:"templatePath"`
-	TempName   string          `json:"template"     toml:"template"      xml:"template,omitempty"      yaml:"template"`
-	Timeout    cnfg.Duration   `json:"timeout"      toml:"timeout"       xml:"timeout"                 yaml:"timeout"`
-	Shell      bool            `json:"shell"        toml:"shell"         xml:"shell"                   yaml:"shell"`
-	IgnoreSSL  bool            `json:"ignoreSsl"    toml:"ignore_ssl"    xml:"ignore_ssl,omitempty"    yaml:"ignoreSsl"`
-	Silent     bool            `json:"silent"       toml:"silent"        xml:"silent"                  yaml:"silent"`
-	Events     ExtractStatuses `json:"events"       toml:"events"        xml:"events"                  yaml:"events"`
-	Exclude    StringSlice     `json:"exclude"      toml:"exclude"       xml:"exclude"                 yaml:"exclude"`
-	Nickname   string          `json:"nickname"     toml:"nickname"      xml:"nickname,omitempty"      yaml:"nickname"`
-	Token      string          `json:"token"        toml:"token"         xml:"token,omitempty"         yaml:"token"`
-	Channel    string          `json:"channel"      toml:"channel"       xml:"channel,omitempty"       yaml:"channel"`
-	client     *http.Client
-	fails      uint
-	posts      uint
-	sync.Mutex `json:"-" toml:"-" xml:"-" yaml:"-"`
+	Name           string          `json:"name"           toml:"name"            xml:"name"                      yaml:"name"`
+	URL            string          `json:"url"            toml:"url"             xml:"url,omitempty"             yaml:"url"`
+	Command        string          `json:"command"        toml:"command"         xml:"command,omitempty"         yaml:"command"`
+	CType          string          `json:"contentType"    toml:"content_type"    xml:"content_type,omitempty"    yaml:"contentType"`
+	TmplPath       string          `json:"templatePath"   toml:"template_path"   xml:"template_path,omitempty"   yaml:"templatePath"`
+	TempName       string          `json:"template"       toml:"template"        xml:"template,omitempty"        yaml:"template"`
+	Timeout        cnfg.Duration   `json:"timeout"        toml:"timeout"         xml:"timeout"                   yaml:"timeout"`
+	Shell          bool            `json:"shell"          toml:"shell"           xml:"shell"                     yaml:"shell"`
+	IgnoreSSL      bool            `json:"ignoreSsl"      toml:"ignore_ssl"      xml:"ignore_ssl,omitempty"      yaml:"ignoreSsl"`
+	Silent         bool            `json:"silent"         toml:"silent"          xml:"silent"                    yaml:"silent"`
+	UpdateExisting bool            `json:"updateExisting" toml:"update_existing" xml:"update_existing,omitempty" yaml:"updateExisting"`
+	Events         ExtractStatuses `json:"events"         toml:"events"          xml:"events"                    yaml:"events"`
+	Exclude        StringSlice     `json:"exclude"        toml:"exclude"         xml:"exclude"                   yaml:"exclude"`
+	Nickname       string          `json:"nickname"       toml:"nickname"        xml:"nickname,omitempty"        yaml:"nickname"`
+	Token          string          `json:"token"          toml:"token"           xml:"token,omitempty"           yaml:"token"`
+	Channel        string          `json:"channel"        toml:"channel"         xml:"channel,omitempty"         yaml:"channel"`
+	client         *http.Client
+	fails          uint
+	posts          uint
+	msgIDs         map[string]string // Discord message IDs keyed by extract path.
+	sync.Mutex     `json:"-" toml:"-" xml:"-" yaml:"-"`
 }
 
 type hookQueueItem struct {
@@ -107,14 +111,15 @@ func (u *Unpackerr) runAllHooks(item *Extract) {
 
 func (u *Unpackerr) buildWebhookPayload(item *Extract) *WebhookPayload {
 	payload := &WebhookPayload{
-		Path:  item.Path,
-		App:   item.App,
-		IDs:   item.IDs,
-		Time:  item.Updated,
-		Data:  nil,
-		Event: item.Status,
-		Title: friendlyEventTitle(item.Status),
-		WebURL: u.WebURL,
+		Path:    item.Path,
+		App:     item.App,
+		IDs:     item.IDs,
+		Time:    item.Updated,
+		Data:    nil,
+		Event:   item.Status,
+		Title:   friendlyEventTitle(item.Status),
+		Retries: item.Retries,
+		WebURL:  u.WebURL,
 		// Application Metadata.
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
@@ -167,9 +172,21 @@ func (u *Unpackerr) sendWebhookWithLog(hook *WebhookConfig, payload *WebhookPayl
 		return
 	}
 
-	bodyStr := body.String()
+	bodyBytes := body.Bytes()
+	bodyStr := string(bodyBytes)
 
-	if reply, err := hook.Send(&body); err != nil {
+	var (
+		reply []byte
+		err   error
+	)
+
+	if hook.supportsDiscordUpdate() {
+		reply, err = hook.SendOrUpdate(payload.Path, bodyBytes, isTerminalWebhookEvent(payload.Event))
+	} else {
+		reply, err = hook.Send(bytes.NewReader(bodyBytes))
+	}
+
+	if err != nil {
 		u.Debugf("Webhook Payload: %s", bodyStr)
 		u.Errorf("Webhook (%s = %s): %s: %v", payload.Path, payload.Event, hook.Name, err)
 		u.Debugf("Webhook Response: %s", string(reply))
@@ -193,7 +210,7 @@ func (w *WebhookConfig) Send(body io.Reader) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), w.Timeout.Duration+time.Second)
 	defer cancel()
 
-	resp, err := w.send(ctx, body)
+	resp, _, err := w.sendRequest(ctx, http.MethodPost, w.URL, body)
 	if err != nil {
 		w.fails++
 	}
@@ -201,29 +218,146 @@ func (w *WebhookConfig) Send(body io.Reader) ([]byte, error) {
 	return resp, err
 }
 
-func (w *WebhookConfig) send(ctx context.Context, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, w.URL, body)
+// SendOrUpdate POSTs a new Discord webhook message (with wait=true) or PATCHes
+// an existing one when update_existing is enabled. clearKey removes the stored
+// message ID after a successful update (used for terminal extract events).
+func (w *WebhookConfig) SendOrUpdate(key string, body []byte, clearKey bool) ([]byte, error) {
+	if w.URL == "" {
+		return nil, ErrWebhookNoURL
+	}
+
+	w.Lock()
+	defer w.Unlock()
+
+	if w.msgIDs == nil {
+		w.msgIDs = make(map[string]string)
+	}
+
+	w.posts++
+
+	ctx, cancel := context.WithTimeout(context.Background(), w.Timeout.Duration+time.Second)
+	defer cancel()
+
+	if msgID := w.msgIDs[key]; msgID != "" {
+		reply, status, err := w.sendRequest(ctx, http.MethodPatch, discordEditURL(w.URL, msgID), bytes.NewReader(body))
+		if err == nil {
+			if clearKey {
+				delete(w.msgIDs, key)
+			}
+
+			return reply, nil
+		}
+
+		// Missing or expired message — create a new one below.
+		if status != http.StatusNotFound && status != http.StatusUnauthorized {
+			w.fails++
+			return reply, err
+		}
+
+		delete(w.msgIDs, key)
+	}
+
+	reply, _, err := w.sendRequest(ctx, http.MethodPost, discordWaitURL(w.URL), bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+		w.fails++
+		return reply, err
+	}
+
+	var msg struct {
+		ID string `json:"id"`
+	}
+
+	if json.Unmarshal(reply, &msg) == nil && msg.ID != "" && !clearKey {
+		w.msgIDs[key] = msg.ID
+	}
+
+	return reply, nil
+}
+
+func (w *WebhookConfig) sendRequest(ctx context.Context, method, rawURL string, body io.Reader) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, method, rawURL, body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", w.CType)
 
 	res, err := w.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("POSTing payload: %w", err)
+		return nil, 0, fmt.Errorf("%sing payload: %w", method, err)
 	}
 	defer res.Body.Close()
 
-	// The error is mostly ignored because we don't care about the body.
-	// Read it in to avoid a memopry leak. Used in the if-stanza below.
+	// Read the body to avoid a memory leak; used when status is unexpected.
 	reply, _ := io.ReadAll(res.Body)
 
 	if res.StatusCode < http.StatusOK || res.StatusCode > http.StatusNoContent {
-		return nil, fmt.Errorf("%w (%s): %s", ErrInvalidStatus, res.Status, reply)
+		return reply, res.StatusCode, fmt.Errorf("%w (%s): %s", ErrInvalidStatus, res.Status, reply)
 	}
 
-	return reply, nil
+	return reply, res.StatusCode, nil
+}
+
+// supportsDiscordUpdate reports whether this webhook should create-then-edit
+// Discord messages instead of posting a new message per event.
+func (w *WebhookConfig) supportsDiscordUpdate() bool {
+	if w == nil || !w.UpdateExisting {
+		return false
+	}
+
+	if strings.EqualFold(w.TempName, "discord") {
+		return true
+	}
+
+	// Custom or forced non-Discord templates are fire-and-forget only.
+	if w.TempName != "" || w.TmplPath != "" {
+		return false
+	}
+
+	lower := strings.ToLower(w.URL)
+
+	return strings.Contains(lower, "discord.com") || strings.Contains(lower, "discordapp.com")
+}
+
+func isTerminalWebhookEvent(event ExtractStatus) bool {
+	switch event {
+	case DELETED, EXTRACTEDNOTHING:
+		return true
+	default:
+		return false
+	}
+}
+
+func discordWaitURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		if strings.Contains(rawURL, "?") {
+			return rawURL + "&wait=true"
+		}
+
+		return rawURL + "?wait=true"
+	}
+
+	query := parsed.Query()
+	query.Set("wait", "true")
+	parsed.RawQuery = query.Encode()
+
+	return parsed.String()
+}
+
+func discordEditURL(rawURL, messageID string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		base := strings.SplitN(rawURL, "?", 2)[0] //nolint:mnd
+
+		return strings.TrimRight(base, "/") + "/messages/" + messageID
+	}
+
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/messages/" + messageID
+
+	return parsed.String()
 }
 
 func (u *Unpackerr) validateWebhook() error { //nolint:cyclop
@@ -292,6 +426,10 @@ func (u *Unpackerr) logWebhook() {
 
 		if hook.Nickname != "" {
 			vars += ", nickname: " + hook.Nickname
+		}
+
+		if hook.UpdateExisting {
+			vars += ", update_existing: true"
 		}
 
 		if len(hook.Exclude) > 0 {

@@ -15,15 +15,16 @@ import (
 
 // WebhookPayload defines the data sent to notifarr.com (and other) webhooks.
 type WebhookPayload struct {
-	Path   string         `json:"path"`                // Path for the extracted item.
-	App    starr.App      `json:"app"`                 // Application Triggering Event
-	IDs    map[string]any `json:"ids,omitempty"`       // Arbitrary IDs from each app.
-	Event  ExtractStatus  `json:"unpackerr_eventtype"` // The type of the event.
-	Title  string         `json:"event_title"`         // Friendly event title for human-facing notifications.
-	Time   time.Time      `json:"time"`                // Time of this event.
-	Data   *XtractPayload `json:"data,omitempty"`      // Payload from extraction process.
-	Config *WebhookConfig `json:"-"`                   // Payload from extraction process.
-	WebURL string         `json:"webUrl,omitempty"`    // URL to the UI.
+	Path    string         `json:"path"`                  // Path for the extracted item.
+	App     starr.App      `json:"app"`                   // Application Triggering Event
+	IDs     map[string]any `json:"ids,omitempty"`         // Arbitrary IDs from each app.
+	Event   ExtractStatus  `json:"unpackerr_eventtype"`   // The type of the event.
+	Title   string         `json:"event_title"`           // Friendly event title for human-facing notifications.
+	Retries uint           `json:"retries,omitempty"`     // Extraction retry count.
+	Time    time.Time      `json:"time"`                  // Time of this event.
+	Data    *XtractPayload `json:"data,omitempty"`        // Payload from extraction process.
+	Config  *WebhookConfig `json:"-"`                     // Payload from extraction process.
+	WebURL  string         `json:"webUrl,omitempty"`      // URL to the UI.
 	// Application Metadata.
 	Go       string    `json:"go"`       // Version of go compiled with
 	OS       string    `json:"os"`       // Operating system: linux, windows, darwin
@@ -58,7 +59,8 @@ const WebhookTemplateNotifiarr = `{
   },
   "unpackerr_eventtype": "{{.Event}}",
   "event_title": {{encode .Title}},
-{{ if .WebURL }}  "web_url": "{{.WebURL}}",
+{{ if .Retries }}  "retries": {{.Retries}},
+{{ end }}{{ if .WebURL }}  "web_url": "{{.WebURL}}",
 {{ end }}  "time": "{{.Time}}",
 {{ if .Data }}    "data": {
     "error": {{encode .Data.Error}},
@@ -129,9 +131,10 @@ const WebhookTemplateDiscord = `{
   "avatar_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
   "embeds": [{
 	    "title": {{encode (index .IDs "title")}},
+	    "description": {{encode .Title}},
 	    "timestamp": "{{timestamp .Time}}",
 	    "author": {
-	     "name": "Unpackerr: {{.Title}}",
+	     "name": "Unpackerr",
 	     "icon_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
 	     "url": "https://github.com/Unpackerr/unpackerr/releases"
 	    },
@@ -142,20 +145,21 @@ const WebhookTemplateDiscord = `{
             {{- else if(eq 5 .Event)}}12745742
             {{- else}}16711695{{end}},
     "fields": [
-     {"name": "Path", "value": {{encode .Path}}, "inline": false},
-     {"name": "App", "value": "{{.App}}", "inline": true}{{ if .Data }}
-     {{ if .Data.Archives}},{"name": "Archives", "value": "{{len .Data.Archives}}", "inline": true}
-     {{end -}}
-     {{ if .Data.Elapsed.Duration}},{"name": "Elapsed", "value": "{{.Data.Elapsed}}", "inline": true}
-     {{end -}}
-     {{ if .Data.Files}},{"name": "Files", "value": "{{len .Data.Files}}", "inline": true}
-     {{end -}}
-     {{ if .Data.Bytes}},{"name": "Size", "value": "{{humanbytes .Data.Bytes}}", "inline": true}
-     {{end -}}
-     {{ if and (gt .Event 1) (lt .Event 5)}},{"name": "Queue", "value": "{{.Data.Queue}}", "inline": true}
-     {{end -}}
-     {{ if .Data.Error }},{"name": "Error", "value": {{encode .Data.Error}}, "inline": false}
-     {{end}}{{end -}}
+     {"name": "Status", "value": {{encode .Title}}, "inline": true},
+     {"name": "App", "value": "{{.App}}", "inline": true}
+     {{- if .Retries }},{"name": "Retries", "value": "{{.Retries}}", "inline": true}{{end -}}
+     {{- with index .IDs "downloadId"}},{"name": "Download ID", "value": {{encode .}}, "inline": true}{{end -}}
+     {{- with index .IDs "reason"}},{"name": "Reason", "value": {{encode .}}, "inline": false}{{end -}}
+     ,{"name": "Path", "value": {{encode .Path}}, "inline": false}
+     {{- if .Data -}}
+     {{- if .Data.Output }},{"name": "Output", "value": {{encode .Data.Output}}, "inline": false}{{end -}}
+     {{- if .Data.Archives}},{"name": "Archives", "value": "{{len .Data.Archives}}", "inline": true}{{end -}}
+     {{- if .Data.Elapsed.Duration}},{"name": "Elapsed", "value": "{{.Data.Elapsed}}", "inline": true}{{end -}}
+     {{- if .Data.Files}},{"name": "Files", "value": "{{len .Data.Files}}", "inline": true}{{end -}}
+     {{- if .Data.Bytes}},{"name": "Size", "value": "{{humanbytes .Data.Bytes}}", "inline": true}{{end -}}
+     {{- if and (gt .Event 1) (lt .Event 5)}},{"name": "Queue", "value": "{{.Data.Queue}}", "inline": true}{{end -}}
+     {{- if .Data.Error }},{"name": "Error", "value": {{encode .Data.Error}}, "inline": false}{{end -}}
+     {{- end}}
     ],
     "footer": {
      "text": "v{{.Version}}-{{.Revision}} ({{.OS}}/{{.Arch}})",
@@ -336,7 +340,7 @@ func separator(separator string) func() string {
 	}
 }
 
-func humanbytes(size int64) string {
+func humanbytes(size uint64) string {
 	const byteUnit = 1024
 
 	// This is from https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/
@@ -345,7 +349,7 @@ func humanbytes(size int64) string {
 		return fmt.Sprintf("%dB", size)
 	}
 
-	div, exp := int64(byteUnit), 0
+	div, exp := uint64(byteUnit), 0
 
 	for n := size / byteUnit; n >= byteUnit; n /= byteUnit {
 		div *= byteUnit

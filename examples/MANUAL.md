@@ -29,13 +29,18 @@ OPTIONS
         This application parses environment variables into config data.
         The default prefix is UN, making env variables like UN_SONARR_0_URL.
 
-    -w, --webhook <1,2,3,4,5,6,7,8>
+    -w, --webhook <1,2,3,4,5,6,7,8,9>
         This sends a webhook of the type specified then exits. This is only
         for testing and development. This requires a valid webhook configured
         in a config file or from environment variables.
         Event IDs (not all of these are used in webhooks): 0 = all
         1 = queued, 2 = extracting, 3 = extract failed, 4 = extracted
         5 = imported, 6 = deleting, 7 = delete failed, 8 = deleted
+        9 = nothing extracted
+
+        Discord webhooks support update_existing=true to edit one message per
+        extract as status changes. Set web_url for an Open UI button on Discord
+        embeds. Notifiarr and other templates remain available.
 
     -v, --version
         Display version and exit.
