@@ -713,8 +713,11 @@ sections:
       - Discord `update_existing = true` edits one message per extract as status changes.
         Message IDs are kept in memory only; a restart mid-extract starts a new message.
       - Discord `update_existing` is ignored for Notifiarr and non-Discord templates.
-      - Set global `web_url` (for example `http://host:5656`) so Discord embeds can show
-        an **Open UI** link button. The webserver UI must also be enabled.
+      - Native Discord embeds use a clean parsed title, compact stats, and a Release field
+        for the raw filename (Path/Output are omitted to keep notifications glanceable).
+      - Set global `web_url` (for example `http://host:5656`) so Discord embeds make the
+        title clickable and include an **Open UI** markdown link. Channel webhooks often
+        cannot show Discord component buttons, so the link is used instead.
     envvar_prefix: WEBHOOK_
     kind: list
     params:
