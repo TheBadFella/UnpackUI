@@ -222,10 +222,10 @@ func TestDiscordTemplateIncludesExtraFields(t *testing.T) {
 	}
 
 	payload := &WebhookPayload{
-		Path:  "/downloads/Movie.Name",
-		App:   "radarr",
-		Event: EXTRACTED,
-		Title: friendlyEventTitle(EXTRACTED),
+		Path:    "/downloads/Movie.Name.2024.1080p.WEB-DL.mkv",
+		App:     "radarr",
+		Event:   EXTRACTED,
+		Title:   friendlyEventTitle(EXTRACTED),
 		Retries: 1,
 		WebURL:  "http://localhost:5656",
 		IDs: map[string]any{
@@ -245,6 +245,7 @@ func TestDiscordTemplateIncludesExtraFields(t *testing.T) {
 			Bytes:    1024,
 			Elapsed:  cnfg.Duration{Duration: 5 * time.Second},
 			Queue:    2,
+			Start:    time.Date(2026, 4, 12, 11, 59, 55, 0, time.UTC),
 		},
 	}
 
@@ -255,13 +256,14 @@ func TestDiscordTemplateIncludesExtraFields(t *testing.T) {
 
 	out := body.String()
 	for _, want := range []string{
-		`"description": "Extraction Complete"`,
-		`"name": "Status"`,
-		`"name": "Download ID"`,
-		`"name": "Reason"`,
+		`"title": "Movie Name"`,
+		`"name": "Unpackerr: Extraction Complete"`,
+		`"name": "App"`,
 		`"name": "Retries"`,
-		`"name": "Output"`,
-		`"label": "Open UI"`,
+		`"name": "Release"`,
+		`"name": "Reason"`,
+		`"name": "Links"`,
+		`[Open UI](http://localhost:5656)`,
 		`"url": "http://localhost:5656"`,
 	} {
 		if !strings.Contains(out, want) {

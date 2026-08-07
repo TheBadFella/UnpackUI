@@ -126,18 +126,23 @@ const WebhookTemplateGotify = `{
 `
 
 // WebhookTemplateDiscord is used when sending a webhook to discord.com.
+// Layout is intentionally compact: clean title, glanceable stats, raw name in Release.
+// Open UI uses an embed URL + markdown link because Discord channel webhooks often
+// strip or hide component buttons (especially on message edits).
 const WebhookTemplateDiscord = `{
   "username": "{{nickname}}",
   "avatar_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
   "embeds": [{
-	    "title": {{encode (index .IDs "title")}},
-	    "description": {{encode .Title}},
-	    "timestamp": "{{timestamp .Time}}",
-	    "author": {
-	     "name": "Unpackerr",
-	     "icon_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
-	     "url": "https://github.com/Unpackerr/unpackerr/releases"
-	    },
+    "title": {{encode (displaytitle .IDs .Path)}},
+    {{- if .WebURL }}
+    "url": {{encode .WebURL}},
+    {{- end }}
+    "timestamp": "{{timestamp .Time}}",
+    "author": {
+      "name": "Unpackerr: {{.Title}}",
+      "icon_url": "https://raw.githubusercontent.com/wiki/Unpackerr/unpackerr/images/logo.png",
+      "url": "https://github.com/Unpackerr/unpackerr/releases"
+    },
     "color": {{ if (eq 1 .Event)}}1752220
             {{- else if (eq 2 .Event)}}16384255
             {{- else if(eq 3 .Event)}}10038562
@@ -145,36 +150,26 @@ const WebhookTemplateDiscord = `{
             {{- else if(eq 5 .Event)}}12745742
             {{- else}}16711695{{end}},
     "fields": [
-     {"name": "Status", "value": {{encode .Title}}, "inline": true},
-     {"name": "App", "value": "{{.App}}", "inline": true}
-     {{- if .Retries }},{"name": "Retries", "value": "{{.Retries}}", "inline": true}{{end -}}
-     {{- with index .IDs "downloadId"}},{"name": "Download ID", "value": {{encode .}}, "inline": true}{{end -}}
-     {{- with index .IDs "reason"}},{"name": "Reason", "value": {{encode .}}, "inline": false}{{end -}}
-     ,{"name": "Path", "value": {{encode .Path}}, "inline": false}
-     {{- if .Data -}}
-     {{- if .Data.Output }},{"name": "Output", "value": {{encode .Data.Output}}, "inline": false}{{end -}}
-     {{- if .Data.Archives}},{"name": "Archives", "value": "{{len .Data.Archives}}", "inline": true}{{end -}}
-     {{- if .Data.Elapsed.Duration}},{"name": "Elapsed", "value": "{{.Data.Elapsed}}", "inline": true}{{end -}}
-     {{- if .Data.Files}},{"name": "Files", "value": "{{len .Data.Files}}", "inline": true}{{end -}}
-     {{- if .Data.Bytes}},{"name": "Size", "value": "{{humanbytes .Data.Bytes}}", "inline": true}{{end -}}
-     {{- if and (gt .Event 1) (lt .Event 5)}},{"name": "Queue", "value": "{{.Data.Queue}}", "inline": true}{{end -}}
-     {{- if .Data.Error }},{"name": "Error", "value": {{encode .Data.Error}}, "inline": false}{{end -}}
-     {{- end}}
+      {"name": "App", "value": "{{.App}}", "inline": true}
+      {{- if .Data }}
+      {{- if not .Data.Start.IsZero }},{"name": "Started", "value": {{encode (discordtime .Data.Start)}}, "inline": true}{{end -}}
+      {{- if .Data.Bytes }},{"name": "Size", "value": "{{humanbytes .Data.Bytes}}", "inline": true}{{end -}}
+      {{- if .Data.Files }},{"name": "Files", "value": "{{len .Data.Files}}", "inline": true}{{end -}}
+      {{- if .Data.Archives }},{"name": "Archives", "value": "{{len .Data.Archives}}", "inline": true}{{end -}}
+      {{- with (shortdur .Data.Elapsed) }},{"name": "Elapsed", "value": {{encode .}}, "inline": true}{{end -}}
+      {{- if and (gt .Event 1) (lt .Event 5) }},{"name": "Queue", "value": "{{.Data.Queue}}", "inline": true}{{end -}}
+      {{- end }}
+      {{- if .Retries }},{"name": "Retries", "value": "{{.Retries}}", "inline": true}{{end -}}
+      ,{"name": "Release", "value": {{encode (releasename .IDs .Path)}}, "inline": false}
+      {{- with index .IDs "reason"}},{"name": "Reason", "value": {{encode .}}, "inline": false}{{end -}}
+      {{- if and .Data .Data.Error }},{"name": "Error", "value": {{encode .Data.Error}}, "inline": false}{{end -}}
+      {{- if .WebURL }},{"name": "Links", "value": {{encode (printf "[Open UI](%s)" .WebURL)}}, "inline": false}{{end }}
     ],
     "footer": {
-     "text": "v{{.Version}}-{{.Revision}} ({{.OS}}/{{.Arch}})",
-     "icon_url": "https://docs.golift.io/integrations/golift.png"
+      "text": "v{{.Version}}-{{.Revision}} ({{.OS}}/{{.Arch}})",
+      "icon_url": "https://docs.golift.io/integrations/golift.png"
     }
-  }]{{ if .WebURL }},
-  "components": [{
-    "type": 1,
-    "components": [{
-      "type": 2,
-      "style": 5,
-      "label": "Open UI",
-      "url": "{{.WebURL}}"
-    }]
-  }]{{ end }}
+  }]
 }
 `
 
@@ -272,16 +267,20 @@ const WebhookTemplateSlack = `
 //nolint:wrapcheck
 func (w *WebhookConfig) Template() (*template.Template, error) {
 	template := template.New("webhook").Funcs(template.FuncMap{
-		"encode":     func(v any) string { b, _ := json.Marshal(v); return string(b) },
-		"rawencode":  func(v any) string { b, _ := json.Marshal(v); return strings.Trim(string(b), `"`) }, // yuck
-		"formencode": url.QueryEscape,
-		"separator":  separator,
-		"humanbytes": humanbytes,
-		"nickname":   func() string { return w.Nickname },
-		"channel":    func() string { return w.Channel },
-		"token":      func() string { return w.Token },
-		"timestamp":  func(t time.Time) string { return t.Format(time.RFC3339) },
-		"name":       func() string { return w.Name },
+		"encode":       func(v any) string { b, _ := json.Marshal(v); return string(b) },
+		"rawencode":    func(v any) string { b, _ := json.Marshal(v); return strings.Trim(string(b), `"`) }, // yuck
+		"formencode":   url.QueryEscape,
+		"separator":    separator,
+		"humanbytes":   humanbytes,
+		"displaytitle": discordDisplayTitle,
+		"releasename":  discordReleaseName,
+		"shortdur":     shortDuration,
+		"discordtime":  formatDiscordTime,
+		"nickname":     func() string { return w.Nickname },
+		"channel":      func() string { return w.Channel },
+		"token":        func() string { return w.Token },
+		"timestamp":    func(t time.Time) string { return t.Format(time.RFC3339) },
+		"name":         func() string { return w.Name },
 	})
 
 	// Providing a template name that exists overrides template_path.
