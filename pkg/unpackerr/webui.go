@@ -45,6 +45,28 @@ type webStatusCounters struct {
 	Retries  uint `json:"retries"`
 }
 
+// webStatsSnapshot is a stable, path-free summary intended for dashboard clients
+// such as Homepage's custom API widget.
+type webStatsSnapshot struct {
+	Waiting       uint   `json:"waiting"`
+	Queued        uint   `json:"queued"`
+	Extracting    uint   `json:"extracting"`
+	Failed        uint   `json:"failed"`
+	Extracted     uint   `json:"extracted"`
+	Imported      uint   `json:"imported"`
+	Deleted       uint   `json:"deleted"`
+	Active        int    `json:"active"`
+	Completed     int    `json:"completed"`
+	Finished      uint   `json:"finished"`
+	Retries       uint   `json:"retries"`
+	WebhookOK     uint   `json:"webhookOK"`
+	WebhookFailed uint   `json:"webhookFailed"`
+	CmdhookOK     uint   `json:"cmdhookOK"`
+	CmdhookFailed uint   `json:"cmdhookFailed"`
+	Uptime        string `json:"uptime"`
+	GeneratedAt   string `json:"generatedAt"`
+}
+
 type webStatusItem struct {
 	ID          string             `json:"id"`
 	Key         string             `json:"-"`
@@ -678,6 +700,41 @@ func (u *Unpackerr) webStatusAPI(writer http.ResponseWriter, _ *http.Request, _ 
 	}
 
 	encodeWebStatusJSON(writer, snapshot, u.Errorf)
+}
+
+func (u *Unpackerr) webStatsAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	snapshot := u.webState.Load()
+	if snapshot == nil {
+		snapshot = &webStatusSnapshot{Stats: &Stats{}}
+	}
+
+	stats := snapshot.Stats
+	if stats == nil {
+		stats = &Stats{}
+	}
+
+	encodeWebStatusJSON(writer, &webStatsSnapshot{
+		Waiting:       stats.Waiting,
+		Queued:        stats.Queued,
+		Extracting:    stats.Extracting,
+		Failed:        stats.Failed,
+		Extracted:     stats.Extracted,
+		Imported:      stats.Imported,
+		Deleted:       stats.Deleted,
+		Active:        snapshot.ActiveCount,
+		Completed:     snapshot.CompletedCount,
+		Finished:      snapshot.Counters.Finished,
+		Retries:       snapshot.Counters.Retries,
+		WebhookOK:     snapshot.Counters.HookOK,
+		WebhookFailed: snapshot.Counters.HookFail,
+		CmdhookOK:     snapshot.Counters.CmdOK,
+		CmdhookFailed: snapshot.Counters.CmdFail,
+		Uptime:        snapshot.Uptime,
+		GeneratedAt:   snapshot.GeneratedAt,
+	}, u.Errorf)
 }
 
 func (u *Unpackerr) webClearCompletedAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {

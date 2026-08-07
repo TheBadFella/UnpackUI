@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
 	"golift.io/cnfg"
 	"golift.io/xtractr"
 )
@@ -36,10 +37,71 @@ func TestWebServerEnabled(t *testing.T) {
 	}
 
 	server.UI = false
+	server.API = true
+	if !server.Enabled() {
+		t.Fatal("expected webserver to enable when API is enabled")
+	}
+
+	server.API = false
 
 	server.Metrics = true
 	if !server.Enabled() {
 		t.Fatal("expected webserver to enable when metrics are enabled")
+	}
+}
+
+func TestWebStatsAPI(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC)
+	unpackerr := New()
+	unpackerr.Map["waiting"] = &Extract{Status: WAITING, Updated: now}
+	unpackerr.Map["extracting"] = &Extract{Status: EXTRACTING, Updated: now}
+	unpackerr.Map["failed"] = &Extract{Status: EXTRACTFAILED, Updated: now}
+	unpackerr.Map["extracted"] = &Extract{Status: EXTRACTED, Updated: now}
+	unpackerr.Map["deleted"] = &Extract{Status: DELETED, Updated: now}
+	unpackerr.Finished = 12
+	unpackerr.Retries = 2
+	unpackerr.refreshWebState(now)
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/stats", nil)
+	rec := httptest.NewRecorder()
+	unpackerr.webStatsAPI(rec, req, nil)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var stats webStatsSnapshot
+	if err := json.Unmarshal(rec.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("failed to decode stats payload: %v", err)
+	}
+
+	if stats.Waiting != 1 || stats.Extracting != 1 || stats.Failed != 1 ||
+		stats.Extracted != 1 || stats.Deleted != 1 {
+		t.Fatalf("unexpected status counts: %+v", stats)
+	}
+
+	if stats.Finished != 12 || stats.Retries != 2 {
+		t.Fatalf("unexpected counters: %+v", stats)
+	}
+}
+
+func TestWebStatsRouteEnabledWithoutUI(t *testing.T) {
+	t.Parallel()
+
+	unpackerr := New()
+	unpackerr.Webserver.API = true
+	unpackerr.Webserver.URLBase = "/"
+	unpackerr.Webserver.router = httprouter.New()
+	unpackerr.webRoutes()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/stats", nil)
+	rec := httptest.NewRecorder()
+	unpackerr.Webserver.router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected API-only route to return 200, got %d", rec.Code)
 	}
 }
 
