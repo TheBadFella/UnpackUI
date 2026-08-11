@@ -312,9 +312,7 @@ func (f *Folders) Remove(folder string) {
 // extractTrackedItem starts an archive or folder's extraction after it hasn't been written to in a while.
 func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Time) {
 	u.folders.Remove(name) // stop the fs watcher(s).
-	// update status.
-	u.folders.Folders[name].updated = now
-	u.folders.Folders[name].status = QUEUED
+	folder.updated = now
 
 	if outputPath := folderDerivedOutputPath(name); outputPath != "" {
 		u.folders.Outputs[filepath.Clean(outputPath)] = filepath.Clean(name)
@@ -330,19 +328,37 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 		return
 	}
 
-	// create a queue counter in the main history; add to u.Map and send webhook for a new folder.
-	item := u.updateQueueStatus(&newStatus{Name: name, Status: QUEUED}, u.folders.Folders[name].updated, true)
-	u.recoveryTrackFolder(name, folder.config, QUEUED, u.folders.Folders[name].updated)
-	u.updateHistory(FolderString + ": " + name)
-
 	exclude := folderExcludeSuffixes(name, folder.config)
+	filter := xtractr.Filter{Path: name, ExcludeSuffix: exclude}
+	if xtractr.FindCompressedFiles(filter).Count() == 0 {
+		folder.status = EXTRACTEDNOTHING
+		resp := &xtractr.Response{
+			Done:    true,
+			Started: now,
+			Error:   xtractr.ErrNoCompressedFiles,
+			X:       &xtractr.Xtract{Name: name, Filter: filter},
+		}
+
+		u.Printf("[Folder] %s: %s: %v", folder.status.Desc(), name, resp.Error)
+		u.recoveryTrackFolder(name, folder.config, folder.status, now)
+		u.updateQueueStatus(&newStatus{Name: name, Resp: resp, Status: folder.status}, now, true)
+
+		return
+	}
+
+	folder.status = QUEUED
+
+	// create a queue counter in the main history; add to u.Map and send webhook for a new folder.
+	item := u.updateQueueStatus(&newStatus{Name: name, Status: QUEUED}, folder.updated, true)
+	u.recoveryTrackFolder(name, folder.config, QUEUED, folder.updated)
+	u.updateHistory(FolderString + ": " + name)
 
 	// extract it.
 	queueSize, err := u.Extract(&xtractr.Xtract{
 		Password:         u.getPasswordFromPath(name),
 		Passwords:        u.Passwords,
 		Name:             name,
-		Filter:           xtractr.Filter{Path: name, ExcludeSuffix: exclude},
+		Filter:           filter,
 		TempFolder:       !folder.config.MoveBack,
 		ExtractTo:        folder.config.ExtractPath,
 		DeleteOrig:       false,
@@ -714,14 +730,15 @@ type newStatus struct {
 // This is used by apps and Folders in a few other places as well.
 func (u *Unpackerr) updateQueueStatus(data *newStatus, now time.Time, sendHook bool) *Extract {
 	if _, ok := u.Map[data.Name]; !ok {
-		// This is a new Folder being queued for extraction.
+		// This is a new Folder entering tracked status.
 		// Arr apps do not land here. They create their own queued items in u.Map.
 		u.Map[data.Name] = &Extract{
 			Path:    data.Name,
 			App:     FolderString,
-			Status:  QUEUED,
+			Status:  data.Status,
 			Updated: now,
 			IDs:     map[string]any{"title": data.Name}, // required or webhook may break.
+			Resp:    data.Resp,
 		}
 
 		u.Map[data.Name].XProg = &ExtractProgress{Extract: u.Map[data.Name]}
