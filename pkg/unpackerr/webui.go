@@ -1082,11 +1082,45 @@ const statusPageHTML = `<!doctype html>
 	      vertical-align: top;
 	    }
     th {
+      position: relative;
       color: var(--muted);
       font-size: 0.74rem;
       text-transform: uppercase;
       letter-spacing: 0;
       font-weight: 600;
+    }
+    .column-resizer {
+      position: absolute;
+      top: 0;
+      right: -5px;
+      width: 10px;
+      height: 100%;
+      cursor: col-resize;
+      touch-action: none;
+      z-index: 2;
+    }
+    .column-resizer::after {
+      content: "";
+      position: absolute;
+      top: 24%;
+      bottom: 24%;
+      left: 4px;
+      width: 2px;
+      background: var(--border-strong);
+      transition: background 120ms ease, box-shadow 120ms ease;
+    }
+    .column-resizer:hover::after,
+    .column-resizer:focus-visible::after,
+    body.is-resizing-columns .column-resizer.is-active::after {
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(255, 75, 47, 0.65);
+    }
+    .column-resizer:focus-visible {
+      outline: none;
+    }
+    body.is-resizing-columns {
+      cursor: col-resize;
+      user-select: none;
     }
     tr:hover td {
       background: rgba(255, 75, 47, 0.06);
@@ -1337,6 +1371,10 @@ const statusPageHTML = `<!doctype html>
 	      thead {
 	        display: none;
 	      }
+	      .column-reset,
+	      .column-resizer {
+	        display: none;
+	      }
 	      #items {
 	        display: grid;
 	        gap: 14px;
@@ -1474,12 +1512,13 @@ const statusPageHTML = `<!doctype html>
 	          <div class="subtle">Current queue plus completed items that stay visible until you clear them.</div>
 	        </div>
 	        <div class="headline-actions">
+	          <button class="action-button column-reset" id="reset-columns" type="button">Reset columns</button>
 	          <button class="action-button" id="clear-completed" type="button">Clear completed</button>
 	          <div class="subtle" id="item-count"></div>
 	        </div>
 	      </div>
 	      <div class="table-wrap">
-	        <table>
+	        <table id="items-table">
 	          <colgroup id="items-cols"></colgroup>
 	          <thead>
 	            <tr id="items-head">
@@ -1527,7 +1566,9 @@ const statusPageHTML = `<!doctype html>
 	    const metaRail = document.getElementById('meta-rail');
 	    const stamp = document.getElementById('stamp');
 	    const clearCompletedButton = document.getElementById('clear-completed');
+	    const resetColumnsButton = document.getElementById('reset-columns');
 	    const itemCount = document.getElementById('item-count');
+	    const itemsTable = document.getElementById('items-table');
 	    const itemsCols = document.getElementById('items-cols');
 	    const itemsHead = document.getElementById('items-head');
 	    const itemsBody = document.getElementById('items');
@@ -1541,9 +1582,12 @@ const statusPageHTML = `<!doctype html>
 	    const activeRefreshMs = 2000;
 	    const idleRefreshMs = 30000;
 	    const errorRefreshMs = 10000;
+	    const columnWidthStorageKey = 'unpackerr.status.column-widths.v1';
 	    let lastSnapshot = { items: [] };
 	    let selectedItemId = '';
 	    let refreshTimer = 0;
+	    let renderedColumnSignature = '';
+	    let activeColumnResize = null;
 
 	    function escapeHtml(value) {
 	      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -1826,6 +1870,177 @@ const statusPageHTML = `<!doctype html>
 	        '<div class="muted">' + updatedAt + '</div>';
 	    }
 
+	    function tableColumns(showDeleteIn) {
+	      const columns = [
+	        { key: 'item', label: 'Item', width: showDeleteIn ? 35 : 42, min: 180 },
+	        { key: 'status', label: 'Status', width: showDeleteIn ? 13 : 14, min: 110 },
+	        { key: 'progress', label: 'Progress', width: showDeleteIn ? 16 : 15, min: 150 }
+	      ];
+	      if (showDeleteIn) {
+	        columns.push({ key: 'delete', label: 'Deletes In', width: 10, min: 110 });
+	      }
+	      columns.push(
+	        { key: 'updated', label: 'Updated', width: showDeleteIn ? 12 : 13, min: 130 },
+	        { key: 'path', label: 'Path', width: showDeleteIn ? 14 : 16, min: 160 }
+	      );
+
+	      return columns;
+	    }
+
+	    function loadColumnWidths() {
+	      try {
+	        const widths = JSON.parse(window.localStorage.getItem(columnWidthStorageKey) || '{}');
+	        return widths && typeof widths === 'object' ? widths : {};
+	      } catch (_) {
+	        return {};
+	      }
+	    }
+
+	    function saveColumnWidths() {
+	      const widths = {};
+	      Array.from(itemsCols.children).forEach((column) => {
+	        const header = itemsHead.querySelector('[data-column-key="' + column.dataset.columnKey + '"]');
+	        if (header) {
+	          widths[column.dataset.columnKey] = Math.round(header.getBoundingClientRect().width);
+	        }
+	      });
+
+	      try {
+	        window.localStorage.setItem(columnWidthStorageKey, JSON.stringify(widths));
+	      } catch (_) {
+	        // Resizing still works when browser storage is unavailable.
+	      }
+	    }
+
+	    function renderTableColumns(showDeleteIn) {
+	      const columns = tableColumns(showDeleteIn);
+	      const signature = columns.map((column) => column.key).join('|');
+	      if (signature === renderedColumnSignature) {
+	        return;
+	      }
+
+	      renderedColumnSignature = signature;
+	      const savedWidths = loadColumnWidths();
+	      const baseWidth = Math.max(980, itemsTable.parentElement.clientWidth);
+	      const hasSavedWidths = columns.some((column) => Number(savedWidths[column.key]) >= column.min);
+	      let totalWidth = 0;
+
+	      itemsCols.innerHTML = columns.map((column) => {
+	        const savedWidth = Number(savedWidths[column.key]);
+	        const width = savedWidth >= column.min ? savedWidth : Math.round(baseWidth * column.width / 100);
+	        totalWidth += width;
+	        return '<col data-column-key="' + column.key + '" style="width:' +
+	          (hasSavedWidths ? width + 'px' : column.width + '%') + '">';
+	      }).join('');
+
+	      itemsHead.innerHTML = columns.map((column) => (
+	        '<th data-column-key="' + column.key + '">' + escapeHtml(column.label) +
+	          '<span class="column-resizer" role="separator" tabindex="0"' +
+	            ' aria-label="Resize ' + escapeHtml(column.label) + ' column"' +
+	            ' aria-orientation="vertical" aria-valuemin="' + column.min + '"' +
+	            ' title="Drag to resize ' + escapeHtml(column.label) + ' column"></span>' +
+	        '</th>'
+	      )).join('');
+
+	      itemsTable.style.width = hasSavedWidths ? Math.max(baseWidth, totalWidth) + 'px' : '';
+	    }
+
+	    function materializeColumnWidths() {
+	      const headers = Array.from(itemsHead.children);
+	      const columns = Array.from(itemsCols.children);
+	      const widths = headers.map((header) => header.getBoundingClientRect().width);
+	      widths.forEach((width, index) => {
+	        columns[index].style.width = Math.round(width) + 'px';
+	      });
+	      itemsTable.style.width = Math.round(itemsTable.getBoundingClientRect().width) + 'px';
+
+	      return { columns, widths };
+	    }
+
+	    function beginColumnResize(event) {
+	      const handle = event.target.closest('.column-resizer');
+	      if (!handle || window.matchMedia('(max-width: 1080px)').matches) {
+	        return;
+	      }
+
+	      const header = handle.closest('th[data-column-key]');
+	      const column = tableColumns((lastSnapshot.items ?? []).some((item) => Boolean(item.deleteIn)))
+	        .find((candidate) => candidate.key === header.dataset.columnKey);
+	      const index = Array.from(itemsHead.children).indexOf(header);
+	      const layout = materializeColumnWidths();
+
+	      event.preventDefault();
+	      handle.classList.add('is-active');
+	      document.body.classList.add('is-resizing-columns');
+	      activeColumnResize = {
+	        handle,
+	        index,
+	        startX: event.clientX,
+	        startWidth: layout.widths[index],
+	        startTableWidth: itemsTable.getBoundingClientRect().width,
+	        minWidth: column ? column.min : 80,
+	        columns: layout.columns
+	      };
+	    }
+
+	    function updateColumnResize(event) {
+	      if (!activeColumnResize) {
+	        return;
+	      }
+
+	      const resizedWidth = Math.max(
+	        activeColumnResize.minWidth,
+	        activeColumnResize.startWidth + event.clientX - activeColumnResize.startX
+	      );
+	      const delta = resizedWidth - activeColumnResize.startWidth;
+	      activeColumnResize.columns[activeColumnResize.index].style.width = Math.round(resizedWidth) + 'px';
+	      itemsTable.style.width = Math.round(Math.max(
+	        itemsTable.parentElement.clientWidth,
+	        activeColumnResize.startTableWidth + delta
+	      )) + 'px';
+	      activeColumnResize.handle.setAttribute('aria-valuenow', Math.round(resizedWidth));
+	    }
+
+	    function finishColumnResize() {
+	      if (!activeColumnResize) {
+	        return;
+	      }
+
+	      activeColumnResize.handle.classList.remove('is-active');
+	      document.body.classList.remove('is-resizing-columns');
+	      activeColumnResize = null;
+	      saveColumnWidths();
+	    }
+
+	    function resizeColumnWithKeyboard(event) {
+	      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+	        return;
+	      }
+
+	      const handle = event.target.closest('.column-resizer');
+	      if (!handle || window.matchMedia('(max-width: 1080px)').matches) {
+	        return;
+	      }
+
+	      event.preventDefault();
+	      const header = handle.closest('th[data-column-key]');
+	      const definitions = tableColumns((lastSnapshot.items ?? []).some((item) => Boolean(item.deleteIn)));
+	      const definition = definitions.find((column) => column.key === header.dataset.columnKey);
+	      const index = Array.from(itemsHead.children).indexOf(header);
+	      const layout = materializeColumnWidths();
+	      const tableWidth = itemsTable.getBoundingClientRect().width;
+	      const delta = event.key === 'ArrowRight' ? 12 : -12;
+	      const width = Math.max(definition ? definition.min : 80, layout.widths[index] + delta);
+
+	      layout.columns[index].style.width = Math.round(width) + 'px';
+	      itemsTable.style.width = Math.round(Math.max(
+	        itemsTable.parentElement.clientWidth,
+	        tableWidth + width - layout.widths[index]
+	      )) + 'px';
+	      handle.setAttribute('aria-valuenow', Math.round(width));
+	      saveColumnWidths();
+	    }
+
 	    function renderItems(data) {
 	      const items = data.items ?? [];
 	      const activeCount = data.activeCount ?? 0;
@@ -1833,18 +2048,7 @@ const statusPageHTML = `<!doctype html>
 	      const showDeleteIn = items.some((item) => Boolean(item.deleteIn));
 	      itemCount.textContent = activeCount + ' active / ' + completedCount + ' completed';
 	      clearCompletedButton.disabled = completedCount === 0;
-	      itemsCols.innerHTML = (showDeleteIn
-	        ? ['35%', '13%', '16%', '10%', '12%', '14%']
-	        : ['42%', '14%', '15%', '13%', '16%']
-	      ).map((width) => '<col style="width:' + width + '">').join('');
-	      itemsHead.innerHTML = [
-	        '<th>Item</th>',
-	        '<th>Status</th>',
-	        '<th>Progress</th>',
-	        showDeleteIn ? '<th>Deletes In</th>' : '',
-	        '<th>Updated</th>',
-	        '<th>Path</th>'
-	      ].join('');
+	      renderTableColumns(showDeleteIn);
 
 			      if (!items.length) {
 			        itemsBody.innerHTML =
@@ -2025,6 +2229,22 @@ const statusPageHTML = `<!doctype html>
 	        stamp.textContent = 'Unable to clear completed items: ' + error.message;
 	      }
 	    });
+
+	    resetColumnsButton.addEventListener('click', () => {
+	      try {
+	        window.localStorage.removeItem(columnWidthStorageKey);
+	      } catch (_) {
+	        // Reset the current layout even when browser storage is unavailable.
+	      }
+	      renderedColumnSignature = '';
+	      renderTableColumns((lastSnapshot.items ?? []).some((item) => Boolean(item.deleteIn)));
+	    });
+
+	    itemsHead.addEventListener('pointerdown', beginColumnResize);
+	    itemsHead.addEventListener('keydown', resizeColumnWithKeyboard);
+	    document.addEventListener('pointermove', updateColumnResize);
+	    document.addEventListener('pointerup', finishColumnResize);
+	    document.addEventListener('pointercancel', finishColumnResize);
 
 	    itemsBody.addEventListener('click', (event) => {
 	      const row = event.target.closest('tr[data-item-id]');
