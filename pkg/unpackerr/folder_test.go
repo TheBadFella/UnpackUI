@@ -181,7 +181,7 @@ func TestExtractTrackedItemWithArchiveQueuesExtraction(t *testing.T) {
 		Updates: make(chan *xtractr.Response, updateChanBuf),
 	}
 	unpackerr.Xtractr = xtractr.NewQueue(&xtractr.Config{Parallel: 1})
-	t.Cleanup(func() { unpackerr.Xtractr.Stop() })
+	t.Cleanup(func() { unpackerr.Stop() })
 
 	unpackerr.extractTrackedItem(itemPath, folder, now)
 

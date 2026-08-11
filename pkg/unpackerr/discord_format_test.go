@@ -67,17 +67,17 @@ func TestDiscordTemplateCompactLayout(t *testing.T) {
 	}
 
 	payload := &WebhookPayload{
-		Path:    "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms.zip",
-		App:     FolderString,
-		Event:   DELETED,
-		Title:   friendlyEventTitle(DELETED),
-		WebURL:  "https://unpackerr.example.com",
-		IDs:     map[string]any{"title": "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms.zip"},
-		Time:    time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC),
-		Version: "1.3.0",
+		Path:     "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms.zip",
+		App:      FolderString,
+		Event:    DELETED,
+		Title:    friendlyEventTitle(DELETED),
+		WebURL:   "https://unpackerr.example.com",
+		IDs:      map[string]any{"title": "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms.zip"},
+		Time:     time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC),
+		Version:  "1.3.0",
 		Revision: "1067",
-		OS:      "linux",
-		Arch:    "amd64",
+		OS:       "linux",
+		Arch:     "amd64",
 		Data: &XtractPayload{
 			Output:   "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms",
 			Archives: []string{"/downloads/file.zip"},

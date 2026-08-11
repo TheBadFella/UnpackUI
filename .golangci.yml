@@ -1,21 +1,15 @@
 version: '2'
 linters:
-  default: all
-  disable:
-    # unused
-    - exhaustruct
-    - exhaustive
-    - dupl
-    - nlreturn
-    - tagliatelle
-    - cyclop
-    - testpackage
-    - wsl
-    - embeddedstructfieldcheck # this is a trash rule.
-    - funcorder # also lame.
-    - noinlineerr # I like inline errors.
-    - goconst # noisy af.
-    - gomodguard # deprecated.
+  default: standard
+  enable:
+    - bodyclose
+    - depguard
+    - durationcheck
+    - errorlint
+    - gosec
+    - misspell
+    - nilerr
+    - nolintlint
 
   settings:
     depguard:
