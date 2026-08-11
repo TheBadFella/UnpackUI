@@ -5,59 +5,23 @@ on:
     branches:
       - main
       - unstable
-  pull_request_target:
+      - web-ui-support
+  pull_request:
 permissions:
   contents: read
 jobs:
   gotest:
     runs-on: ubuntu-latest
     steps:
-      - name: checkout PR head (pull_request_target)
-        if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: checkout branch (push)
-        if: github.event_name != 'pull_request_target'
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: 'stable'
+          go-version-file: go.mod
       - name: go-generate
         run: go generate ./...
       - name: go-test
         run: |
           go test ./pkg/...
-
-  golangci-darwin:
-    # description: "Runs golangci-lint on macos against freebsd and macos."
-    strategy:
-      matrix:
-        os: [freebsd, darwin]
-    name: golangci-lint
-    runs-on: macos-latest
-    env:
-      GOOS: ${{ matrix.os }}
-    steps:
-      - name: checkout PR head (pull_request_target)
-        if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: checkout branch (push)
-        if: github.event_name != 'pull_request_target'
-        uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version: 'stable'
-      - name: go-generate
-        run: GOOS=darwin go generate ./...
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.12
 
   golangci-linux:
     name: golangci-lint
@@ -65,21 +29,13 @@ jobs:
     env:
       GOOS: linux
     steps:
-      - name: checkout PR head (pull_request_target)
-        if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@v7
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: checkout branch (push)
-        if: github.event_name != 'pull_request_target'
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: 'stable'
+          go-version-file: go.mod
       - name: go-generate
         run: GOOS=linux go generate ./...
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12
+          version: v2.12.2

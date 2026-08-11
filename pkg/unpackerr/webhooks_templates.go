@@ -15,16 +15,16 @@ import (
 
 // WebhookPayload defines the data sent to notifarr.com (and other) webhooks.
 type WebhookPayload struct {
-	Path    string         `json:"path"`                  // Path for the extracted item.
-	App     starr.App      `json:"app"`                   // Application Triggering Event
-	IDs     map[string]any `json:"ids,omitempty"`         // Arbitrary IDs from each app.
-	Event   ExtractStatus  `json:"unpackerr_eventtype"`   // The type of the event.
-	Title   string         `json:"event_title"`           // Friendly event title for human-facing notifications.
-	Retries uint           `json:"retries,omitempty"`     // Extraction retry count.
-	Time    time.Time      `json:"time"`                  // Time of this event.
-	Data    *XtractPayload `json:"data,omitempty"`        // Payload from extraction process.
-	Config  *WebhookConfig `json:"-"`                     // Payload from extraction process.
-	WebURL  string         `json:"webUrl,omitempty"`      // URL to the UI.
+	Path    string         `json:"path"`                // Path for the extracted item.
+	App     starr.App      `json:"app"`                 // Application Triggering Event
+	IDs     map[string]any `json:"ids,omitempty"`       // Arbitrary IDs from each app.
+	Event   ExtractStatus  `json:"unpackerr_eventtype"` // The type of the event.
+	Title   string         `json:"event_title"`         // Friendly event title for human-facing notifications.
+	Retries uint           `json:"retries,omitempty"`   // Extraction retry count.
+	Time    time.Time      `json:"time"`                // Time of this event.
+	Data    *XtractPayload `json:"data,omitempty"`      // Payload from extraction process.
+	Config  *WebhookConfig `json:"-"`                   // Payload from extraction process.
+	WebURL  string         `json:"webUrl,omitempty"`    // URL to the UI.
 	// Application Metadata.
 	Go       string    `json:"go"`       // Version of go compiled with
 	OS       string    `json:"os"`       // Operating system: linux, windows, darwin
