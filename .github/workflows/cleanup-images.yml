@@ -2,6 +2,12 @@ name: Cleanup Old Images
 
 on:
   workflow_dispatch:
+    inputs:
+      delete_tag:
+        description: Exact container tag whose package version should be deleted
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '0 6 * * 0'
 
@@ -20,6 +26,7 @@ jobs:
     env:
       PACKAGE_NAME: ${{ github.event.repository.name }}
       RETAIN_COUNT: '5'
+      DELETE_TAG: ${{ inputs.delete_tag || '' }}
     steps:
       - name: Delete old GHCR image versions
         env:
@@ -48,6 +55,34 @@ jobs:
           if (( status != 0 )); then
             echo "Container package ${OWNER}/${encoded_package_name} was not found. Nothing to clean up."
             exit 0
+          fi
+
+          if [[ -n "$DELETE_TAG" ]]; then
+            mapfile -t requested_delete_ids < <(
+              jq -sr --arg delete_tag "$DELETE_TAG" '
+                .[] |
+                select(.metadata.container.tags // [] | index($delete_tag)) |
+                .id
+              ' <<<"$versions_json"
+            )
+
+            if (( ${#requested_delete_ids[@]} == 0 )); then
+              echo "No container package version has the exact tag ${DELETE_TAG}."
+            else
+              for version_id in "${requested_delete_ids[@]}"; do
+                echo "Deleting package version ${version_id} with tag ${DELETE_TAG}"
+                gh api \
+                  --method DELETE \
+                  -H "Accept: application/vnd.github+json" \
+                  "/${package_endpoint_prefix}/${OWNER}/packages/container/${encoded_package_name}/versions/${version_id}"
+              done
+
+              versions_json=$(gh api \
+                --paginate \
+                -H "Accept: application/vnd.github+json" \
+                "/${package_endpoint_prefix}/${OWNER}/packages/container/${encoded_package_name}/versions?per_page=100" \
+                --jq '.[]')
+            fi
           fi
 
           mapfile -t delete_ids < <(

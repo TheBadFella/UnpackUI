@@ -311,8 +311,17 @@ func (f *Folders) Remove(folder string) {
 
 // extractTrackedItem starts an archive or folder's extraction after it hasn't been written to in a while.
 func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Time) {
-	u.folders.Remove(name) // stop the fs watcher(s).
 	folder.updated = now
+
+	if partial := folderIncompleteDownload(name); partial != "" {
+		folder.status = WAITING
+		u.recoveryTrackFolder(name, folder.config, folder.status, now)
+		u.Debugf("[Folder] Deferring extraction while download is incomplete: %s (%s)", name, partial)
+
+		return
+	}
+
+	u.folders.Remove(name) // stop the fs watcher(s).
 
 	if outputPath := folderDerivedOutputPath(name); outputPath != "" {
 		u.folders.Outputs[filepath.Clean(outputPath)] = filepath.Clean(name)
@@ -374,6 +383,36 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 	}
 
 	u.Printf("[Folder] Queued: %s, queue size: %d", name, queueSize)
+}
+
+// folderIncompleteDownload returns the first temporary download file found below path.
+// Download clients rename these files to their final archive name after flushing and
+// verifying them, so their presence means the containing folder is not ready to scan.
+func folderIncompleteDownload(path string) string {
+	var partial string
+
+	_ = filepath.WalkDir(path, func(itemPath string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if entry.IsDir() {
+			return nil
+		}
+
+		name := strings.ToLower(entry.Name())
+		for _, suffix := range []string{".part", ".partial", ".crdownload", ".download", ".aria2", ".!qb"} {
+			if strings.HasSuffix(name, suffix) {
+				partial = itemPath
+
+				return filepath.SkipAll
+			}
+		}
+
+		return nil
+	})
+
+	return partial
 }
 
 func folderDerivedOutputPath(path string) string {

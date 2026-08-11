@@ -157,6 +157,64 @@ func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	}
 }
 
+func TestExtractTrackedItemDefersIncompleteDownloadUntilArchiveFinalizes(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	itemPath := filepath.Join(watchPath, "show")
+	if err := os.Mkdir(itemPath, 0o700); err != nil {
+		t.Fatalf("creating watched item: %v", err)
+	}
+
+	partialPath := filepath.Join(itemPath, "show.7z.part")
+	if err := os.WriteFile(partialPath, []byte("archive"), 0o600); err != nil {
+		t.Fatalf("creating partial archive: %v", err)
+	}
+
+	now := time.Now()
+	cfg := &FolderConfig{Path: watchPath}
+	folder := &Folder{updated: now.Add(-time.Minute), status: WAITING, config: cfg}
+	unpackerr := New()
+	unpackerr.KeepHistory = 0
+	unpackerr.folders = &Folders{
+		Logs:    unpackerr.Logger,
+		Folders: map[string]*Folder{itemPath: folder},
+		Outputs: make(map[string]string),
+		Updates: make(chan *xtractr.Response, updateChanBuf),
+	}
+
+	unpackerr.extractTrackedItem(itemPath, folder, now)
+
+	if folder.status != WAITING {
+		t.Fatalf("expected partial download to remain %s, got %s", WAITING, folder.status)
+	}
+	if !folder.updated.Equal(now) {
+		t.Fatalf("expected deferred item timestamp %v, got %v", now, folder.updated)
+	}
+	if unpackerr.Map[itemPath] != nil {
+		t.Fatalf("expected partial download to stay out of completed history, got %+v", unpackerr.Map[itemPath])
+	}
+	if unpackerr.folders.Folders[itemPath] != folder {
+		t.Fatal("expected partial download to remain tracked")
+	}
+
+	archivePath := filepath.Join(itemPath, "show.7z")
+	if err := os.Rename(partialPath, archivePath); err != nil {
+		t.Fatalf("finalizing partial archive: %v", err)
+	}
+
+	unpackerr.Xtractr = xtractr.NewQueue(&xtractr.Config{Parallel: 1})
+	t.Cleanup(func() { unpackerr.Stop() })
+	unpackerr.extractTrackedItem(itemPath, folder, now.Add(time.Minute))
+
+	if folder.status != QUEUED {
+		t.Fatalf("expected finalized archive status %s, got %s", QUEUED, folder.status)
+	}
+	if item := unpackerr.Map[itemPath]; item == nil || item.Status != QUEUED {
+		t.Fatalf("expected finalized archive in extraction queue, got %+v", item)
+	}
+}
+
 func TestExtractTrackedItemWithArchiveQueuesExtraction(t *testing.T) {
 	t.Parallel()
 
