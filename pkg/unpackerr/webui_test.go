@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +13,25 @@ import (
 	"golift.io/cnfg"
 	"golift.io/xtractr"
 )
+
+func TestStatusPageIncludesResizableColumns(t *testing.T) {
+	t.Parallel()
+
+	for _, fragment := range []string{
+		`id="items-table"`,
+		`id="reset-columns"`,
+		`class="column-resizer"`,
+		`role="separator"`,
+		`columnWidthStorageKey`,
+		`localStorage.setItem`,
+		`pointerdown`,
+		`ArrowRight`,
+	} {
+		if !strings.Contains(statusPageHTML, fragment) {
+			t.Errorf("status page does not contain column resizing fragment %q", fragment)
+		}
+	}
+}
 
 type webStatusAPITestResponse struct {
 	CompletedCount int                        `json:"completedCount"`
