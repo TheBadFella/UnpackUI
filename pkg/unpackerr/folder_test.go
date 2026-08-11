@@ -1,10 +1,13 @@
 package unpackerr
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"golift.io/xtractr"
 )
 
 type noopLogger struct{}
@@ -107,6 +110,87 @@ func TestFoldersProcessEventCurrentBehavior(t *testing.T) {
 
 	if _, ok := folders.Folders[dir]; !ok {
 		t.Fatalf("expected folder path to be tracked: %s", dir)
+	}
+}
+
+func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	itemPath := filepath.Join(watchPath, "movie")
+	if err := os.Mkdir(itemPath, 0o700); err != nil {
+		t.Fatalf("creating watched item: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(itemPath, "movie.mkv"), []byte("video"), 0o600); err != nil {
+		t.Fatalf("creating media file: %v", err)
+	}
+
+	now := time.Now()
+	cfg := &FolderConfig{Path: watchPath}
+	folder := &Folder{updated: now.Add(-time.Minute), status: WAITING, config: cfg}
+	unpackerr := New()
+	unpackerr.KeepHistory = 0
+	unpackerr.folders = &Folders{
+		Logs:    unpackerr.Logger,
+		Folders: map[string]*Folder{itemPath: folder},
+		Outputs: make(map[string]string),
+	}
+
+	// Xtractr is intentionally nil: reaching the worker queue would panic.
+	unpackerr.extractTrackedItem(itemPath, folder, now)
+
+	if folder.status != EXTRACTEDNOTHING {
+		t.Fatalf("expected archive-free folder status %s, got %s", EXTRACTEDNOTHING, folder.status)
+	}
+	item := unpackerr.Map[itemPath]
+	if item == nil {
+		t.Fatal("expected archive-free folder in completed history")
+	}
+	if item.Status != EXTRACTEDNOTHING {
+		t.Fatalf("expected completed item status %s, got %s", EXTRACTEDNOTHING, item.Status)
+	}
+	if item.Resp == nil || !errors.Is(item.Resp.Error, xtractr.ErrNoCompressedFiles) {
+		t.Fatalf("expected no-compressed-files response, got %+v", item.Resp)
+	}
+	if len(unpackerr.Items) != 0 {
+		t.Fatalf("expected archive-free folder not to enter queue history, got %v", unpackerr.Items)
+	}
+}
+
+func TestExtractTrackedItemWithArchiveQueuesExtraction(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	itemPath := filepath.Join(watchPath, "movie")
+	if err := os.Mkdir(itemPath, 0o700); err != nil {
+		t.Fatalf("creating watched item: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(itemPath, "movie.zip"), []byte("archive"), 0o600); err != nil {
+		t.Fatalf("creating archive file: %v", err)
+	}
+
+	now := time.Now()
+	cfg := &FolderConfig{Path: watchPath}
+	folder := &Folder{updated: now.Add(-time.Minute), status: WAITING, config: cfg}
+	unpackerr := New()
+	unpackerr.KeepHistory = 0
+	unpackerr.folders = &Folders{
+		Logs:    unpackerr.Logger,
+		Folders: map[string]*Folder{itemPath: folder},
+		Outputs: make(map[string]string),
+		Updates: make(chan *xtractr.Response, updateChanBuf),
+	}
+	unpackerr.Xtractr = xtractr.NewQueue(&xtractr.Config{Parallel: 1})
+	t.Cleanup(func() { unpackerr.Xtractr.Stop() })
+
+	unpackerr.extractTrackedItem(itemPath, folder, now)
+
+	if folder.status != QUEUED {
+		t.Fatalf("expected folder with archive status %s, got %s", QUEUED, folder.status)
+	}
+	item := unpackerr.Map[itemPath]
+	if item == nil || item.Status != QUEUED {
+		t.Fatalf("expected folder with archive in extraction queue, got %+v", item)
 	}
 }
 
