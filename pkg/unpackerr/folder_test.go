@@ -1,7 +1,6 @@
 package unpackerr
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -142,18 +141,109 @@ func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	if folder.status != EXTRACTEDNOTHING {
 		t.Fatalf("expected archive-free folder status %s, got %s", EXTRACTEDNOTHING, folder.status)
 	}
-	item := unpackerr.Map[itemPath]
-	if item == nil {
-		t.Fatal("expected archive-free folder in completed history")
+	if item := unpackerr.Map[itemPath]; item != nil {
+		t.Fatalf("expected archive-free folder to stay out of the UI queue, got %+v", item)
 	}
-	if item.Status != EXTRACTEDNOTHING {
-		t.Fatalf("expected completed item status %s, got %s", EXTRACTEDNOTHING, item.Status)
-	}
-	if item.Resp == nil || !errors.Is(item.Resp.Error, xtractr.ErrNoCompressedFiles) {
-		t.Fatalf("expected no-compressed-files response, got %+v", item.Resp)
+	if unpackerr.folders.Folders[itemPath] != folder {
+		t.Fatal("expected archive-free folder to remain tracked briefly to avoid re-queue")
 	}
 	if len(unpackerr.Items) != 0 {
 		t.Fatalf("expected archive-free folder not to enter queue history, got %v", unpackerr.Items)
+	}
+}
+
+func TestIncompleteArchiveName(t *testing.T) {
+	t.Parallel()
+
+	if !isIncompleteArchiveName("show.7z.part") {
+		t.Fatal("expected archive partial to count as incomplete")
+	}
+	if !isIncompleteArchiveName("movie.zip.crdownload") {
+		t.Fatal("expected browser archive download to count as incomplete")
+	}
+	if isIncompleteArchiveName("episode.mkv.part") {
+		t.Fatal("did not expect media partial to count as an incomplete archive")
+	}
+	if isIncompleteArchiveName("episode.mkv") {
+		t.Fatal("did not expect finished media file to count as an incomplete archive")
+	}
+}
+
+func TestFoldersProcessEventTracksMediaFolderWithoutQueueing(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	folders := newTestFolders(t, cfg)
+
+	dir := filepath.Join(watchPath, "episode")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatalf("creating media folder: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "episode.mkv"), []byte("video"), 0o600); err != nil {
+		t.Fatalf("creating media file: %v", err)
+	}
+
+	folders.processEvent(&eventData{
+		cnfg: cfg,
+		name: filepath.Base(dir),
+		file: filepath.Join(dir, "episode.mkv"),
+		op:   "test",
+	}, time.Now())
+
+	if _, ok := folders.Folders[dir]; !ok {
+		t.Fatalf("expected media folder to stay watched: %s", dir)
+	}
+}
+
+func TestBuildWebStateOmitsMediaOnlyWatchedFolders(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	itemPath := filepath.Join(watchPath, "episode")
+	if err := os.Mkdir(itemPath, 0o700); err != nil {
+		t.Fatalf("creating media folder: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(itemPath, "episode.mkv"), []byte("video"), 0o600); err != nil {
+		t.Fatalf("creating media file: %v", err)
+	}
+
+	now := time.Now()
+	unpackerr := New()
+	unpackerr.folders = &Folders{
+		Logs: unpackerr.Logger,
+		Folders: map[string]*Folder{
+			itemPath: {updated: now, status: WAITING, config: &FolderConfig{Path: watchPath}},
+		},
+	}
+
+	snapshot := unpackerr.buildWebState(now)
+	if len(snapshot.Items) != 0 {
+		t.Fatalf("expected media-only watched folder to stay out of the UI, got %+v", snapshot.Items)
+	}
+}
+
+func TestSaveEventResetsExtractedNothingWhenFolderChanges(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	folders := newTestFolders(t, cfg)
+	dir := filepath.Join(watchPath, "show")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatalf("creating folder: %v", err)
+	}
+
+	folders.Folders[dir] = &Folder{updated: time.Now().Add(-time.Minute), status: EXTRACTEDNOTHING, config: cfg}
+	folders.processEvent(&eventData{
+		cnfg: cfg,
+		name: filepath.Base(dir),
+		file: dir,
+		op:   "test",
+	}, time.Now())
+
+	if folders.Folders[dir].status != WAITING {
+		t.Fatalf("expected later folder activity to wait for extraction again, got %s", folders.Folders[dir].status)
 	}
 }
 

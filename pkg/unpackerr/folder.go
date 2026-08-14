@@ -321,6 +321,18 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 		return
 	}
 
+	exclude := folderExcludeSuffixes(name, folder.config)
+	filter := xtractr.Filter{Path: name, ExcludeSuffix: exclude}
+	if xtractr.FindCompressedFiles(filter).Count() == 0 {
+		// Keep the folder watched briefly so a late-arriving archive can still be seen,
+		// but do not queue, notify, or show this as a completed extraction.
+		folder.status = EXTRACTEDNOTHING
+		u.Debugf("[Folder] Ignoring item without compressed files: %s", name)
+		u.recoveryTrackFolder(name, folder.config, folder.status, now)
+
+		return
+	}
+
 	u.folders.Remove(name) // stop the fs watcher(s).
 
 	if outputPath := folderDerivedOutputPath(name); outputPath != "" {
@@ -333,24 +345,6 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 		u.Printf("[Folder] Removing tracked item without extraction: %v (rar file exists)", name)
 		u.folders.Folders[name].status = EXTRACTEDNOTHING
 		u.recoveryClearFolder(name)
-
-		return
-	}
-
-	exclude := folderExcludeSuffixes(name, folder.config)
-	filter := xtractr.Filter{Path: name, ExcludeSuffix: exclude}
-	if xtractr.FindCompressedFiles(filter).Count() == 0 {
-		folder.status = EXTRACTEDNOTHING
-		resp := &xtractr.Response{
-			Done:    true,
-			Started: now,
-			Error:   xtractr.ErrNoCompressedFiles,
-			X:       &xtractr.Xtract{Name: name, Filter: filter},
-		}
-
-		u.Printf("[Folder] %s: %s: %v", folder.status.Desc(), name, resp.Error)
-		u.recoveryTrackFolder(name, folder.config, folder.status, now)
-		u.updateQueueStatus(&newStatus{Name: name, Resp: resp, Status: folder.status}, now, true)
 
 		return
 	}
@@ -385,9 +379,13 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 	u.Printf("[Folder] Queued: %s, queue size: %d", name, queueSize)
 }
 
-// folderIncompleteDownload returns the first temporary download file found below path.
+// incompleteDownloadSuffixes are temporary names download clients use before a file is finalized.
+var incompleteDownloadSuffixes = []string{".part", ".partial", ".crdownload", ".download", ".aria2", ".!qb"}
+
+// folderIncompleteDownload returns the first temporary archive download found below path.
 // Download clients rename these files to their final archive name after flushing and
 // verifying them, so their presence means the containing folder is not ready to scan.
+// Non-archive temps (for example video.mkv.part) are ignored so media folders are not queued.
 func folderIncompleteDownload(path string) string {
 	var partial string
 
@@ -400,19 +398,50 @@ func folderIncompleteDownload(path string) string {
 			return nil
 		}
 
-		name := strings.ToLower(entry.Name())
-		for _, suffix := range []string{".part", ".partial", ".crdownload", ".download", ".aria2", ".!qb"} {
-			if strings.HasSuffix(name, suffix) {
-				partial = itemPath
-
-				return filepath.SkipAll
-			}
+		if !isIncompleteArchiveName(entry.Name()) {
+			return nil
 		}
 
-		return nil
+		partial = itemPath
+
+		return filepath.SkipAll
 	})
 
 	return partial
+}
+
+func isIncompleteArchiveName(name string) bool {
+	lower := strings.ToLower(name)
+
+	for _, suffix := range incompleteDownloadSuffixes {
+		if !strings.HasSuffix(lower, suffix) {
+			continue
+		}
+
+		if xtractr.IsArchiveFile(strings.TrimSuffix(lower, suffix)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func folderHasExtractableContent(path string, cfg *FolderConfig) bool {
+	if path == "" {
+		return false
+	}
+
+	if xtractr.IsArchiveFile(path) || isIncompleteArchiveName(filepath.Base(path)) {
+		return true
+	}
+
+	if folderIncompleteDownload(path) != "" {
+		return true
+	}
+
+	exclude := folderExcludeSuffixes(path, cfg)
+
+	return xtractr.FindCompressedFiles(xtractr.Filter{Path: path, ExcludeSuffix: exclude}).Count() > 0
 }
 
 func folderDerivedOutputPath(path string) string {
@@ -524,7 +553,11 @@ func (u *Unpackerr) folderXtractrCallback(resp *xtractr.Response) {
 		u.Printf("[Folder] Extraction Started: %s, retries: %d, items in queue: %d", resp.X.Name, folder.retries, resp.Queued)
 	case errors.Is(resp.Error, xtractr.ErrNoCompressedFiles):
 		folder.status = EXTRACTEDNOTHING
-		u.Printf("[Folder] %s: %s: %v", folder.status.Desc(), resp.X.Name, resp.Error)
+		u.Debugf("[Folder] Ignoring item without compressed files: %s", resp.X.Name)
+		delete(u.Map, resp.X.Name)
+		u.recoveryTrackFolder(resp.X.Name, folder.config, folder.status, resp.Started.Add(resp.Elapsed))
+
+		return
 	case resp.Error != nil:
 		folder.archives = resp.Archives
 		folder.status = EXTRACTFAILED
@@ -666,9 +699,12 @@ func (f *Folders) processEvent(event *eventData, now time.Time) {
 }
 
 func (f *Folders) saveEvent(event *eventData, dirPath string, now time.Time) {
-	if _, ok := f.Folders[dirPath]; ok {
-		// f.Debugf("Item Updated: %v", event.file)
-		f.Folders[dirPath].updated = now
+	if existing, ok := f.Folders[dirPath]; ok {
+		existing.updated = now
+		if existing.status == EXTRACTEDNOTHING {
+			existing.status = WAITING
+		}
+
 		return
 	}
 
@@ -700,7 +736,7 @@ func (u *Unpackerr) checkFolderStats(now time.Time) {
 		case EXTRACTEDNOTHING == folder.status:
 			// Wait until this item hasn't been touched for a while, so it doesn't re-queue.
 			if now.Sub(folder.updated) > u.StartDelay.Duration {
-				// Ignore "no compressed files" errors for folders.
+				u.folders.Remove(name)
 				u.recoveryClearFolder(name)
 				delete(u.Map, name)
 				delete(u.folders.Folders, name)
