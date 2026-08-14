@@ -194,7 +194,11 @@ func (u *Unpackerr) buildWaitingFolderWebItems(
 	}
 
 	for name, folder := range u.folders.Folders {
-		if _, ok := u.Map[name]; ok || folder == nil {
+		if _, ok := u.Map[name]; ok || folder == nil || folder.status != WAITING {
+			continue
+		}
+
+		if !folderHasExtractableContent(name, folder.config) {
 			continue
 		}
 
