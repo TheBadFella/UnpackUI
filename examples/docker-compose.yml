@@ -114,7 +114,7 @@ services:
     - UN_FOLDER_0_DISABLE_LOG=false
     - UN_FOLDER_0_MOVE_BACK=false
     - UN_FOLDER_0_EXTRACT_ISOS=false
-    ## Web Hooks
+    ## Webhooks
     - UN_WEBHOOK_0_URL=https://notifiarr.com/api/v1/notification/unpackerr/api_key_from_notifiarr_com
     - UN_WEBHOOK_0_NAME=
     - UN_WEBHOOK_0_SILENT=false
@@ -143,4 +143,4 @@ services:
     - UN_CMDHOOK_0_EXCLUDE_1=lidarr
     - UN_CMDHOOK_0_TIMEOUT=10s
 
-## => Content Auto Generated, 07 AUG 2026 01:18 UTC
+## => Content Auto Generated, 28 AUG 2026 20:46 UTC
