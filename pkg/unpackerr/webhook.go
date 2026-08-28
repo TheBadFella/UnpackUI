@@ -348,7 +348,7 @@ func discordWaitURL(rawURL string) string {
 func discordEditURL(rawURL, messageID string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		base := strings.SplitN(rawURL, "?", 2)[0] //nolint:mnd
+		base, _, _ := strings.Cut(rawURL, "?")
 
 		return strings.TrimRight(base, "/") + "/messages/" + messageID
 	}

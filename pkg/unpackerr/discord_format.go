@@ -10,25 +10,26 @@ import (
 	"golift.io/cnfg"
 )
 
-var (
-	archiveExtSuffixes = []string{
+// Matches common scene/P2P release tags that end the show/movie title.
+var mediaTokenPattern = regexp.MustCompile(`(?i)^(?:` +
+	`s\d{1,2}(?:e\d{1,3})?|` + // S01 / S01E02
+	`\d{1,2}x\d{1,3}|` + // 1x02
+	`\d{3,4}p|4k|8k|uhd|hdr|sdr|dv|` + // 1080p / 4K / HDR
+	`web-?dl|webrip|bluray|b[dr]rip|hdtv|dvdrip|remux|` +
+	`x264|x265|h\.?264|h\.?265|hevc|avc|av1|xvid|` +
+	`ddp?(?:\d(?:\.\d)?)?|aac|dts(?:-?hd)?|truehd|atmos|flac|pcm|` +
+	`proper|repack|internal|extended|unrated|directors?\.?cut|` +
+	`multi|dual|limited|complete|season|` +
+	`amzn|nf|dsnp|hulu|atvp|pcok|hmax|zee5|hotstar|` +
+	`\d{4}` + // year
+	`)$`)
+
+func archiveExtSuffixes() []string {
+	return []string{
 		".tar.gz", ".tar.bz2", ".tar.xz", ".tgz",
 		".zip", ".rar", ".7z", ".gz", ".bz2", ".xz", ".iso",
 	}
-	// Matches common scene/P2P release tags that end the show/movie title.
-	mediaTokenPattern = regexp.MustCompile(`(?i)^(?:` +
-		`s\d{1,2}(?:e\d{1,3})?|` + // S01 / S01E02
-		`\d{1,2}x\d{1,3}|` + // 1x02
-		`\d{3,4}p|4k|8k|uhd|hdr|sdr|dv|` + // 1080p / 4K / HDR
-		`web-?dl|webrip|bluray|b[dr]rip|hdtv|dvdrip|remux|` +
-		`x264|x265|h\.?264|h\.?265|hevc|avc|av1|xvid|` +
-		`ddp?(?:\d(?:\.\d)?)?|aac|dts(?:-?hd)?|truehd|atmos|flac|pcm|` +
-		`proper|repack|internal|extended|unrated|directors?\.?cut|` +
-		`multi|dual|limited|complete|season|` +
-		`amzn|nf|dsnp|hulu|atvp|pcok|hmax|zee5|hotstar|` +
-		`\d{4}` + // year
-		`)$`)
-)
+}
 
 // discordReleaseName returns the raw release/file name for Discord embeds.
 func discordReleaseName(ids map[string]any, path string) string {
@@ -97,7 +98,7 @@ func cleanReleaseTitle(name string) string {
 func stripArchiveExtension(name string) string {
 	lower := strings.ToLower(name)
 
-	for _, ext := range archiveExtSuffixes {
+	for _, ext := range archiveExtSuffixes() {
 		if strings.HasSuffix(lower, ext) {
 			return name[:len(name)-len(ext)]
 		}
@@ -115,7 +116,7 @@ func isMediaToken(part string) bool {
 		return true
 	}
 
-	for _, sub := range strings.Split(part, "-") {
+	for sub := range strings.SplitSeq(part, "-") {
 		if sub != "" && mediaTokenPattern.MatchString(sub) {
 			return true
 		}
@@ -137,5 +138,6 @@ func formatDiscordTime(value time.Time) string {
 		return ""
 	}
 
-	return value.Local().Format("1/2/2006 3:04 PM")
+	// Discord timestamps should match the host clock, not UTC.
+	return value.In(time.Local).Format("1/2/2006 3:04 PM") //nolint:gosmopolitan
 }
