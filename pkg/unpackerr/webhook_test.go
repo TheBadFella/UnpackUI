@@ -1,8 +1,6 @@
 package unpackerr
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -209,19 +207,21 @@ func TestSupportsDiscordUpdate(t *testing.T) {
 
 func TestDiscordTemplateIncludesExtraFields(t *testing.T) {
 	t.Parallel()
+	assertDiscordTemplateContains(t, extraFieldsDiscordTestPayload(), []string{
+		`"title": "Movie Name"`,
+		`"name": "Unpackerr: Extraction Complete"`,
+		`"name": "App"`,
+		`"name": "Retries"`,
+		`"name": "Release"`,
+		`"name": "Reason"`,
+		`"name": "Links"`,
+		`[Open UI](http://localhost:5656)`,
+		`"url": "http://localhost:5656"`,
+	}, nil)
+}
 
-	hook := &WebhookConfig{
-		TempName: "discord",
-		Nickname: "Unpackerr",
-		CType:    "application/json",
-	}
-
-	tmpl, err := hook.Template()
-	if err != nil {
-		t.Fatalf("template: %v", err)
-	}
-
-	payload := &WebhookPayload{
+func extraFieldsDiscordTestPayload() *WebhookPayload {
+	return &WebhookPayload{
 		Path:    "/downloads/Movie.Name.2024.1080p.WEB-DL.mkv",
 		App:     "radarr",
 		Event:   EXTRACTED,
@@ -248,46 +248,20 @@ func TestDiscordTemplateIncludesExtraFields(t *testing.T) {
 			Start:    time.Date(2026, 4, 12, 11, 59, 55, 0, time.UTC),
 		},
 	}
-
-	var body bytes.Buffer
-	if err := tmpl.Execute(&body, payload); err != nil {
-		t.Fatalf("execute template: %v", err)
-	}
-
-	out := body.String()
-	for _, want := range []string{
-		`"title": "Movie Name"`,
-		`"name": "Unpackerr: Extraction Complete"`,
-		`"name": "App"`,
-		`"name": "Retries"`,
-		`"name": "Release"`,
-		`"name": "Reason"`,
-		`"name": "Links"`,
-		`[Open UI](http://localhost:5656)`,
-		`"url": "http://localhost:5656"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("expected template output to contain %q\n%s", want, out)
-		}
-	}
-
-	if !json.Valid(body.Bytes()) {
-		t.Fatalf("discord template produced invalid JSON:\n%s", out)
-	}
 }
 
 func TestSendOrUpdateCreatesThenEditsDiscordMessage(t *testing.T) {
 	t.Parallel()
 
 	var (
-		mu       sync.Mutex
-		requests []string
+		requestLock sync.Mutex
+		requests    []string
 	)
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		mu.Lock()
+		requestLock.Lock()
 		requests = append(requests, request.Method+" "+request.URL.RequestURI())
-		mu.Unlock()
+		requestLock.Unlock()
 
 		switch {
 		case request.Method == http.MethodPost && request.URL.Query().Get("wait") == "true":
@@ -318,8 +292,8 @@ func TestSendOrUpdateCreatesThenEditsDiscordMessage(t *testing.T) {
 		t.Fatalf("update: %v", err)
 	}
 
-	mu.Lock()
-	defer mu.Unlock()
+	requestLock.Lock()
+	defer requestLock.Unlock()
 
 	if len(requests) != 2 {
 		t.Fatalf("expected 2 requests, got %#v", requests)

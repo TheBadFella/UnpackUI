@@ -152,7 +152,9 @@ const WebhookTemplateDiscord = `{
     "fields": [
       {"name": "App", "value": "{{.App}}", "inline": true}
       {{- if .Data }}
-      {{- if not .Data.Start.IsZero }},{"name": "Started", "value": {{encode (discordtime .Data.Start)}}, "inline": true}{{end -}}
+      {{- if not .Data.Start.IsZero -}}
+      ,{"name": "Started", "value": {{encode (discordtime .Data.Start)}}, "inline": true}
+      {{- end -}}
       {{- if .Data.Bytes }},{"name": "Size", "value": "{{humanbytes .Data.Bytes}}", "inline": true}{{end -}}
       {{- if .Data.Files }},{"name": "Files", "value": "{{len .Data.Files}}", "inline": true}{{end -}}
       {{- if .Data.Archives }},{"name": "Archives", "value": "{{len .Data.Archives}}", "inline": true}{{end -}}

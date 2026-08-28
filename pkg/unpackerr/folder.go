@@ -313,11 +313,7 @@ func (f *Folders) Remove(folder string) {
 func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Time) {
 	folder.updated = now
 
-	if partial := folderIncompleteDownload(name); partial != "" {
-		folder.status = WAITING
-		u.recoveryTrackFolder(name, folder.config, folder.status, now)
-		u.Debugf("[Folder] Deferring extraction while download is incomplete: %s (%s)", name, partial)
-
+	if u.deferIncompleteFolderExtract(name, folder, now) {
 		return
 	}
 
@@ -380,8 +376,23 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 	u.Printf("[Folder] Queued: %s, queue size: %d", name, queueSize)
 }
 
+func (u *Unpackerr) deferIncompleteFolderExtract(name string, folder *Folder, now time.Time) bool {
+	partial := folderIncompleteDownload(name)
+	if partial == "" {
+		return false
+	}
+
+	folder.status = WAITING
+	u.recoveryTrackFolder(name, folder.config, folder.status, now)
+	u.Debugf("[Folder] Deferring extraction while download is incomplete: %s (%s)", name, partial)
+
+	return true
+}
+
 // incompleteDownloadSuffixes are temporary names download clients use before a file is finalized.
-var incompleteDownloadSuffixes = []string{".part", ".partial", ".crdownload", ".download", ".aria2", ".!qb"}
+func incompleteDownloadSuffixes() []string {
+	return []string{".part", ".partial", ".crdownload", ".download", ".aria2", ".!qb"}
+}
 
 // folderIncompleteDownload returns the first temporary archive download found below path.
 // Download clients rename these files to their final archive name after flushing and
@@ -414,7 +425,7 @@ func folderIncompleteDownload(path string) string {
 func isIncompleteArchiveName(name string) bool {
 	lower := strings.ToLower(name)
 
-	for _, suffix := range incompleteDownloadSuffixes {
+	for _, suffix := range incompleteDownloadSuffixes() {
 		if !strings.HasSuffix(lower, suffix) {
 			continue
 		}

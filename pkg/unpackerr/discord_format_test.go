@@ -54,47 +54,7 @@ func TestCleanReleaseTitle(t *testing.T) {
 
 func TestDiscordTemplateCompactLayout(t *testing.T) {
 	t.Parallel()
-
-	hook := &WebhookConfig{
-		TempName: "discord",
-		Nickname: "Unpackerr",
-		CType:    "application/json",
-	}
-
-	tmpl, err := hook.Template()
-	if err != nil {
-		t.Fatalf("template: %v", err)
-	}
-
-	payload := &WebhookPayload{
-		Path:     "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms.zip",
-		App:      FolderString,
-		Event:    DELETED,
-		Title:    friendlyEventTitle(DELETED),
-		WebURL:   "https://unpackerr.example.com",
-		IDs:      map[string]any{"title": "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms.zip"},
-		Time:     time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC),
-		Version:  "1.3.0",
-		Revision: "1067",
-		OS:       "linux",
-		Arch:     "amd64",
-		Data: &XtractPayload{
-			Output:   "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu.DDP5.1.HEVC.x265-HDHub4u.Ms",
-			Archives: []string{"/downloads/file.zip"},
-			Files:    []string{"/downloads/a.mkv", "/downloads/b.mkv"},
-			Bytes:    45354845306,
-			Elapsed:  cnfg.Duration{Duration: 50*time.Minute + 26*time.Second + 375*time.Millisecond},
-			Start:    time.Date(2026, 4, 12, 11, 10, 0, 0, time.UTC),
-		},
-	}
-
-	var body bytes.Buffer
-	if err := tmpl.Execute(&body, payload); err != nil {
-		t.Fatalf("execute template: %v", err)
-	}
-
-	out := body.String()
-	for _, want := range []string{
+	assertDiscordTemplateContains(t, compactDiscordTestPayload(), []string{
 		`"title": "Vadhandhi"`,
 		`"name": "Unpackerr: Source Deleted"`,
 		`"name": "App"`,
@@ -108,20 +68,70 @@ func TestDiscordTemplateCompactLayout(t *testing.T) {
 		`"name": "Links"`,
 		`[Open UI](https://unpackerr.example.com)`,
 		`"url": "https://unpackerr.example.com"`,
-	} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("expected template output to contain %q\n%s", want, out)
-		}
-	}
-
-	for _, ban := range []string{
+	}, []string{
 		`"name": "Path"`,
 		`"name": "Output"`,
 		`"name": "Status"`,
 		`"components"`,
-	} {
-		if strings.Contains(out, ban) {
-			t.Fatalf("did not expect template output to contain %q\n%s", ban, out)
+	})
+}
+
+func compactDiscordTestPayload() *WebhookPayload {
+	release := "/downloads/Vadhandhi.S02.4K-2160p.SDR.AMZN.WEB-DL.Hindi-Tamil-Telugu." +
+		"DDP5.1.HEVC.x265-HDHub4u.Ms.zip"
+
+	return &WebhookPayload{
+		Path:     release,
+		App:      FolderString,
+		Event:    DELETED,
+		Title:    friendlyEventTitle(DELETED),
+		WebURL:   "https://unpackerr.example.com",
+		IDs:      map[string]any{"title": release},
+		Time:     time.Date(2026, 4, 12, 12, 0, 0, 0, time.UTC),
+		Version:  "1.3.0",
+		Revision: "1067",
+		OS:       "linux",
+		Arch:     "amd64",
+		Data: &XtractPayload{
+			Output:   strings.TrimSuffix(release, ".zip"),
+			Archives: []string{"/downloads/file.zip"},
+			Files:    []string{"/downloads/a.mkv", "/downloads/b.mkv"},
+			Bytes:    45354845306,
+			Elapsed:  cnfg.Duration{Duration: 50*time.Minute + 26*time.Second + 375*time.Millisecond},
+			Start:    time.Date(2026, 4, 12, 11, 10, 0, 0, time.UTC),
+		},
+	}
+}
+
+func assertDiscordTemplateContains(t *testing.T, payload *WebhookPayload, want, ban []string) {
+	t.Helper()
+
+	hook := &WebhookConfig{
+		TempName: "discord",
+		Nickname: "Unpackerr",
+		CType:    "application/json",
+	}
+
+	tmpl, err := hook.Template()
+	if err != nil {
+		t.Fatalf("template: %v", err)
+	}
+
+	var body bytes.Buffer
+	if err := tmpl.Execute(&body, payload); err != nil {
+		t.Fatalf("execute template: %v", err)
+	}
+
+	out := body.String()
+	for _, item := range want {
+		if !strings.Contains(out, item) {
+			t.Fatalf("expected template output to contain %q\n%s", item, out)
+		}
+	}
+
+	for _, item := range ban {
+		if strings.Contains(out, item) {
+			t.Fatalf("did not expect template output to contain %q\n%s", item, out)
 		}
 	}
 

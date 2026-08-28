@@ -12,6 +12,7 @@ linters:
     - cyclop
     - testpackage
     - wsl
+    - wsl_v5 # v2.13 successor of wsl, which upstream already disables.
     - embeddedstructfieldcheck # this is a trash rule.
     - funcorder # also lame.
     - noinlineerr # I like inline errors.
@@ -48,6 +49,13 @@ linters:
       - comments
       - common-false-positives
       - std-error-handling
+    rules:
+      - path: pkg/unpackerr/webhook\.go
+        linters:
+          - lll
+      - path: pkg/unpackerr/webhooks_templates\.go
+        linters:
+          - lll
 
 issues:
   max-issues-per-linter: 0
