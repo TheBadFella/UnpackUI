@@ -8,7 +8,7 @@
 
 <img width="960" alt="UnpackUI status dashboard" src="pkg/ui/UnpackUI.png">
 
-<img width="128" height="128" alt="UnpackUI" src="https://cdn.jsdelivr.net/gh/selfhst/icons@main/png/unpackerr.png">
+<img width="128" height="128" alt="UnpackUI" src="https://unpackerr.zip/img/icon.png">
 
 ## About
 

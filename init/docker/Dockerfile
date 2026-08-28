@@ -1,4 +1,4 @@
-FROM golang:1-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -X \"golift.io/version.Revision=${ITERATION}\" \
     -X \"golift.io/version.Version=${VERSION}\""
 
-FROM alpine
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -59,8 +59,8 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
 
 COPY --from=builder /tmp/unpackerr /unpackerr
 # Make sure we have an ssl cert chain and timezone data.
-RUN apk add --no-cache openssl tzdata
+RUN apk add --no-cache ca-certificates openssl tzdata
 
 ENV TZ=UTC
 
-ENTRYPOINT [ "/unpackerr" ]
+ENTRYPOINT ["/unpackerr"]
