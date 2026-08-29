@@ -10,7 +10,7 @@ Create a `compose.yml` file:
 ```yaml
 services:
   unpackui:
-    image: ghcr.io/thebadfella/unpackui:1.6.1
+    image: ghcr.io/thebadfella/unpackui:1.7.0
     container_name: unpackui
     restart: unless-stopped
     user: "1000:1000"
@@ -26,6 +26,9 @@ services:
       UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
       UN_SUPPRESS_MISSING_URLS: "true"
       UN_STATE_FILE: /config/unpackerr.state.json
+      UN_MAX_BYTES: 75GB
+      UN_MAX_FILES: "5000"
+      UN_MAX_RATIO: "15"
 
       # Add the Starr applications you use.
       UN_SONARR_0_URL: http://sonarr:8989
@@ -54,9 +57,11 @@ the newest released image automatically.
 
 ## Configuration file
 
-The `/config` mount is optional when all settings are environment variables. To
-use a TOML file instead, place it at `/path/to/unpackui-config/unpackerr.conf` on
-the host; the container discovers it as `/config/unpackerr.conf`.
+The `/config` mount is optional when all settings are environment variables and
+restart recovery does not need persistent storage. If you remove the mount,
+remove `UN_STATE_FILE` or point it at another persistent, writable mount. To use
+a TOML file, place it at `/path/to/unpackui-config/unpackerr.conf` on the host;
+the container discovers it as `/config/unpackerr.conf`.
 
 See [Configuration](configuration.md) for file examples and precedence rules.
 
@@ -67,7 +72,7 @@ Go 1.27 or newer is required for this release.
 ```console
 git clone https://github.com/TheBadFella/UnpackUI.git
 cd UnpackUI
-git checkout v1.6.1
+git checkout v1.7.0
 go build -o unpackerr .
 ./unpackerr -c ./unpackerr.conf
 ```

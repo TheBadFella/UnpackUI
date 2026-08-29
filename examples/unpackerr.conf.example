@@ -98,14 +98,27 @@ parallel = 1
 file_mode = "0644"
 dir_mode = "0755"
 
+## Per-archive cap on uncompressed bytes written to disk. Guards against zip bombs.
+## Uses a size string such as `75GB` or `100GiB`. `0` or `0B` disables the cap.
+max_bytes = "75GB"
+
+## Per-archive cap on files, directories, and symlinks created during extract.
+## `0` disables the cap.
+max_files = 5000
+
+## Per-archive cap on `bytes written / archive file size`. A `15` means a 1GB
+## archive may write at most 15GB. `0` disables the cap.
+max_ratio = 15
+
 ## List of passwords to use for encrypted archives. Must be a list of strings.
 ## Use this special format as a password to read more passwords from a file:
 ## passwords = [ "filepath:/path/to/passwords.txt" ]
 passwords = []
 
 ## Optional URL for the built-in status UI (see [webserver] settings).
-## When set, Discord webhook embeds include an "Open UI" link button that
-## points here. Example: http://192.168.1.10:5656 or https://unpackerr.example.com
+## When set, Discord webhook embeds link their title to this URL and include
+## an "Open UI" markdown link. Example: http://192.168.1.10:5656 or
+## https://unpackerr.example.com
 #web_url = "http://127.0.0.1:5656"
 
 [webserver]
@@ -390,4 +403,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 29 AUG 2026 15:27 UTC
+## => Content Auto Generated, 29 AUG 2026 15:59 UTC

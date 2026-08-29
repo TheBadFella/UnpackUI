@@ -1,16 +1,20 @@
 package unpackerr
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"code.cloudfoundry.org/bytefmt"
 	"github.com/Unpackerr/unpackerr/pkg/ui"
 	flag "github.com/spf13/pflag"
 	"golift.io/cnfg"
@@ -22,6 +26,9 @@ import (
 
 const (
 	defaultMaxRetries  = 3
+	defaultMaxFiles    = 5000
+	defaultMaxRatio    = 15
+	defaultMaxBytes    = "75GB"
 	defaultFileMode    = 0o644
 	defaultLogFileMode = 0o600
 	defaultDirMode     = 0o755
@@ -112,6 +119,9 @@ func New() *Unpackerr {
 			LogQueues:           cnfg.Duration{Duration: time.Minute + time.Second},
 			MaxRetries:          defaultMaxRetries,
 			RemnantAction:       remnantAction(""),
+			MaxBytes:            defaultMaxBytes,
+			MaxFiles:            defaultMaxFiles,
+			MaxRatio:            defaultMaxRatio,
 			LogFiles:            defaultLogFiles,
 			Timeout:             cnfg.Duration{Duration: defaultTimeout},
 			Interval:            cnfg.Duration{Duration: defaultInterval},
@@ -174,6 +184,11 @@ func Start() error {
 		return err
 	}
 
+	limits, err := unpackerr.extractLimits()
+	if err != nil {
+		return err
+	}
+
 	unpackerr.setupRecoveryState()
 	unpackerr.logStartupInfo(msg, output)
 
@@ -187,6 +202,9 @@ func Start() error {
 		Logger:   unpackerr.Logger,
 		FileMode: os.FileMode(fileMode),
 		DirMode:  os.FileMode(dirMode),
+		MaxBytes: limits.bytes,
+		MaxFiles: limits.files,
+		MaxRatio: limits.ratio,
 	})
 
 	if len(unpackerr.Webhook) > 0 || len(unpackerr.Cmdhook) > 0 {
@@ -411,6 +429,72 @@ func (u *Unpackerr) Run() {
 			u.refreshWebState(now)
 		}
 	}
+}
+
+// extractLimits are the xtractr queue-wide zip-bomb guards. 0 is unlimited.
+type extractLimits struct {
+	bytes uint64
+	files int
+	ratio float64
+}
+
+var (
+	errNegativeExtractLimit = errors.New("extract limit must not be negative")
+	errInvalidMaxBytes      = errors.New("invalid max_bytes")
+)
+
+func (u *Unpackerr) extractLimits() (extractLimits, error) {
+	if u.MaxFiles < 0 {
+		return extractLimits{}, fmt.Errorf("%w: max_files=%d", errNegativeExtractLimit, u.MaxFiles)
+	}
+
+	if u.MaxRatio < 0 || math.IsNaN(u.MaxRatio) || math.IsInf(u.MaxRatio, 0) {
+		return extractLimits{}, fmt.Errorf("%w: max_ratio=%v", errNegativeExtractLimit, u.MaxRatio)
+	}
+
+	bytes, err := parseExtractMaxBytes(u.MaxBytes)
+	if err != nil {
+		return extractLimits{}, err
+	}
+
+	return extractLimits{bytes: bytes, files: u.MaxFiles, ratio: u.MaxRatio}, nil
+}
+
+func parseExtractMaxBytes(size string) (uint64, error) {
+	size = strings.TrimSpace(size)
+	if size == "" {
+		return 0, fmt.Errorf("%w: empty", errInvalidMaxBytes)
+	}
+
+	if size == "0" || strings.EqualFold(size, "0B") {
+		return 0, nil
+	}
+
+	n, err := bytefmt.ToBytes(size)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %q: %w", errInvalidMaxBytes, size, err)
+	}
+
+	return n, nil
+}
+
+func (l extractLimits) String() string {
+	size := "unlimited"
+	if l.bytes > 0 {
+		size = bytefmt.ByteSize(l.bytes)
+	}
+
+	files := "unlimited"
+	if l.files > 0 {
+		files = strconv.Itoa(l.files)
+	}
+
+	ratio := "unlimited"
+	if l.ratio > 0 {
+		ratio = fmt.Sprintf("%g:1", l.ratio)
+	}
+
+	return size + ", " + files + " files, " + ratio
 }
 
 // Custom percentage procedure for starr apps.
