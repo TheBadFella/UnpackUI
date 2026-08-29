@@ -11,7 +11,7 @@ run_step() {
 }
 
 run_step "go generate ./..." go generate ./...
-run_step "go test ./pkg/..." go test ./pkg/...
+run_step "go test ./..." go test ./...
 case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     printf '==> GOOS=linux go generate ./... skipped\n'
@@ -38,7 +38,7 @@ case "$(uname -s)" in
     ;;
 esac
 
-lint_version="v2.11.4"
+lint_version="v2.13.2"
 printf '==> golangci-lint run (%s)\n' "$lint_version"
 
 if command -v golangci-lint >/dev/null 2>&1; then
@@ -57,4 +57,4 @@ else
   fi
 fi
 
-GOOS=linux "$lint_bin" run
+GOOS=linux "$lint_bin" run ./...
