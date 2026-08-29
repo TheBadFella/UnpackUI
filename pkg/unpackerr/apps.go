@@ -80,6 +80,9 @@ type Config struct {
 	Webhook       []*WebhookConfig `json:"webhook,omitempty"  toml:"webhook"        xml:"webhook"        yaml:"webhook,omitempty"`
 	Cmdhook       []*WebhookConfig `json:"cmdhook,omitempty"  toml:"cmdhook"        xml:"cmdhook"        yaml:"cmdhook,omitempty"`
 	Folder        FoldersConfig    `json:"folders"            toml:"folders"        xml:"folders"        yaml:"folders"` // undocumented.
+
+	// SuppressMissingURLs keeps unused optional Starr entries out of the error log.
+	SuppressMissingURLs bool `json:"suppressMissingURLs" toml:"suppress_missing_urls" xml:"suppress_missing_urls" yaml:"suppressMissingURLs"`
 }
 
 type FoldersConfig struct {

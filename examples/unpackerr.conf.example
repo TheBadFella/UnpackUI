@@ -23,6 +23,12 @@ error_stderr = false
 ## Set this to true when you want less log spam.
 activity = false
 
+## When true, Starr application entries without a URL are skipped without an
+## error log. This keeps the default empty Sonarr and Radarr entries quiet when
+## those applications are not used. Configured applications still report missing
+## API keys, invalid URLs, and connection errors.
+suppress_missing_urls = true
+
 ## The Starr-application activity queue is logged on an interval.
 ## Adjust that interval with this setting.
 ## Default is a minute. 2m, 5m, 10m, 30m, 1h are also perfectly acceptable.
@@ -384,4 +390,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 29 AUG 2026 04:32 UTC
+## => Content Auto Generated, 29 AUG 2026 15:27 UTC
