@@ -26,8 +26,16 @@ Pass `-c /path/to/unpackerr.conf` to select a file explicitly.
 # Ignore empty optional Starr entries without hiding real configuration errors.
 suppress_missing_urls = true
 
+# Per-archive disk protection. Use 0 to disable an individual limit.
+max_bytes = "75GB"
+max_files = 5000
+max_ratio = 15
+
 # Persist watched-folder work so interrupted items can be retried after restart.
 state_file = "/config/unpackerr.state.json"
+
+# Handle extracted destination files left by an interrupted extraction.
+remnant_action = "rename"
 
 # Publicly reachable UI URL used in native Discord notification links.
 web_url = "https://unpackui.example.com"
@@ -52,7 +60,11 @@ The equivalent environment variables are:
 ```yaml
 environment:
   UN_SUPPRESS_MISSING_URLS: "true"
+  UN_MAX_BYTES: 75GB
+  UN_MAX_FILES: "5000"
+  UN_MAX_RATIO: "15"
   UN_STATE_FILE: /config/unpackerr.state.json
+  UN_REMNANT_ACTION: rename
   UN_WEB_URL: https://unpackui.example.com
   UN_WEBSERVER_UI: "true"
   UN_WEBSERVER_API: "true"
@@ -74,7 +86,10 @@ Sonarr instance begins with `UN_SONARR_1_`.
 
 `state_file` stores a small JSON record of watched-folder items that were
 waiting, queued, or extracting. On restart, UnpackUI validates those entries
-against the configured watch folders and retries valid interrupted work.
+against the configured watch folders, cleans known partial sidecar output for
+queued or extracting items, and re-queues valid work from the beginning. It
+does not resume an archive at the exact byte where extraction stopped, and it
+does not persist Starr queue items.
 
 When no explicit path is set, UnpackUI uses `/config/unpackerr.state.json` if
 `/config` exists, otherwise a file beside `log_file`, otherwise a file beneath
@@ -91,6 +106,42 @@ Set it to `false` if you want missing-URL warnings while troubleshooting.
 This option does not hide problems for an app that has a URL. Missing API keys,
 invalid URLs, failed requests, and other runtime errors are still logged.
 
+## Interrupted-extraction remnants
+
+`remnant_action` handles a different problem from restart recovery. If an
+extracted file cannot be moved to its final destination because that path
+already exists, Unpackerr compares the blocker with a snapshot taken before the
+extraction. Files that were already part of the download are protected; files
+created afterward can be treated as output left by an interrupted extraction.
+
+This check applies to Starr jobs and watched folders with `move_back = true`.
+The default watched-folder mode extracts into a sidecar directory and does not
+classify destination remnants this way.
+
+- `rename` (default) moves each blocker to a sibling ending in `.remnant`
+  (or a numbered variant), rolls back newly moved sibling output, and retries.
+- `delete` removes each blocker, rolls back newly moved sibling output, and
+  retries.
+- `off` leaves blockers untouched and fails without retrying that item.
+
+Handling is bounded by `max_retries`. This is a per-file destination-conflict
+safety mechanism; it does not replace the watched-folder `state_file` recovery
+described above.
+
+## Extraction safety limits
+
+The upstream protection merged from PR #667 applies three per-archive limits:
+
+- `max_bytes` / `UN_MAX_BYTES` caps uncompressed bytes written. Size strings
+  such as `75GB` and `100GiB` are accepted.
+- `max_files` / `UN_MAX_FILES` caps files, directories, and symlinks created.
+- `max_ratio` / `UN_MAX_RATIO` caps bytes written divided by archive size. A
+  value of `15` allows a 1 GB archive to write at most 15 GB.
+
+The defaults are 75 GB, 5,000 entries, and 15:1. Set an individual value to `0`
+to make that limit unlimited. Raise limits deliberately for trusted archives
+whose legitimate contents exceed these defaults.
+
 ## Complete references
 
 - [Fork-specific environment variables](environment-variables.md)
@@ -98,4 +149,5 @@ invalid URLs, failed requests, and other runtime errors are still logged.
 - [Generated Compose environment reference](../examples/docker-compose.yml)
 - [Upstream Unpackerr documentation](https://unpackerr.zip)
 
-The generated examples are the source of truth for inherited upstream options.
+The examples are generated from `init/config/definitions.yml` and provide the
+exhaustive reference for inherited upstream options in this repository.

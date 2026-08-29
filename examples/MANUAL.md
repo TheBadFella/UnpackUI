@@ -39,7 +39,7 @@ OPTIONS
         9 = nothing extracted
 
         Discord webhooks support update_existing=true to edit one message per
-        extract as status changes. Set web_url for an Open UI button on Discord
+        extract as status changes. Set web_url for an Open UI link in Discord
         embeds. Notifiarr and other templates remain available.
 
     -v, --version

@@ -34,7 +34,8 @@ The dashboard shows aggregate counters and current/recent extraction items. It
 includes status, application, progress, ETA, retries, elapsed time, output
 details, and delete countdowns when available.
 
-- Updates arrive live over a WebSocket, with polling as a fallback.
+- The dashboard polls every 2 seconds while work is active and every 30 seconds
+  while idle. A failed request is retried after 10 seconds.
 - Drag a table header divider to resize a column. Widths are stored in that
   browser's local storage; **Reset columns** restores the defaults.
 - **Clear completed** removes completed rows from the in-memory UI history. It
@@ -48,7 +49,6 @@ details, and delete countdowns when available.
 | `/` | `ui = true` | Dashboard page. |
 | `/api/status` | `ui = true` | Detailed dashboard state. This may include paths and extraction details. |
 | `/api/status/clear-completed` | `ui = true` | `POST` action used by the dashboard to clear completed history. |
-| `/ws` | `ui = true` | Live dashboard updates. |
 | `/api/stats` | `ui = true` or `api = true` | Flat aggregate counters without download paths or Starr details. |
 
 Every route is placed below `urlbase` except the upstream metrics compatibility
@@ -98,4 +98,5 @@ the internet. The detailed UI API can contain filesystem paths; use only
 counts but should not receive item details.
 
 When using a reverse proxy, set `upstreams` (or `UN_WEBSERVER_UPSTREAMS`) to the
-proxy IP/CIDR so forwarded client addresses are trusted correctly.
+proxy IP/CIDR if you want its `X-Forwarded-For` client address used in HTTP
+access logs. This setting does not add authentication.
