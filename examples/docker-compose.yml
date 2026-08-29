@@ -28,6 +28,7 @@ services:
     - UN_QUIET=false
     - UN_ERROR_STDERR=false
     - UN_ACTIVITY=false
+    - UN_SUPPRESS_MISSING_URLS=true
     - UN_LOG_QUEUES=1m
     - UN_LOG_FILE=/downloads/unpackerr.log
     - UN_LOG_FILES=10
@@ -144,4 +145,4 @@ services:
     - UN_CMDHOOK_0_EXCLUDE_1=lidarr
     - UN_CMDHOOK_0_TIMEOUT=10s
 
-## => Content Auto Generated, 29 AUG 2026 04:32 UTC
+## => Content Auto Generated, 29 AUG 2026 15:27 UTC

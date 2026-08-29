@@ -245,6 +245,16 @@ sections:
         desc: |
           Setting activity to true will silence all app queue log lines with only zeros.
           Set this to true when you want less log spam.
+      - name: suppress_missing_urls
+        envvar: SUPPRESS_MISSING_URLS
+        default: true
+        recommend: *BOOLEAN
+        short: Silently ignore optional Starr configurations with no URL.
+        desc: |
+          When true, Starr application entries without a URL are skipped without an
+          error log. This keeps the default empty Sonarr and Radarr entries quiet when
+          those applications are not used. Configured applications still report missing
+          API keys, invalid URLs, and connection errors.
       - name: log_queues
         envvar: LOG_QUEUES
         default: '1m'

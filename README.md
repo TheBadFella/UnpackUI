@@ -1,102 +1,49 @@
-> [!IMPORTANT]
-> This fork is maintained for personal use only and is not an official Unpackerr release.
+<div align="center">
 
-> [!NOTE]
-> UnpackUI primarily adds a lightweight UI for monitoring extraction status, while keeping Unpackerr's core behavior intact aside from a few targeted fixes and quality-of-life improvements.
->
-> Native Discord webhooks can edit one message per extract (`update_existing = true`) with richer embeds and an optional **Open UI** button when `web_url` is set. Notifiarr remains fully supported.
+<img width="360" alt="Unpackerr" src="https://unpackerr.zip/img/unpackerr.png">
+
+# 📦 UnpackUI
+
+### Unpackerr with the missing pieces filled in
+
+My personal fork of Unpackerr adds a focused status UI, recovery, safer folder
+handling, and richer notifications. Feel free to use it if those additions fit
+your setup.
+
+[![Release](https://img.shields.io/github/v/release/TheBadFella/UnpackUI?style=for-the-badge&label=release&color=6750A4)](https://github.com/TheBadFella/UnpackUI/releases)
+[![Checks](https://img.shields.io/github/actions/workflow/status/TheBadFella/UnpackUI/codetests.yml?branch=web-ui-support&style=for-the-badge&label=checks&color=386A20)](https://github.com/TheBadFella/UnpackUI/actions/workflows/codetests.yml)
 
 <img width="960" alt="UnpackUI status dashboard" src="pkg/ui/UnpackUI.png">
 
-<img width="128" height="128" alt="UnpackUI" src="https://unpackerr.zip/img/icon.png">
+[Upstream repository](https://github.com/Unpackerr/unpackerr) ·
+[Official Unpackerr documentation](https://unpackerr.zip)
 
-## About
+</div>
 
-Unpackerr runs as a daemon on your download host or seedbox.
-It checks for completed downloads and extracts them so
-[Lidarr](http://lidarr.audio), [Radarr](http://radarr.video),
-[Readarr](http://readarr.com), and [Sonarr](http://sonarr.tv) may import them. 
-If your problem is rar files getting stuck in your activity queue, then this is your solution.
+## ✨ Highlights
 
-Not a starr app user, and just need to extract files? We do that too.
-This application can run standalone and extract files found in a "watch" folder.
-In other words, you can configure this application to watch your download folder, and
-it will happily extract everything you download. 
+| Feature | What it adds |
+|---|---|
+| **Live dashboard** | Responsive extraction status, progress, ETA, history, resizable columns, and clear-completed controls. |
+| **Restart recovery** | Persists watched-folder work and safely retries interrupted extractions after a restart. |
+| **Safer folder handling** | Waits for downloads to finish and ignores media-only or archive-free folders. |
+| **Extraction guardrails** | Caps uncompressed bytes, created files, and expansion ratio to protect the disk from rogue archives. |
+| **Dashboard API** | Provides aggregate, path-free JSON stats for Homepage and similar tools. |
+| **Better notifications** | Adds compact Discord embeds, update-in-place messages, and optional links to the UI. |
+| **Quieter optional apps** | Silently skips empty Starr app entries while preserving real configuration and connection errors. |
 
-Interested? Check out the website with installation instructions:
+## 📚 Guides
 
-### [https://unpackerr.zip](https://unpackerr.zip)
+| Guide | Use it for |
+|---|---|
+| [Setup](docs/setup.md) | Docker Compose, GHCR images, and source builds |
+| [Configuration](docs/configuration.md) | Config files, precedence, recovery, and fork settings |
+| [Environment variables](docs/environment-variables.md) | Fork-specific variables and their upstream equivalents |
+| [Status UI and API](docs/ui.md) | Dashboard controls, routes, Homepage, and security |
+| [Notifications](docs/notifications.md) | Discord, Notifiarr, events, and multiple destinations |
 
-**Website missing what you need? We can [chat on Discord](https://golift.io/discord) too.**
+## 🔗 Project
 
-## What's it extract?
-
-The absolute basics, just ask STaRDoGG. It also extracts recursively, meaning deep within folders, and archives within archives.
-**Tars, Rars, Zips, 7-Zips, Gzips, Tarred gzips and bzips; encrypted rars and 7zips. And ISO disc images.**
-Need something else? Ask. Does it do too much? Let me know what knobs you need. [Open a request!](https://github.com/Unpackerr/unpackerr/issues/new)
-
-## Attribution
-
-The following fine folks are providing their services, completely free! These service
-integrations are used for things like storage, building, compiling, distribution and
-documentation support. This project succeeds because of them. Thank you!
-
-[![packagecloud](https://docs.golift.io/integrations/packagecloud.png "PackageCloud.io")](https://packagecloud.io)
-[![GitHub](https://docs.golift.io/integrations/octocat.png "GitHub")](https://GitHub.com)
-[![Docker Cloud](https://docs.golift.io/integrations/docker.png "Docker Cloud")](https://cloud.docker.com)
-[![Go Lift](https://docs.golift.io/integrations/golift.png "Go Lift")](https://golift.io)
-[![CloudFlare](https://docs.golift.io/integrations/cloudflare.png "CloudFlare")](https://cloudflare.com)
-
-## Contributing
-
-Yes, please. Just make a pull request and lets chat about it in the PR or on Discord.
-
-## Local Testing
-
-For quick local testing on Windows with the local UI config:
-
-```powershell
-& 'C:\Program Files\Go\bin\go.exe' build -o unpackerr.exe .
-.\unpackerr.exe -c .\unpackerr.local.conf
-```
-
-## Homepage widget
-
-Enable either `api = true` or `ui = true` in the `[webserver]` section. The
-`/api/stats` endpoint returns flat aggregate counts and does not expose download
-paths or Sonarr/Radarr details. Homepage decides which values to display through
-its widget mappings; for the five requested status fields:
-
-```yaml
-- Media:
-    - Unpackerr:
-        icon: unpackerr.png
-        href: http://unpackerr:5656
-        widget:
-          type: customapi
-          url: http://unpackerr:5656/api/stats
-          mappings:
-            - field: extracted
-              label: Extracted
-              format: number
-            - field: deleted
-              label: Deleted
-              format: number
-            - field: waiting
-              label: Waiting
-              format: number
-            - field: extracting
-              label: Extracting
-              format: number
-            - field: failed
-              label: Failed
-              format: number
-```
-
-The endpoint also provides `queued`, `imported`, `active`, `completed`,
-`finished`, `retries`, webhook/cmdhook counters, `uptime`, and `generatedAt`, so
-you can add or replace mappings without changing Unpackerr configuration.
-
-## License
-
-[MIT](https://unpackerr.zip/docs/unpackerr/license)
+[Releases](https://github.com/TheBadFella/UnpackUI/releases) ·
+[Container packages](https://github.com/TheBadFella/UnpackUI/pkgs/container/unpackui) ·
+[MIT License](LICENSE)
