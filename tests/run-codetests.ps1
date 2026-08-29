@@ -26,8 +26,8 @@ Invoke-Step "go generate ./..." {
     go generate ./...
 }
 
-Invoke-Step "go test ./pkg/..." {
-    go test ./pkg/...
+Invoke-Step "go test ./..." {
+    go test ./...
 }
 
 if ($IsWindows -or $env:OS -eq 'Windows_NT') {
@@ -65,7 +65,7 @@ if (($IsWindows -or $env:OS -eq 'Windows_NT') -and !$RunLintOnWindows) {
     exit 0
 }
 
-$lintVersion = 'v2.11.4'
+$lintVersion = 'v2.13.2'
 $lintCommand = Get-Command golangci-lint -ErrorAction SilentlyContinue
 $lintExe = $null
 
@@ -101,7 +101,7 @@ Invoke-Step "golangci-lint run ($lintVersion)" {
     $previousGOOS = $env:GOOS
     try {
         $env:GOOS = 'linux'
-        & $lintExe run
+        & $lintExe run ./...
     } finally {
         $env:GOOS = $previousGOOS
     }
