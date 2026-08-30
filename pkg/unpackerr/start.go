@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -25,33 +23,39 @@ import (
 )
 
 const (
-	defaultMaxRetries  = 3
-	defaultMaxFiles    = 5000
-	defaultMaxRatio    = 15
-	defaultMaxBytes    = "75GB"
-	defaultFileMode    = 0o644
-	defaultLogFileMode = 0o600
-	defaultDirMode     = 0o755
-	defaultTimeout     = 10 * time.Second
-	minimumInterval    = 15 * time.Second
-	defaultInterval    = 2 * time.Minute
-	cleanerInterval    = 5 * time.Second
-	defaultRetryDelay  = 5 * time.Minute
-	defaultStartDelay  = time.Minute
-	minimumDeleteDelay = time.Second
-	defaultDeleteDelay = 5 * time.Minute
-	staleItemTimeout   = 24 * time.Hour // Safety net: items stuck at intermediate states are cleaned up.
-	defaultHistory     = 10             // items kept in history.
-	suffix             = "_unpackerred" // suffix for unpacked folders.
-	updateChanBuf      = 100            // Size of xtractr callback update channels.
-	defaultFolderBuf   = 20000          // Channel queue size for file system events.
-	minimumFolderBuf   = 1000           // Minimum size of the folder event buffer.
-	defaultLogFileMb   = 10
-	defaultLogFiles    = 10
-	helpLink           = "GoLift Discord: https://golift.io/discord" // prints on start and on exit.
-	windows            = "windows"
-	bits8              = 8
-	base32             = 32
+	defaultMaxRetries       = 2    // two retries after the first try (3 attempts).
+	defaultMaxFiles         = 1000 // Starr cap. Folders default to 0 (unlimited).
+	defaultMaxRatio         = 5.0  // Starr cap. Folders default to 0 (unlimited).
+	defaultSonarrMaxBytes   = "20GB"
+	defaultRadarrMaxBytes   = "75GB"
+	defaultLidarrMaxBytes   = "4GB"
+	defaultReadarrMaxBytes  = "1GB"
+	defaultWhisparrMaxBytes = "20GB"
+	defaultMaxNested        = 8 // Starr extras cap. Folders default to 0 (unlimited).
+	defaultExtrasMaxDepth   = 3 // Starr extras walk. Folders default to 0 (unlimited).
+	defaultFileMode         = 0o644
+	defaultLogFileMode      = 0o600
+	defaultDirMode          = 0o755
+	defaultTimeout          = 10 * time.Second
+	minimumInterval         = 15 * time.Second
+	defaultInterval         = 2 * time.Minute
+	cleanerInterval         = 5 * time.Second
+	defaultRetryDelay       = 5 * time.Minute
+	defaultStartDelay       = time.Minute
+	minimumDeleteDelay      = time.Second
+	defaultDeleteDelay      = 5 * time.Minute
+	staleItemTimeout        = 24 * time.Hour // Safety net: items stuck at intermediate states are cleaned up.
+	defaultHistory          = 10             // items kept in history.
+	suffix                  = "_unpackerred" // suffix for unpacked folders.
+	updateChanBuf           = 100            // Size of xtractr callback update channels.
+	defaultFolderBuf        = 20000          // Channel queue size for file system events.
+	minimumFolderBuf        = 1000           // Minimum size of the folder event buffer.
+	defaultLogFileMb        = 10
+	defaultLogFiles         = 10
+	helpLink                = "GoLift Discord: https://golift.io/discord" // prints on start and on exit.
+	windows                 = "windows"
+	bits8                   = 8
+	base32                  = 32
 )
 
 // Unpackerr stores all the running data.
@@ -119,9 +123,6 @@ func New() *Unpackerr {
 			LogQueues:           cnfg.Duration{Duration: time.Minute + time.Second},
 			MaxRetries:          defaultMaxRetries,
 			RemnantAction:       remnantAction(""),
-			MaxBytes:            defaultMaxBytes,
-			MaxFiles:            defaultMaxFiles,
-			MaxRatio:            defaultMaxRatio,
 			LogFiles:            defaultLogFiles,
 			Timeout:             cnfg.Duration{Duration: defaultTimeout},
 			Interval:            cnfg.Duration{Duration: defaultInterval},
@@ -184,11 +185,6 @@ func Start() error {
 		return err
 	}
 
-	limits, err := unpackerr.extractLimits()
-	if err != nil {
-		return err
-	}
-
 	unpackerr.setupRecoveryState()
 	unpackerr.logStartupInfo(msg, output)
 
@@ -202,9 +198,6 @@ func Start() error {
 		Logger:   unpackerr.Logger,
 		FileMode: os.FileMode(fileMode),
 		DirMode:  os.FileMode(dirMode),
-		MaxBytes: limits.bytes,
-		MaxFiles: limits.files,
-		MaxRatio: limits.ratio,
 	})
 
 	if len(unpackerr.Webhook) > 0 || len(unpackerr.Cmdhook) > 0 {
@@ -431,33 +424,27 @@ func (u *Unpackerr) Run() {
 	}
 }
 
-// extractLimits are the xtractr queue-wide zip-bomb guards. 0 is unlimited.
-type extractLimits struct {
-	bytes uint64
-	files int
-	ratio float64
+func (u *Unpackerr) maxRetries() uint {
+	if u.MaxRetries == 0 {
+		return defaultMaxRetries
+	}
+
+	return u.MaxRetries
 }
 
-var (
-	errNegativeExtractLimit = errors.New("extract limit must not be negative")
-	errInvalidMaxBytes      = errors.New("invalid max_bytes")
-)
+var errInvalidMaxBytes = errors.New("invalid max_bytes")
 
-func (u *Unpackerr) extractLimits() (extractLimits, error) {
-	if u.MaxFiles < 0 {
-		return extractLimits{}, fmt.Errorf("%w: max_files=%d", errNegativeExtractLimit, u.MaxFiles)
+func parseOptionalMaxBytes(size string) (uint64, bool, error) {
+	if strings.TrimSpace(size) == "" {
+		return 0, false, nil
 	}
 
-	if u.MaxRatio < 0 || math.IsNaN(u.MaxRatio) || math.IsInf(u.MaxRatio, 0) {
-		return extractLimits{}, fmt.Errorf("%w: max_ratio=%v", errNegativeExtractLimit, u.MaxRatio)
-	}
-
-	bytes, err := parseExtractMaxBytes(u.MaxBytes)
+	n, err := parseExtractMaxBytes(size)
 	if err != nil {
-		return extractLimits{}, err
+		return 0, false, err
 	}
 
-	return extractLimits{bytes: bytes, files: u.MaxFiles, ratio: u.MaxRatio}, nil
+	return n, true, nil
 }
 
 func parseExtractMaxBytes(size string) (uint64, error) {
@@ -476,25 +463,6 @@ func parseExtractMaxBytes(size string) (uint64, error) {
 	}
 
 	return n, nil
-}
-
-func (l extractLimits) String() string {
-	size := "unlimited"
-	if l.bytes > 0 {
-		size = bytefmt.ByteSize(l.bytes)
-	}
-
-	files := "unlimited"
-	if l.files > 0 {
-		files = strconv.Itoa(l.files)
-	}
-
-	ratio := "unlimited"
-	if l.ratio > 0 {
-		ratio = fmt.Sprintf("%g:1", l.ratio)
-	}
-
-	return size + ", " + files + " files, " + ratio
 }
 
 // Custom percentage procedure for starr apps.

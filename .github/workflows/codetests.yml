@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - unstable
-      - web-ui-support
+      - web-ui
   pull_request:
 permissions:
   contents: read
