@@ -259,14 +259,15 @@ func (u *Unpackerr) logStartupInfo(msg string, externalFiles map[string]string) 
 	u.logFolders()
 	u.Printf(" => Parallel: %d", u.Parallel)
 
-	if limits, err := u.extractLimits(); err == nil {
-		u.Printf(" => Extract Limits: %s", limits)
-	}
+	u.Printf(" => Default Extract Limits: Sonarr/Whisparr %s, Radarr %s, Lidarr %s, Readarr %s; "+
+		"%d files, %g:1, %d nested, extras depth %d; folders uncapped",
+		defaultSonarrMaxBytes, defaultRadarrMaxBytes, defaultLidarrMaxBytes, defaultReadarrMaxBytes,
+		defaultMaxFiles, defaultMaxRatio, defaultMaxNested, defaultExtrasMaxDepth)
 
 	u.Printf(" => Passwords: %d (rar/7z)", len(u.Passwords))
 	u.Printf(" => Interval / Progress: %s/%s", u.Interval.String(), u.Progress.String())
 	u.Printf(" => Start/Delete Delay: %s/%s", u.StartDelay.String(), u.DeleteDelay.String())
-	u.Printf(" => Retry Delay: %v, max: %d", u.RetryDelay, u.MaxRetries)
+	u.Printf(" => Retry Delay: %v, max: %d", u.RetryDelay, u.maxRetries())
 	u.Printf(" => Remnant Action: %s", u.RemnantAction)
 	u.Printf(" => GUI / StdErr: %v / %v", ui.HasGUI(), u.ErrorStdErr)
 	u.Printf(" => Debug / Quiet: %v / %v", u.Config.Debug, u.Quiet)
