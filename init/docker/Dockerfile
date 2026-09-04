@@ -57,7 +57,7 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.licenses="${LICENSE}" \
       org.opencontainers.image.version="${VERSION}-${ITERATION}"
 
-COPY --from=builder /tmp/unpackerr /unpackerr
+COPY --chmod=755 --from=builder /tmp/unpackerr /unpackerr
 # Make sure we have an ssl cert chain and timezone data.
 RUN apk add --no-cache ca-certificates openssl tzdata
 

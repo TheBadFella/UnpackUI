@@ -29,7 +29,6 @@ permissions:
   contents: read
 jobs:
 
-
   docker-ghcr-build-push:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable'
     name: Deploy GHCR Container
