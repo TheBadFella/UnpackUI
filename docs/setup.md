@@ -22,7 +22,6 @@ services:
     environment:
       TZ: America/Regina
       UN_WEBSERVER_UI: "true"
-      UN_WEBSERVER_API: "true"
       UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
       UN_SUPPRESS_MISSING_URLS: "true"
       UN_STATE_FILE: /config/unpackerr.state.json
@@ -50,7 +49,8 @@ docker compose logs -f unpackui
 ```
 
 Open `http://localhost:5656`. A startup log line containing `status-ui` confirms
-that the UI is enabled.
+that the UI is enabled. On first startup, the log also prints generated browser
+and administrator API credentials. Save them before restarting.
 
 The versioned tag is best for repeatable deployments. Use `latest` if you want
 the newest released image automatically.

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/bytefmt"
-	"github.com/julienschmidt/httprouter"
 	"golift.io/version"
 	"golift.io/xtractr"
 )
@@ -63,6 +62,10 @@ type webStatsSnapshot struct {
 	WebhookFailed uint   `json:"webhookFailed"`
 	CmdhookOK     uint   `json:"cmdhookOK"`
 	CmdhookFailed uint   `json:"cmdhookFailed"`
+	HookOK        uint   `json:"hookOK"`
+	HookFail      uint   `json:"hookFail"`
+	CmdOK         uint   `json:"cmdOK"`
+	CmdFail       uint   `json:"cmdFail"`
 	Uptime        string `json:"uptime"`
 	GeneratedAt   string `json:"generatedAt"`
 }
@@ -685,7 +688,7 @@ func addStatusCount(stats *Stats, status ExtractStatus) {
 	}
 }
 
-func (u *Unpackerr) webIndex(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (u *Unpackerr) webIndex(writer http.ResponseWriter, _ *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 
@@ -694,7 +697,7 @@ func (u *Unpackerr) webIndex(writer http.ResponseWriter, _ *http.Request, _ http
 	}
 }
 
-func (u *Unpackerr) webStatusAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (u *Unpackerr) webStatusAPI(writer http.ResponseWriter, _ *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -706,7 +709,7 @@ func (u *Unpackerr) webStatusAPI(writer http.ResponseWriter, _ *http.Request, _ 
 	encodeWebStatusJSON(writer, snapshot, u.Errorf)
 }
 
-func (u *Unpackerr) webStatsAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (u *Unpackerr) webStatsAPI(writer http.ResponseWriter, _ *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -736,12 +739,16 @@ func (u *Unpackerr) webStatsAPI(writer http.ResponseWriter, _ *http.Request, _ h
 		WebhookFailed: snapshot.Counters.HookFail,
 		CmdhookOK:     snapshot.Counters.CmdOK,
 		CmdhookFailed: snapshot.Counters.CmdFail,
+		HookOK:        snapshot.Counters.HookOK,
+		HookFail:      snapshot.Counters.HookFail,
+		CmdOK:         snapshot.Counters.CmdOK,
+		CmdFail:       snapshot.Counters.CmdFail,
 		Uptime:        snapshot.Uptime,
 		GeneratedAt:   snapshot.GeneratedAt,
 	}, u.Errorf)
 }
 
-func (u *Unpackerr) webClearCompletedAPI(writer http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func (u *Unpackerr) webClearCompletedAPI(writer http.ResponseWriter, _ *http.Request) {
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 
@@ -1469,10 +1476,40 @@ const statusPageHTML = `<!doctype html>
 	        grid-template-columns: repeat(3, minmax(0, 1fr));
 	      }
 	    }
+	    .auth-panel {
+	      max-width: 420px;
+	      margin: 48px auto 0;
+	      padding: 24px;
+	      border: 1px solid var(--border);
+	      border-radius: 14px;
+	      background: var(--panel);
+	    }
+	    .auth-panel h2 { margin: 0 0 8px; }
+	    .auth-panel form { display: grid; gap: 14px; margin-top: 20px; }
+	    .auth-panel label { display: grid; gap: 6px; color: var(--muted); font-size: 0.82rem; }
+	    .auth-panel input {
+	      padding: 10px 12px;
+	      border: 1px solid var(--border);
+	      border-radius: 8px;
+	      color: var(--text);
+	      background: var(--bg);
+	      font: inherit;
+	    }
+	    .auth-error { min-height: 1.2em; color: var(--bad); font-size: 0.82rem; }
 	  </style>
 </head>
 <body>
-  <div class="shell">
+	  <section class="auth-panel" id="auth-panel" hidden>
+	    <h2>Sign in to UnpackUI</h2>
+	    <div class="subtle">Use the web UI credentials printed at startup or stored in your configuration.</div>
+	    <form id="auth-form">
+	      <label>Username <input id="auth-name" name="username" autocomplete="username" value="admin"></label>
+	      <label>Password <input id="auth-password" name="password" type="password" autocomplete="current-password" required></label>
+	      <button class="action-button" id="auth-submit" type="submit">Sign in</button>
+	      <div class="auth-error" id="auth-error" role="alert"></div>
+	    </form>
+	  </section>
+	  <div class="shell" id="status-shell">
 	    <section class="hero">
 	      <div class="headline">
 	        <div class="hero-copy">
@@ -1583,6 +1620,14 @@ const statusPageHTML = `<!doctype html>
 	    const detailClose = document.getElementById('detail-close');
 	    const statusUrl = new URL('api/status', window.location.href);
 	    const clearCompletedUrl = new URL('api/status/clear-completed', window.location.href);
+	    const loginUrl = new URL('api/auth/login', window.location.href);
+	    const authPanel = document.getElementById('auth-panel');
+	    const authForm = document.getElementById('auth-form');
+	    const authName = document.getElementById('auth-name');
+	    const authPassword = document.getElementById('auth-password');
+	    const authSubmit = document.getElementById('auth-submit');
+	    const authError = document.getElementById('auth-error');
+	    const statusShell = document.getElementById('status-shell');
 	    const activeRefreshMs = 2000;
 	    const idleRefreshMs = 30000;
 	    const errorRefreshMs = 10000;
@@ -1592,6 +1637,65 @@ const statusPageHTML = `<!doctype html>
 	    let refreshTimer = 0;
 	    let renderedColumnSignature = '';
 	    let activeColumnResize = null;
+
+	    function showLogin(message = '') {
+	      window.clearTimeout(refreshTimer);
+	      statusShell.hidden = true;
+	      authPanel.hidden = false;
+	      authError.textContent = message;
+	      authPassword.focus();
+	    }
+
+	    function showStatus() {
+	      authPanel.hidden = true;
+	      statusShell.hidden = false;
+	      authError.textContent = '';
+	    }
+
+	    async function deriveKDF(username, password) {
+	      if (!window.crypto?.subtle) {
+	        throw new Error('Password login requires HTTPS or localhost.');
+	      }
+
+	      const encoder = new TextEncoder();
+	      const key = await window.crypto.subtle.importKey(
+	        'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+	      );
+	      const bits = await window.crypto.subtle.deriveBits({
+	        name: 'PBKDF2',
+	        hash: 'SHA-256',
+	        salt: encoder.encode('unpackerr:' + username),
+	        iterations: 210000
+	      }, key, 256);
+
+	      return Array.from(new Uint8Array(bits), (byte) => byte.toString(16).padStart(2, '0')).join('');
+	    }
+
+	    authForm.addEventListener('submit', async (event) => {
+	      event.preventDefault();
+	      authSubmit.disabled = true;
+	      authError.textContent = '';
+
+	      try {
+	        const name = authName.value.trim() || 'admin';
+	        const kdf = await deriveKDF(name, authPassword.value);
+	        const response = await fetch(loginUrl, {
+	          method: 'POST',
+	          cache: 'no-store',
+	          headers: { 'Content-Type': 'application/json' },
+	          body: JSON.stringify({ name, kdf })
+	        });
+	        if (!response.ok) throw new Error(response.status === 401 ? 'Invalid username or password.' : 'Sign in failed (HTTP ' + response.status + ').');
+
+	        authPassword.value = '';
+	        showStatus();
+	        await refresh();
+	      } catch (error) {
+	        showLogin(error.message);
+	      } finally {
+	        authSubmit.disabled = false;
+	      }
+	    });
 
 	    function escapeHtml(value) {
 	      return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -2199,8 +2303,13 @@ const statusPageHTML = `<!doctype html>
 	    async function refresh() {
 	      try {
 	        const response = await fetch(statusUrl, { cache: 'no-store' });
+	        if (response.status === 401) {
+	          showLogin();
+	          return;
+	        }
 	        if (!response.ok) throw new Error('HTTP ' + response.status);
 	        const data = await response.json();
+	        showStatus();
 	        renderSnapshot(data);
 	        const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : 'just now';
 	        stamp.textContent = 'Updated ' + generated;

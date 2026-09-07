@@ -12,7 +12,6 @@ ports:
   - "5656:5656"
 environment:
   UN_WEBSERVER_UI: "true"
-  UN_WEBSERVER_API: "true"
   UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
 ```
 
@@ -21,12 +20,16 @@ With TOML:
 ```toml
 [webserver]
 ui = true
-api = true
 listen_addr = "0.0.0.0:5656"
 ```
 
 Open `http://localhost:5656`. If `urlbase` is set to `/unpackui`, open
 `http://localhost:5656/unpackui/` instead.
+
+The first startup generates a UI password and an administrator API key when
+they are not configured. Read the startup log, sign in as `admin`, and store
+the generated values securely. Browser password login uses Web Crypto, so use
+HTTPS or open the service through `localhost`.
 
 ## Dashboard behavior
 
@@ -46,10 +49,14 @@ details, and delete countdowns when available.
 
 | Endpoint | Requires | Purpose |
 |---|---|---|
-| `/` | `ui = true` | Dashboard page. |
-| `/api/status` | `ui = true` | Detailed dashboard state. This may include paths and extraction details. |
-| `/api/status/clear-completed` | `ui = true` | `POST` action used by the dashboard to clear completed history. |
-| `/api/stats` | `ui = true` or `api = true` | Flat aggregate counters without download paths or Starr details. |
+| `/` | `ui = true` | Dashboard and browser sign-in page. |
+| `/api/status` | `read:system:queue` | Detailed dashboard state. This may include paths and extraction details. |
+| `/api/status/clear-completed` | `write:system:history` | `POST` action that hides completed rows from the dashboard. |
+| `/api/stats` | `read:system:stats` | Flat aggregate counters without download paths or Starr details. |
+| `/api/queue` | `read:system:queue` | Current extraction queue. |
+| `/api/history` | `read:system:history` | Persisted extraction history. |
+| `/api/config/{section}` | matching config permission | Read or update one configuration section. |
+| `/api/openapi.json` | none | OpenAPI 3 description for the upstream API. |
 
 Every route is placed below `urlbase` except the upstream metrics compatibility
 route. For example, `/api/stats` becomes `/unpackui/api/stats` when
@@ -67,6 +74,8 @@ The aggregate API works with Homepage's `customapi` widget:
         widget:
           type: customapi
           url: http://unpackui:5656/api/stats
+          headers:
+            X-Api-Key: replace-with-a-read-only-api-key
           mappings:
             - field: extracted
               label: Extracted
@@ -91,12 +100,17 @@ The response also provides `queued`, `imported`, `active`, `completed`,
 
 ## Network security
 
-The built-in web server does not provide authentication. Keep it on a trusted
-network or place it behind an authenticated reverse proxy before exposing it to
-the internet. The detailed UI API can contain filesystem paths; use only
-`api = true` without `ui = true` when an external dashboard needs aggregate
-counts but should not receive item details.
+The web server starts whenever `listen_addr` is set. Its API uses named keys,
+roles, and permissions. Send a key in `X-Api-Key` or as an
+`Authorization: Bearer` token. Browser sessions use `ui_password`; it may also
+be set to `webauth:<Header>` behind a trusted proxy or to `noauth` on a trusted
+network. Keep the detailed status, queue, history, and configuration endpoints
+off untrusted networks even when authentication is enabled.
+
+`api` and `UN_WEBSERVER_API` remain accepted for compatibility with older
+UnpackUI configurations, but no longer gate the upstream API. Disable the HTTP
+server by setting `listen_addr = ""`.
 
 When using a reverse proxy, set `upstreams` (or `UN_WEBSERVER_UPSTREAMS`) to the
-proxy IP/CIDR if you want its `X-Forwarded-For` client address used in HTTP
-access logs. This setting does not add authentication.
+proxy IP/CIDR. This controls trusted forwarded client addresses and `webauth`
+headers; do not trust a network that can be reached directly by clients.

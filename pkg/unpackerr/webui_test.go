@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
 	"golift.io/cnfg"
 	"golift.io/xtractr"
 )
@@ -26,6 +25,11 @@ func TestStatusPageIncludesResizableColumns(t *testing.T) {
 		`localStorage.setItem`,
 		`pointerdown`,
 		`ArrowRight`,
+		`id="auth-form"`,
+		`api/auth/login`,
+		`PBKDF2`,
+		`iterations: 210000`,
+		`response.status === 401`,
 	} {
 		if !strings.Contains(statusPageHTML, fragment) {
 			t.Errorf("status page does not contain column resizing fragment %q", fragment)
@@ -43,12 +47,12 @@ type webStatusAPITestItem struct {
 	Completed bool `json:"completed"`
 }
 
-func TestWebServerEnabled(t *testing.T) {
+func TestWebServerFeatureFlags(t *testing.T) {
 	t.Parallel()
 
 	server := &WebServer{ListenAddr: "0.0.0.0:5656"}
-	if server.Enabled() {
-		t.Fatal("expected disabled webserver when no feature is enabled")
+	if !server.Enabled() {
+		t.Fatal("expected listen_addr to enable the authenticated webserver")
 	}
 
 	server.UI = true
@@ -86,7 +90,7 @@ func TestWebStatsAPI(t *testing.T) {
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/stats", nil)
 	rec := httptest.NewRecorder()
-	unpackerr.webStatsAPI(rec, req, nil)
+	unpackerr.webStatsAPI(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -112,8 +116,10 @@ func TestWebStatsRouteEnabledWithoutUI(t *testing.T) {
 
 	unpackerr := New()
 	unpackerr.Webserver.API = true
+	unpackerr.Webserver.UIPassword = authNone
+	unpackerr.Webserver.allow = MakeIPs([]string{"192.0.2.1"})
 	unpackerr.Webserver.URLBase = "/"
-	unpackerr.Webserver.router = httprouter.New()
+	unpackerr.Webserver.router = http.NewServeMux()
 	unpackerr.webRoutes()
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/stats", nil)
@@ -357,7 +363,7 @@ func TestWebStatusAPI(t *testing.T) {
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/status", nil)
 	rec := httptest.NewRecorder()
 
-	unpackerr.webStatusAPI(rec, req, nil)
+	unpackerr.webStatusAPI(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -423,7 +429,7 @@ func TestWebClearCompletedAPI(t *testing.T) {
 		context.Background(), http.MethodPost, "/api/status/clear-completed", nil,
 	)
 	rec := httptest.NewRecorder()
-	unpackerr.webClearCompletedAPI(rec, req, nil)
+	unpackerr.webClearCompletedAPI(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)

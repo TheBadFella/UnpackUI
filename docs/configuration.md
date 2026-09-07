@@ -42,7 +42,6 @@ web_url = "https://unpackui.example.com"
 
 [webserver]
 ui = true
-api = true
 metrics = false
 listen_addr = "0.0.0.0:5656"
 urlbase = "/"
@@ -67,7 +66,6 @@ environment:
   UN_REMNANT_ACTION: rename
   UN_WEB_URL: https://unpackui.example.com
   UN_WEBSERVER_UI: "true"
-  UN_WEBSERVER_API: "true"
   UN_WEBSERVER_METRICS: "false"
   UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
   UN_WEBSERVER_URLBASE: /
@@ -149,5 +147,5 @@ whose legitimate contents exceed these defaults.
 - [Generated Compose environment reference](../examples/docker-compose.yml)
 - [Upstream Unpackerr documentation](https://unpackerr.zip)
 
-The examples are generated from `init/config/definitions.yml` and provide the
+The examples are generated from `pkg/configdef/definitions.yml` and provide the
 exhaustive reference for inherited upstream options in this repository.

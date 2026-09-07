@@ -11,13 +11,12 @@ below.
 | `UN_SUPPRESS_MISSING_URLS` | `true` | Silently skips optional Starr entries with no URL. Missing API keys, invalid configured URLs, and connection failures are still logged. |
 | `UN_STATE_FILE` | automatic | Stores watched-folder recovery state so interrupted work can be re-queued after restart. Use a writable persistent path, or `off` to disable recovery. |
 | `UN_WEB_URL` | empty | Sets the externally reachable status UI URL used by native Discord links. It does not enable the web server by itself. |
-| `UN_WEBSERVER_API` | `false` | Enables the aggregate, path-free JSON endpoint at `/api/stats`. The UI also makes this endpoint available when `UN_WEBSERVER_UI=true`. |
+| `UN_WEBSERVER_API` | `false` | Legacy compatibility setting. The authenticated API is available whenever `UN_WEBSERVER_LISTEN_ADDR` is set. |
 | `UN_WEBSERVER_UI` | `false` | Enables the status dashboard, its detailed status API, adaptive polling, and clear-completed action. |
 | `UN_WEBHOOK_<n>_UPDATE_EXISTING` | `false` | For native Discord hooks, creates one message per extraction and edits it as status changes. Replace `<n>` with the zero-based webhook index. |
 
-These are fork additions relative to upstream Unpackerr at the UnpackUI v1.7.0
-sync point. Settings such as `UN_REMNANT_ACTION` are inherited from upstream,
-even if they first appear in this release.
+These are UnpackUI additions. Settings such as `UN_REMNANT_ACTION` are inherited
+from upstream.
 
 ## Related upstream variables
 
@@ -25,9 +24,12 @@ The following inherited variables are commonly used with the fork features:
 
 | Variable | What it does |
 |---|---|
-| `UN_WEBSERVER_LISTEN_ADDR` | Address and port for the web server; defaults to `0.0.0.0:5656`. |
+| `UN_WEBSERVER_LISTEN_ADDR` | Address and port for the authenticated web server; defaults to `0.0.0.0:5656`. An empty value disables it. |
 | `UN_WEBSERVER_URLBASE` | Serves the UI and API below a path prefix such as `/unpackui`. |
-| `UN_WEBSERVER_METRICS` | Enables the Prometheus `/metrics` endpoint independently of the UI. |
+| `UN_WEBSERVER_UI_PASSWORD` | Browser authentication as `user:password`, `filepath:...`, `webauth:<Header>`, or `noauth`. |
+| `UN_WEBSERVER_API_KEYS_<n>_*` | Defines named API keys and their roles. Keys must be 60–150 ASCII characters. |
+| `UN_WEBSERVER_ROLES_<name>_PERMISSIONS_<n>` | Assigns API permission names to a custom role. |
+| `UN_WEBSERVER_METRICS` | Enables `/metrics`; scrapes require an API key with `read:system:metrics`. |
 | `UN_WEBSERVER_SSL_CERT_FILE` / `UN_WEBSERVER_SSL_KEY_FILE` | Enables direct HTTPS when both files are set. |
 | `UN_WEBSERVER_UPSTREAMS` | Comma-separated trusted reverse-proxy IPs or CIDRs for forwarded client addresses. |
 | `UN_WEBHOOK_<n>_URL` | Destination URL for an indexed webhook. |

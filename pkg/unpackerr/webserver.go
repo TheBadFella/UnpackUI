@@ -8,32 +8,79 @@ import (
 	"net/http/pprof"
 	"path"
 	"strings"
+	"time"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/gorilla/securecookie"
 	apachelog "github.com/lestrrat-go/apache-logformat/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+var errURLBaseBraces = errors.New("urlbase must not contain { or }")
+
 type WebServer struct {
-	API        bool        `json:"api"         toml:"api"           xml:"api"           yaml:"api"`
-	Metrics    bool        `json:"metrics"     toml:"metrics"       xml:"metrics"       yaml:"metrics"`
-	UI         bool        `json:"ui"          toml:"ui"            xml:"ui"            yaml:"ui"`
-	Pprof      bool        `json:"pprof"       toml:"pprof"         xml:"pprof"         yaml:"pprof"`
-	LogFiles   int         `json:"logFiles"    toml:"log_files"     xml:"log_files"     yaml:"logFiles"`
-	LogFileMb  int         `json:"logFileMb"   toml:"log_file_mb"   xml:"log_file_mb"   yaml:"logFileMb"`
-	ListenAddr string      `json:"listenAddr"  toml:"listen_addr"   xml:"listen_addr"   yaml:"listenAddr"`
-	LogFile    string      `json:"logFile"     toml:"log_file"      xml:"log_file"      yaml:"logFile"`
-	SSLCrtFile string      `json:"sslCertFile" toml:"ssl_cert_file" xml:"ssl_cert_file" yaml:"sslCertFile"`
-	SSLKeyFile string      `json:"sslKeyFile"  toml:"ssl_key_file"  xml:"ssl_key_file"  yaml:"sslKeyFile"`
-	URLBase    string      `json:"urlbase"     toml:"urlbase"       xml:"urlbase"       yaml:"urlbase"`
-	Upstreams  StringSlice `json:"upstreams"   toml:"upstreams"     xml:"upstreams"     yaml:"upstreams"`
+	API        bool            `json:"api"         toml:"api"           xml:"api"           yaml:"api"`
+	UI         bool            `json:"ui"          toml:"ui"            xml:"ui"            yaml:"ui"`
+	Metrics    bool            `json:"metrics"     toml:"metrics"       xml:"metrics"       yaml:"metrics"`
+	Pprof      bool            `json:"pprof"       toml:"pprof"         xml:"pprof"         yaml:"pprof"`
+	LogFiles   int             `json:"logFiles"    toml:"log_files"     xml:"log_files"     yaml:"logFiles"`
+	LogFileMb  int             `json:"logFileMb"   toml:"log_file_mb"   xml:"log_file_mb"   yaml:"logFileMb"`
+	ListenAddr string          `json:"listenAddr"  toml:"listen_addr"   xml:"listen_addr"   yaml:"listenAddr"`
+	LogFile    string          `json:"logFile"     toml:"log_file"      xml:"log_file"      yaml:"logFile"`
+	SSLCrtFile string          `json:"sslCertFile" toml:"ssl_cert_file" xml:"ssl_cert_file" yaml:"sslCertFile"`
+	SSLKeyFile string          `json:"sslKeyFile"  toml:"ssl_key_file"  xml:"ssl_key_file"  yaml:"sslKeyFile"`
+	URLBase    string          `json:"urlbase"     toml:"urlbase"       xml:"urlbase"       yaml:"urlbase"`
+	Upstreams  StringSlice     `json:"upstreams"   toml:"upstreams"     xml:"upstreams"     yaml:"upstreams"`
+	UIPassword CryptPass       `json:"uiPassword"  toml:"ui_password"   xml:"ui_password"   yaml:"uiPassword"`
+	APIKeys    []APIKey        `json:"apiKeys"     toml:"api_keys"      xml:"api_keys"      yaml:"apiKeys"`
+	Roles      map[string]Role `json:"roles"       toml:"roles"         xml:"roles"         yaml:"roles"`
 	allow      AllowedIPs
-	router     *httprouter.Router
+	router     *http.ServeMux
 	server     *http.Server
+	keyPerms   map[string][]string
+	cookies    *securecookie.SecureCookie
+	failDelay  time.Duration
+}
+
+func (w *WebServer) listenAddr() string {
+	if w == nil {
+		return ""
+	}
+
+	return strings.TrimSpace(w.ListenAddr)
 }
 
 func (w *WebServer) Enabled() bool {
-	return w != nil && w.ListenAddr != "" && (w.API || w.Metrics || w.UI || w.Pprof)
+	return w != nil && w.listenAddr() != ""
+}
+
+func (w *WebServer) bindAddr() string {
+	addr := w.listenAddr()
+	if addr != "" && !strings.Contains(addr, ":") {
+		return "0.0.0.0:" + addr
+	}
+
+	return addr
+}
+
+func (w *WebServer) normalizeURLBase() {
+	if w == nil {
+		return
+	}
+
+	w.URLBase = strings.TrimSuffix(path.Join("/", w.URLBase), "/") + "/"
+}
+
+// validateURLBase rejects ServeMux wildcards in the configured prefix.
+func (w *WebServer) validateURLBase() error {
+	if w == nil {
+		return nil
+	}
+
+	if strings.ContainsAny(w.URLBase, "{}") {
+		return fmt.Errorf("%w: %q", errURLBaseBraces, w.URLBase)
+	}
+
+	return nil
 }
 
 func (u *Unpackerr) logWebserver() {
@@ -42,10 +89,7 @@ func (u *Unpackerr) logWebserver() {
 		return
 	}
 
-	addr := u.Webserver.ListenAddr
-	if !strings.Contains(addr, ":") {
-		addr = "0.0.0.0:" + addr
-	}
+	u.Webserver.normalizeURLBase()
 
 	ssl := ""
 	if u.Webserver.SSLCrtFile != "" && u.Webserver.SSLKeyFile != "" {
@@ -69,8 +113,14 @@ func (u *Unpackerr) logWebserver() {
 		features = append(features, "pprof")
 	}
 
-	u.Printf(" => Starting webserver. Listen address: http%s://%v%s (%s, %d upstreams)",
-		ssl, addr, u.Webserver.URLBase, strings.Join(features, ", "), len(u.Webserver.Upstreams))
+	u.Printf(" => Starting webserver. Listen address: http%s://%v%s (%s, %d upstreams) auth:%s",
+		ssl, u.Webserver.bindAddr(), u.Webserver.URLBase, strings.Join(features, ", "),
+		len(u.Webserver.Upstreams), u.uiPassword().Type())
+
+	if u.Webserver.Metrics {
+		u.Printf(" => Prometheus metrics enabled at %s (API key required)",
+			path.Join(u.Webserver.URLBase, "metrics"))
+	}
 }
 
 func (u *Unpackerr) startWebServer() {
@@ -78,26 +128,37 @@ func (u *Unpackerr) startWebServer() {
 		return
 	}
 
-	addr := u.Webserver.ListenAddr
-	if !strings.Contains(addr, ":") {
-		addr = "0.0.0.0:" + addr
+	u.setupAdminAPIKey()
+	u.logAdminAPIKey()
+	u.Webserver.normalizeURLBase()
+
+	err := u.Webserver.validateURLBase()
+	if err != nil {
+		u.Errorf("Web Server Failed: %v", err)
+		return
 	}
 
-	u.Webserver.URLBase = strings.TrimSuffix(path.Join("/", u.Webserver.URLBase), "/") + "/"
 	u.Webserver.allow = MakeIPs(u.Webserver.Upstreams)
-	u.Webserver.router = httprouter.New()
+	u.Webserver.router = http.NewServeMux()
+
+	if err := u.Webserver.initCookies(); err != nil {
+		u.Errorf("Could not initialize session cookies: %v", err)
+	}
+
+	u.Webserver.failDelay = loginFailDelay
 	apache, _ := apachelog.New(`%{X-Forwarded-For}i %l - %t "%r" %>s %b "%{Referer}i" "%{User-agent}i"`)
 
 	// Make a multiplexer because websockets can't use apache log.
+	// Login deadline must wrap apachelog: its ResponseWriter does not Unwrap.
 	smx := http.NewServeMux()
-	wsHandler := u.fixForwardedFor(u.Webserver.router)
-	accessLogHandler := u.fixForwardedFor(apache.Wrap(u.Webserver.router, u.HTTP.Writer()))
+	wsHandler := u.fixForwardedFor(u.withLoginReadDeadline(u.Webserver.router))
+	accessLogHandler := u.fixForwardedFor(u.withLoginReadDeadline(apache.Wrap(u.Webserver.router, u.HTTP.Writer())))
 	smx.Handle(path.Join(u.Webserver.URLBase, "ws"), wsHandler)
 	smx.Handle("/", u.skipWebAccessLog(accessLogHandler, wsHandler))
 	u.webRoutes()
 
 	u.Webserver.server = &http.Server{
-		Addr:              addr,
+		Addr:              u.Webserver.bindAddr(),
 		Handler:           smx,
 		ReadTimeout:       0,
 		ReadHeaderTimeout: defaultTimeout,
@@ -109,18 +170,36 @@ func (u *Unpackerr) startWebServer() {
 	go u.runWebServer()
 }
 
+func (w *WebServer) handle(method, route string, handler http.Handler) {
+	w.router.Handle(method+" "+route, handler)
+}
+
+func (w *WebServer) handleGet(route string, handler http.HandlerFunc) {
+	w.handle(http.MethodGet, route, handler)
+}
+
+func (w *WebServer) handlePost(route string, handler http.HandlerFunc) {
+	w.handle(http.MethodPost, route, handler)
+}
+
+func (w *WebServer) handlePut(route string, handler http.HandlerFunc) {
+	w.handle(http.MethodPut, route, handler)
+}
+
 func (u *Unpackerr) webRoutes() {
-	if u.Webserver.API || u.Webserver.UI {
-		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/api/stats"), u.webStatsAPI)
+	if u.Webserver.UI {
+		u.Webserver.handleGet(strings.TrimSuffix(u.Webserver.URLBase, "/")+"/{$}", u.webIndex)
+		u.Webserver.handleGet(path.Join(u.Webserver.URLBase, "/api/status"),
+			u.requirePerm(PermReadSystemQueue, u.webStatusAPI))
+		u.Webserver.handlePost(path.Join(u.Webserver.URLBase, "/api/status/clear-completed"),
+			u.requirePerm(PermWriteSystemHistory, u.webClearCompletedAPI))
+	} else {
+		u.Webserver.handleGet(strings.TrimSuffix(u.Webserver.URLBase, "/")+"/{$}", Index)
 	}
 
-	if u.Webserver.UI {
-		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), u.webIndex)
-		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/api/status"), u.webStatusAPI)
-		u.Webserver.router.POST(path.Join(u.Webserver.URLBase, "/api/status/clear-completed"), u.webClearCompletedAPI)
-	} else {
-		u.Webserver.router.GET(path.Join(u.Webserver.URLBase, "/"), Index)
-	}
+	u.registerAuthRoutes()
+	u.registerOpenAPIRoute()
+	u.registerAPIRoutes()
 
 	if u.Webserver.Pprof {
 		u.registerPprof()
@@ -132,31 +211,26 @@ func (u *Unpackerr) webRoutes() {
 	}
 
 	u.setupMetrics()
-	u.Webserver.router.Handler(http.MethodGet, "/metrics", promhttp.Handler())
+	metrics := u.requirePermHTTP(PermReadSystemMetrics, promhttp.Handler())
+	u.Webserver.handleGet("/metrics", metrics.ServeHTTP)
 
 	if u.Webserver.URLBase != "/" {
 		// Metrics get served from both paths.
-		u.Webserver.router.Handler(http.MethodGet, path.Join(u.Webserver.URLBase, "/metrics"), promhttp.Handler())
+		u.Webserver.handleGet(path.Join(u.Webserver.URLBase, "/metrics"), metrics.ServeHTTP)
 	}
 }
 
 // registerPprof adds Go's built-in pprof handlers for runtime profiling.
 // Access heap profiles at /debug/pprof/heap, goroutine dumps at /debug/pprof/goroutine, etc.
 func (u *Unpackerr) registerPprof() {
-	wrap := func(h http.HandlerFunc) httprouter.Handle {
-		return func(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-			h(w, r)
-		}
-	}
-
-	u.Webserver.router.GET("/debug/pprof/", wrap(pprof.Index))
-	u.Webserver.router.GET("/debug/pprof/cmdline", wrap(pprof.Cmdline))
-	u.Webserver.router.GET("/debug/pprof/profile", wrap(pprof.Profile))
-	u.Webserver.router.GET("/debug/pprof/symbol", wrap(pprof.Symbol))
-	u.Webserver.router.GET("/debug/pprof/trace", wrap(pprof.Trace))
-	u.Webserver.router.Handler(http.MethodGet, "/debug/pprof/heap", pprof.Handler("heap"))
-	u.Webserver.router.Handler(http.MethodGet, "/debug/pprof/goroutine", pprof.Handler("goroutine"))
-	u.Webserver.router.Handler(http.MethodGet, "/debug/pprof/allocs", pprof.Handler("allocs"))
+	u.Webserver.handleGet("/debug/pprof/", pprof.Index)
+	u.Webserver.handleGet("/debug/pprof/cmdline", pprof.Cmdline)
+	u.Webserver.handleGet("/debug/pprof/profile", pprof.Profile)
+	u.Webserver.handleGet("/debug/pprof/symbol", pprof.Symbol)
+	u.Webserver.handleGet("/debug/pprof/trace", pprof.Trace)
+	u.Webserver.handleGet("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+	u.Webserver.handleGet("/debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
+	u.Webserver.handleGet("/debug/pprof/allocs", pprof.Handler("allocs").ServeHTTP)
 }
 
 // runWebServer starts the http or https listener.
@@ -175,7 +249,7 @@ func (u *Unpackerr) runWebServer() {
 	}
 }
 
-func Index(w http.ResponseWriter, _ *http.Request, _ httprouter.Params) {
+func Index(w http.ResponseWriter, _ *http.Request) {
 	fmt.Fprint(w, "Welcome!\n")
 }
 
@@ -198,7 +272,7 @@ func (u *Unpackerr) skipWebAccessLog(withAccessLog, withoutAccessLog http.Handle
 // under specific circumstances.
 func (u *Unpackerr) fixForwardedFor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
-		if x := r.Header.Get("X-Forwarded-For"); x == "" || !u.Webserver.allow.Contains(r.RemoteAddr) {
+		if x := r.Header.Get("X-Forwarded-For"); x == "" || !u.webAllowContains(r.RemoteAddr) {
 			r.Header.Set("X-Forwarded-For",
 				strings.Trim(r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")], "[]"))
 		} else if l := strings.LastIndexAny(x, ", "); l != -1 {

@@ -56,8 +56,8 @@ func (c *MetricsCollector) Collect(metrics chan<- prometheus.Metric) {
 	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(stats.HookFail), "hook_fail")
 	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(stats.CmdOK), "cmd_ok")
 	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(stats.CmdFail), "cmd_fail")
-	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(c.Retries), "retries")
-	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(c.Finished), "finished")
+	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(stats.Retries), "retries")
+	metrics <- newMetric(c.counter, prometheus.CounterValue, float64(stats.Finished), "finished")
 	if c.folders != nil {
 		metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.folders.Events)), "folder_events")
 		metrics <- newMetric(c.buffer, prometheus.GaugeValue, float64(len(c.folders.Updates)), "folder_updates")
@@ -153,15 +153,22 @@ func (u *Unpackerr) setupMetrics() {
 
 // Stats is filled and returned when a stats request is issued.
 type Stats struct {
-	Waiting    uint
-	Queued     uint
-	Extracting uint
-	Failed     uint
-	Extracted  uint
-	Imported   uint
-	Deleted    uint
-	HookOK     uint
-	HookFail   uint
-	CmdOK      uint
-	CmdFail    uint
+	Waiting    uint `json:"waiting"`
+	Queued     uint `json:"queued"`
+	Extracting uint `json:"extracting"`
+	Failed     uint `json:"failed"`
+	Extracted  uint `json:"extracted"`
+	Imported   uint `json:"imported"`
+	Deleted    uint `json:"deleted"`
+	HookOK     uint `json:"hookOK"`
+	HookFail   uint `json:"hookFail"`
+	CmdOK      uint `json:"cmdOK"`
+	CmdFail    uint `json:"cmdFail"`
+	Retries    uint `json:"retries"`
+	Finished   uint `json:"finished"`
+}
+
+// stats compiles and builds the statistics for the app.
+func (u *Unpackerr) stats() *Stats {
+	return u.snapshotStats()
 }
