@@ -1504,7 +1504,9 @@ const statusPageHTML = `<!doctype html>
 	    <div class="subtle">Use the web UI credentials printed at startup or stored in your configuration.</div>
 	    <form id="auth-form">
 	      <label>Username <input id="auth-name" name="username" autocomplete="username" value="admin"></label>
-	      <label>Password <input id="auth-password" name="password" type="password" autocomplete="current-password" required></label>
+	      <label>Password
+	        <input id="auth-password" name="password" type="password" autocomplete="current-password" required>
+	      </label>
 	      <button class="action-button" id="auth-submit" type="submit">Sign in</button>
 	      <div class="auth-error" id="auth-error" role="alert"></div>
 	    </form>
@@ -1685,7 +1687,12 @@ const statusPageHTML = `<!doctype html>
 	          headers: { 'Content-Type': 'application/json' },
 	          body: JSON.stringify({ name, kdf })
 	        });
-	        if (!response.ok) throw new Error(response.status === 401 ? 'Invalid username or password.' : 'Sign in failed (HTTP ' + response.status + ').');
+	        if (!response.ok) {
+	          const message = response.status === 401
+	            ? 'Invalid username or password.'
+	            : 'Sign in failed (HTTP ' + response.status + ').';
+	          throw new Error(message);
+	        }
 
 	        authPassword.value = '';
 	        showStatus();

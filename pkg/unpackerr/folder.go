@@ -617,6 +617,8 @@ func getFileList(path string) []os.FileInfo {
 }
 
 // folderXtractrCallback is run twice by the xtractr library when the extraction begins, and finishes.
+//
+//nolint:funlen // The callback owns the full extraction state transition.
 func (u *Unpackerr) folderXtractrCallback(resp *xtractr.Response) {
 	now := resp.Started.Add(resp.Elapsed)
 
@@ -888,7 +890,7 @@ func (f *Folders) saveEvent(event *eventData, dirPath string, now time.Time) {
 
 // checkFolderStats runs at an interval to see if any folders need work done on them.
 // This runs on an interval ticker in the main go routine.
-func (u *Unpackerr) checkFolderStats(now time.Time) {
+func (u *Unpackerr) checkFolderStats(now time.Time) { //nolint:funlen // status cases are clearer together.
 	for name, folder := range u.folders.Folders {
 		switch elapsed := now.Sub(folder.updated); {
 		case WAITING == folder.status && elapsed >= u.StartDelay.Duration:
