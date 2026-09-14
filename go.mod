@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	code.cloudfoundry.org/bytefmt v0.88.0
 	github.com/BurntSushi/toml v1.6.0
+	github.com/dromara/carbon/v2 v2.6.17
 	github.com/energye/systray v1.0.3
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gorilla/securecookie v1.1.2
@@ -14,7 +15,7 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/radovskyb/watcher v1.0.7
 	github.com/spf13/pflag v1.0.10
-	golang.org/x/crypto v0.56.0
+	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
 	golang.org/x/sys v0.48.0
 	golift.io/cnfg v0.4.1-0.20260913183411-6fc2ae31e285
@@ -65,7 +66,7 @@ require (
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golift.io/udf v0.0.1 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
