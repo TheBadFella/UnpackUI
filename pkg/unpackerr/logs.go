@@ -1,18 +1,15 @@
 package unpackerr
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/Unpackerr/unpackerr/pkg/ui"
+	"github.com/dromara/carbon/v2"
 	homedir "github.com/mitchellh/go-homedir"
 	"golift.io/rotatorr"
 	"golift.io/rotatorr/timerotator"
@@ -26,95 +23,8 @@ const (
 	logsDirMode  = 0o755
 	starrLogPfx  = " =>    Server: "
 	starrLogLine = "%s, apikey:%v, timeout:%v, verify_ssl:%v, protos:%s, " +
-		"syncthing:%v, delete_orig:%v, delete_delay:%v, paths:%q"
+		"syncthing:%v, delete_orig:%v, delete_delay:%v, max_bytes:%s, paths:%q"
 )
-
-// ExtractStatus is our enum for an extract's status.
-type ExtractStatus uint8
-
-// Extract Statuses.
-const (
-	WAITING = ExtractStatus(iota)
-	QUEUED
-	EXTRACTING
-	EXTRACTFAILED
-	EXTRACTED
-	IMPORTED
-	DELETING
-	DELETEFAILED // unused
-	DELETED
-	EXTRACTEDNOTHING
-)
-
-// Desc makes ExtractStatus human readable.
-func (status ExtractStatus) Desc() string {
-	if status > EXTRACTEDNOTHING {
-		return "Unknown"
-	}
-
-	return []string{
-		// The order must not be faulty.
-		"Waiting, pre-Queue",
-		"Queued",
-		"Extracting",
-		"Extraction Failed",
-		"Extracted, Awaiting Import",
-		"Imported",
-		"Deleting",
-		"Delete Failed",
-		"Deleted",
-		"Nothing Extracted",
-	}[status]
-}
-
-// MarshalText turns a status into a word, for a json identifier.
-func (status ExtractStatus) MarshalText() ([]byte, error) {
-	return []byte(status.String()), nil
-}
-
-// UnmarshalText turns a json identifier or TOML event ID back into a status.
-func (status *ExtractStatus) UnmarshalText(text []byte) error {
-	name := strings.TrimSpace(string(text))
-	if parsed, err := strconv.ParseUint(name, 10, 8); err == nil {
-		got := ExtractStatus(parsed)
-		if got <= EXTRACTEDNOTHING {
-			*status = got
-			return nil
-		}
-	}
-
-	for candidate := WAITING; candidate <= EXTRACTEDNOTHING; candidate++ {
-		if candidate.String() == name {
-			*status = candidate
-			return nil
-		}
-	}
-
-	return fmt.Errorf("%w: %s", errUnknownExtractStatus, name)
-}
-
-var errUnknownExtractStatus = errors.New("unknown extract status")
-
-// String turns a status into a short string.
-func (status ExtractStatus) String() string {
-	if status > EXTRACTEDNOTHING {
-		return "unknown"
-	}
-
-	return []string{
-		// The order must not be faulty.
-		"waiting",
-		"queued",
-		"extracting",
-		"extractfailed",
-		"extracted",
-		"imported",
-		"deleting",
-		"deletefailed",
-		"deleted",
-		"extractednothing",
-	}[status]
-}
 
 // Debugf writes Debug log lines... to stdout and/or a file.
 func (l *Logger) Debugf(msg string, v ...any) {
@@ -147,11 +57,14 @@ func (u *Unpackerr) logCurrentQueue(now time.Time) {
 		stats.Waiting, stats.Queued, stats.Extracting, stats.Extracted, stats.Imported, stats.Failed, stats.Deleted)
 
 	u.Printf("[Unpackerr] Totals: %d retries, %d finished, %d|%d webhooks,"+
-		" %d|%d cmdhooks, stacks; event:%d, hook:%d, del:%d, up %s",
+		" %d|%d cmdhooks, stacks; fs:%d/%d, xtractr:%d/%d, folder:%d/%d, hook:%d/%d, del:%d/%d, task:%d/%d, up %s",
 		stats.Retries, stats.Finished, stats.HookOK, stats.HookFail, stats.CmdOK, stats.CmdFail,
-		len(u.folders.Events)+len(u.updates)+len(u.folders.Updates), len(u.hookChan), len(u.delChan),
-		formatDuration(now.Sub(version.Started)))
-	u.updateTray(stats, uint(len(u.folders.Events)+len(u.updates)+len(u.folders.Updates)+len(u.delChan)+len(u.hookChan)))
+		stats.StackFS.Len, stats.StackFS.Cap, stats.StackXtractr.Len, stats.StackXtractr.Cap,
+		stats.StackFolder.Len, stats.StackFolder.Cap, stats.StackHook.Len, stats.StackHook.Cap,
+		stats.StackDel.Len, stats.StackDel.Cap, stats.StackTask.Len, stats.StackTask.Cap,
+		carbon.CreateFromStdTime(version.Started).DiffAbsInString(carbon.CreateFromStdTime(now)))
+
+	u.updateTray(stats, stats.stackTotal())
 }
 
 // setupLogging splits log write into a file and/or stdout.
@@ -329,46 +242,15 @@ func (u *Unpackerr) logStartupInfo(msg string, externalFiles map[string]string) 
 		u.Printf(" => Extra Config File: %s => %s", file, path)
 	}
 
-	u.logSonarr()
-	u.logRadarr()
-	u.logLidarr()
-	u.logReadarr()
-	u.logWhisparr()
-	u.logFolders()
-	u.Printf(" => Parallel: %d", u.Parallel)
-
-	u.Printf(" => Default Extract Limits: Sonarr/Whisparr %s, Radarr %s, Lidarr %s, Readarr %s; "+
-		"%d files, %g:1, %d nested, extras depth %d; folders uncapped",
-		defaultSonarrMaxBytes, defaultRadarrMaxBytes, defaultLidarrMaxBytes, defaultReadarrMaxBytes,
-		defaultMaxFiles, defaultMaxRatio, defaultMaxNested, defaultExtrasMaxDepth)
-
-	u.Printf(" => Passwords: %d (rar/7z)", len(u.Passwords))
-	u.Printf(" => Interval / Progress: %s/%s", u.Interval.String(), u.Progress.String())
-	u.Printf(" => Start/Delete Delay: %s/%s", u.StartDelay.String(), u.DeleteDelay.String())
-	u.Printf(" => Retry Delay: %v, max: %d", u.RetryDelay, u.maxRetries())
-	u.Printf(" => Remnant Action: %s", u.RemnantAction)
-	u.Printf(" => GUI / StdErr: %v / %v", ui.HasGUI(), u.ErrorStdErr)
-	u.Printf(" => Debug / Quiet: %v / %v", u.Config.Debug, u.Quiet)
-	u.Printf(" => Activity / Queues: %v / %s", u.Activity, u.LogQueues.String())
-
-	if runtime.GOOS != windows {
-		u.Printf(" => Directory & File Modes: %s & %s", u.DirMode, u.FileMode)
-	}
-
-	if u.LogFile != "" {
-		msg := "no rotation"
-		if u.LogFiles > 0 {
-			msg = fmt.Sprintf("%d @ %dMb", u.LogFiles, u.LogFileMb)
-		}
-
-		u.Printf(" => Log File: %s (%s, mode: %s)", u.LogFile, msg, u.LogFileMode)
+	// Normalize before the dump so the logged URL base matches what startWebServer uses.
+	// The dump itself must not mutate config (live GET reuses the same printer).
+	if u.Webserver != nil && u.Webserver.Enabled() {
+		u.Webserver.normalizeURLBase()
 	}
 
 	if u.StateFile != "" {
 		u.Printf(" => State File: %s", u.StateFile)
 	}
 
-	u.logWebhook()
-	u.logCmdhook()
-	u.logWebserver()
+	u.writeRunningConfig(u.Printf, dumpAuth{})
 }

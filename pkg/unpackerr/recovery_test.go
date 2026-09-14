@@ -63,11 +63,10 @@ func TestRecoverInterruptedFolders(t *testing.T) {
 
 	now := time.Now().UTC()
 	unpackerr := New()
-	unpackerr.Folders = []*FolderConfig{{Path: watchPath}}
+	unpackerr.Folders = InstanceMap[FolderConfig]{"0": {Path: watchPath}}
 	unpackerr.StateFile = filepath.Join(t.TempDir(), defaultStateFile)
 	unpackerr.folders = &Folders{
 		Folders: make(map[string]*Folder),
-		Outputs: make(map[string]string),
 	}
 	unpackerr.recovery = &recoveryState{
 		Version: recoveryStateVersion,
@@ -88,11 +87,11 @@ func TestRecoverInterruptedFolders(t *testing.T) {
 		t.Fatalf("expected interrupted folder to be restored")
 	}
 
-	if folder.status != WAITING {
-		t.Fatalf("expected restored folder to be waiting, got %s", folder.status)
+	if folder.Status != WAITING {
+		t.Fatalf("expected restored folder to be waiting, got %s", folder.Status)
 	}
 
-	if now.Sub(folder.updated) < unpackerr.StartDelay.Duration {
+	if now.Sub(folder.Updated) < unpackerr.StartDelay.Duration {
 		t.Fatalf("expected extracting item to be eligible for immediate retry")
 	}
 }
@@ -128,7 +127,7 @@ func TestRecoverInterruptedFolderCleansPartialOutput(t *testing.T) {
 
 	now := time.Now().UTC()
 	unpackerr := newRecoveryTestUnpackerr(watchPath, archivePath, EXTRACTING, now.Add(-time.Minute))
-	unpackerr.Folders[0].ExtractPath = extractPath
+	unpackerr.Folders["0"].ExtractPath = extractPath
 
 	unpackerr.recoverInterruptedFolders(now)
 
@@ -140,7 +139,7 @@ func TestRecoverInterruptedFolderCleansPartialOutput(t *testing.T) {
 		t.Fatalf("expected final partial output to be cleaned, got err=%v", err)
 	}
 
-	if folder := unpackerr.folders.Folders[archivePath]; folder == nil || folder.status != WAITING {
+	if folder := unpackerr.folders.Folders[archivePath]; folder == nil || folder.Status != WAITING {
 		t.Fatalf("expected interrupted folder to be restored for retry, got %#v", folder)
 	}
 }
@@ -158,11 +157,10 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 	updated := time.Now().UTC()
 	now := updated.Add(time.Second)
 	unpackerr := New()
-	unpackerr.Folders = []*FolderConfig{{Path: watchPath}}
+	unpackerr.Folders = InstanceMap[FolderConfig]{"0": {Path: watchPath}}
 	unpackerr.StateFile = filepath.Join(t.TempDir(), defaultStateFile)
 	unpackerr.folders = &Folders{
 		Folders: make(map[string]*Folder),
-		Outputs: make(map[string]string),
 	}
 	unpackerr.recovery = &recoveryState{
 		Version: recoveryStateVersion,
@@ -183,8 +181,8 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 		t.Fatalf("expected waiting folder to be restored")
 	}
 
-	if !folder.updated.Equal(updated) {
-		t.Fatalf("expected original updated time %s, got %s", updated, folder.updated)
+	if !folder.Updated.Equal(updated) {
+		t.Fatalf("expected original updated time %s, got %s", updated, folder.Updated)
 	}
 }
 
@@ -215,10 +213,9 @@ func TestRecoverWaitingFolderDoesNotCleanOutput(t *testing.T) {
 
 func newRecoveryTestUnpackerr(watchPath, archivePath string, status ExtractStatus, updated time.Time) *Unpackerr {
 	unpackerr := New()
-	unpackerr.Folders = []*FolderConfig{{Path: watchPath}}
+	unpackerr.Folders = InstanceMap[FolderConfig]{"0": {Path: watchPath}}
 	unpackerr.folders = &Folders{
 		Folders: make(map[string]*Folder),
-		Outputs: make(map[string]string),
 	}
 	unpackerr.recovery = &recoveryState{
 		Version: recoveryStateVersion,

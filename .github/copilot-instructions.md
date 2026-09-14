@@ -12,6 +12,9 @@ in mind; the items below have been raised and rejected before.
 - Live `Config` fields are read and written only on the main loop. Do not ask for a
   mutex around `u.StartDelay`, `u.Passwords`, `u.Sonarr`, and similar. If a new reader
   runs on another goroutine, route it through `onMainLoop` instead.
+  Exception: `GET /api/stats` / Prometheus `Collect` read Starr/folder map headers
+  under `configMu` and the last poll snapshot under `History.mu`. Poll workers publish
+  `Queue` and `last*` after `GetQueue` returns. Do not hop that path onto `onMainLoop`.
 - `retrieveAppQueues` does not need to snapshot the app lists. A config PUT applies on
   the same goroutine, which is parked in `wait.Wait()` until every poll returns.
 - `syncFileUIPassword` is not a lock-order inversion. `uiPassword()` releases
@@ -28,6 +31,8 @@ in mind; the items below have been raised and rejected before.
 - The history JSONL is written by this process, capped at `keep_history`, and read
   with `bufio.Reader.ReadBytes`. It is not untrusted input. Do not request line
   caps, bounded readers, atomic rename, rollback copies, or `.bak` handling for it.
+  Starr rows newer than 72 hours are restored into `History.Map` after `validateApps`.
+  Do not restore Folder rows that way; the watch tracker owns those.
 - A local admin POST does not need context-cancellation checks between enqueue and
   execution on the main loop.
 - `New()` allocates `Config`, `Webserver`, `History`, and `folders`. Nil checks on

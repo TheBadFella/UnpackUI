@@ -33,7 +33,7 @@ func TestValidateAppSuppressesOnlyMissingURLWarning(t *testing.T) {
 			unpackerr.SuppressMissingURLs = test.suppress
 			unpackerr.Error = log.New(&output, "", 0)
 
-			err := unpackerr.validateApp(&StarrConfig{}, starr.Sonarr)
+			err := unpackerr.validateApp(&StarrConfig{}, starr.Sonarr, "0")
 			if !errors.Is(err, ErrInvalidURL) {
 				t.Fatalf("expected ErrInvalidURL, got %v", err)
 			}
@@ -54,9 +54,9 @@ func TestValidateAppStillWarnsForMissingAPIKey(t *testing.T) {
 	unpackerr.SuppressMissingURLs = true
 	unpackerr.Error = log.New(&output, "", 0)
 
-	err := unpackerr.validateApp(&StarrConfig{URL: "http://sonarr:8989"}, starr.Sonarr)
-	if !errors.Is(err, ErrInvalidURL) {
-		t.Fatalf("expected ErrInvalidURL, got %v", err)
+	err := unpackerr.validateApp(&StarrConfig{URL: "http://sonarr:8989"}, starr.Sonarr, "0")
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("expected ErrInvalidKey, got %v", err)
 	}
 
 	if !strings.Contains(output.String(), "Missing Sonarr API Key") {

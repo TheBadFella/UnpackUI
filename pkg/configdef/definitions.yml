@@ -16,7 +16,6 @@ def_order:
     - radarr
     - lidarr
     - readarr
-    - whisparr
 recommendations:
   apps: &APPS
     - name: Sonarr
@@ -27,8 +26,6 @@ recommendations:
       value: lidarr
     - name: Readarr
       value: readarr
-    - name: Whisparr
-      value: whisparr
     - name: Folder
       value: folder
   on_off: &BOOLEAN
@@ -75,6 +72,8 @@ recommendations:
     - name: 20 minutes
       value: 20m
   timeout: &TIMEOUTS
+    - name: 5 seconds
+      value: 5s
     - name: 10 seconds
       value: 10s
     - name: 15 seconds
@@ -91,10 +90,6 @@ recommendations:
       value: 90s
     - name: 2 minutes
       value: 2m
-    - name: 3 minutes
-      value: 3m
-    - name: 5 minutes
-      value: 5m
   queues: &QUEUE_INTERVALS
     - name: 1 minute
       value: 1m
@@ -154,7 +149,7 @@ defs:
       title: Sonarr Settings
       prefix: SONARR_
       text: |
-        ## Leaving the [[sonarr]] header uncommented (no leading hash #) without also
+        ## Leaving the [sonarr.0] header uncommented (no leading hash #) without also
         ## uncommenting the api_key (remove the hash #) will produce a startup warning.
       docker_example:
         url: http://sonarr:8989
@@ -164,7 +159,7 @@ defs:
       title: Radarr Settings
       prefix: RADARR_
       text: |
-        ## Leaving the [[radarr]] header uncommented (no leading hash #) without also
+        ## Leaving the [radarr.0] header uncommented (no leading hash #) without also
         ## uncommenting the api_key (remove the hash #) will produce a startup warning.
       docker_example:
         url: http://radarr:7878
@@ -186,14 +181,6 @@ defs:
         url: http://readarr:8787
       examples:
         url: http://127.0.0.1:8787
-    whisparr:
-      title: Whisparr Settings
-      prefix: WHISPARR_
-      comment: true
-      docker_example:
-        url: http://whisparr:6969
-      examples:
-        url: http://127.0.0.1:6969
 
 sections:
   global:
@@ -302,9 +289,10 @@ sections:
         recommend: &FILE_MODES
           - value: '0600'
           - value: '0640'
-          - value: '0660'
           - value: '0644'
+          - value: '0660'
           - value: '0664'
+          - value: '0666'
         short: 'POSIX mode used for new log files; not for Windows'
       - name: state_file
         envvar: STATE_FILE
@@ -319,19 +307,30 @@ sections:
           Set this to "off" to disable restart recovery.
       - name: keep_history
         envvar: KEEP_HISTORY
-        default: 200
+        default: 400
         recommend:
           - value: 0
+          - value: 5
+          - value: 10
+          - value: 20
           - value: 50
           - value: 100
           - value: 200
+          - value: 300
+          - value: 400
           - value: 500
+          - value: 750
           - value: 1000
+          - value: 1500
+          - value: 2000
         short: Completed items kept in the history file and API.
         desc: |
           How many completed or failed items to keep in unpackerr.history.jsonl
           (next to the log file, or the config file if logs go to stdout).
-          The tray menu still shows only the last 10 names. `0` disables history.
+          In-flight Starr items are also written so a restart can put EXTRACTED
+          and IMPORTED work back on the live queue for 72 hours. The history API
+          still lists only completed or failed rows. The tray menu still shows
+          only the last 10 names. `0` disables history and restart resume.
       - name: interval
         envvar: INTERVAL
         default: 2m
@@ -344,20 +343,30 @@ sections:
         envvar: PROGRESS
         default: 15s
         recommend:
-          - name: '2 seconds'
-            value: '2s'
           - name: '5 seconds'
             value: '5s'
           - name: '10 seconds'
             value: '10s'
           - name: '15 seconds'
             value: '15s'
+          - name: '30 seconds'
+            value: '30s'
           - name: '1 minute'
             value: '1m'
+          - name: '2 minutes'
+            value: '2m'
+          - name: '3 minutes'
+            value: '3m'
+          - name: '5 minutes'
+            value: '5m'
+          - name: '8 minutes'
+            value: '8m'
+          - name: '10 minutes'
+            value: '10m'
         short: How often status is logged for in-progress extractions.
         desc: |
           How often status is logged for in-progress extractions.
-          Recommend 2-60s. Uses Go Duration.
+          `0` uses the default `15s`. Uses Go Duration.
       - name: start_delay
         envvar: START_DELAY
         default: 1m
@@ -434,6 +443,7 @@ sections:
           - value: '0755'
           - value: '0770'
           - value: '0775'
+          - value: '0777'
         short: Extracted folders are written with this mode
       - name: passwords
         envvar: PASSWORD_
@@ -493,7 +503,7 @@ sections:
         desc: |
           Expose Prometheus metrics at /metrics. The HTTP server starts whenever listen_addr is set;
           this only controls the /metrics route. Scrapes must send an API key with
-          read:system:metrics via Authorization: Bearer or X-Api-Key.
+          system:metrics:read via Authorization: Bearer or X-Api-Key.
       - name: pprof
         envvar: PPROF
         default: false
@@ -515,9 +525,10 @@ sections:
         omit_compose: true
         short: Web UI password (user:pass, hashed, proxy header, or noauth).
         desc: |
-          Browser login credential. Use user:pass (hashed on startup),
-          !!cryptd!!user:$2a$... for a stored hash, webauth:X-Webauth-User
-          for a reverse-proxy header, or noauth.
+          Local UI login. Use user:pass (hashed on startup), !!cryptd!!user:$2a$...
+          for a stored hash, webauth:X-Webauth-User for a reverse-proxy header, or
+          noauth. The HTTP API does not accept plaintext; send user:<PBKDF2 hex>
+          (same digest as login) and uiCurrentKdf when changing a live password.
           filepath:/path reads that file for the live password and keeps filepath: in the
           config. Empty generates a temporary password when the HTTP server is enabled.
           Reset with --reset. Do not set an empty
@@ -583,12 +594,13 @@ sections:
           Nested [webserver.roles.<name>] tables. Names are letters, digits, _ or -.
           Built-in admin cannot be redefined. `*` is reserved for that built-in role.
           Each custom role needs at least one known permission.
+          File browser is system:browse:read (list) and system:browse:write (create folder).
           Env works but is picky: do not set UN_WEBSERVER_ROLES itself. Role names are
           case-sensitive and may contain underscores. Index permissions from 0:
-          UN_WEBSERVER_ROLES_stats_PERMISSIONS_0=read:system:stats
-          UN_WEBSERVER_ROLES_read_only_PERMISSIONS_0=read:system:stats
+          UN_WEBSERVER_ROLES_stats_PERMISSIONS_0=system:stats:read
+          UN_WEBSERVER_ROLES_read_only_PERMISSIONS_0=system:stats:read
           [webserver.roles.stats]
-          permissions = ["read:system:stats"]
+          permissions = ["system:stats:read"]
 
   starr_header:
     no_header: true
@@ -597,11 +609,14 @@ sections:
       ##-IMPORTANT-#######-READ THIS!!!-################ Seriously, read this. ######
       ###############################################################################
       ## The following sections can be repeated if you have more than one Sonarr,  ##
-      ## Radarr, Lidarr, Readarr, Whisparr, Folder, Webhook, and/or Command Hook.  ##
-      ## You MUST uncomment the [[header]], url and api_key at for any Starr app.  ##
-      ## The [[sonarr]] and [[radarr]] headers come uncommented. Uncomment the url ##
+      ## Radarr, Lidarr, Readarr, Folder, Webhook, and/or Command Hook.            ##
+      ## Identify each instance with a short key: [sonarr.uhd], [folder.tv].       ##
+      ## Changed in v1.0.0 (September 2026): map keys, not [[array]] list rows.    ##
+      ## You MUST uncomment the [header.0], url and api_key for any Starr app.     ##
+      ## The [sonarr.0] and [radarr.0] headers come uncommented. Uncomment the url ##
       ## and api_key if they are in use. Comment them with a hash if they are not. ##
-      ## Uncomment the [[lidarr]] and/or [[readarr]] headers and values if in use. ##
+      ## Uncomment the [lidarr.0] and/or [readarr.0] headers and values if in use. ##
+      ## Do not set a bare UN_SONARR / UN_FOLDER / UN_WEBHOOK / UN_CMDHOOK.        ##
       ###############################################################################
       ###############################################################################
       ##           ALL LINES BEGINNING WITH A HASH # ARE IGNORED COMMENTS          ##
@@ -610,8 +625,18 @@ sections:
       ###############################################################################
 
   starr:
-    kind: list
+    kind: named
     params:
+      - name: name
+        envvar: NAME
+        default: ''
+        short: Optional label for logs, webhooks, and the dashboard.
+        desc: |
+          Empty uses the app name (Sonarr, Radarr, and so on). Set this for a
+          Sonarr-compatible app such as Sportarr so logs and Discord are not
+          tagged Sonarr. Add Whisparr as a Radarr instance with name = "Whisparr".
+          Hook exclude matches this name or the app dialect.
+          Names must be printable and cannot contain quotes, braces, or angle brackets.
       - name: url
         envvar: URL
         short: URL where this starr app can be accessed.
@@ -710,14 +735,29 @@ sections:
             value: ''
           - name: Unlimited
             value: '0'
+          - value: 500MB
           - value: 1GB
+          - value: 2GB
           - value: 4GB
+          - value: 5GB
+          - value: 8GB
+          - value: 10GB
+          - value: 15GB
           - value: 20GB
+          - value: 25GB
+          - value: 30GB
+          - value: 35GB
+          - value: 40GB
+          - value: 45GB
+          - value: 50GB
           - value: 75GB
+          - value: 100GB
+          - value: 150GB
+          - value: 200GB
         short: Per-archive byte cap. Empty uses the app default. `0` is unlimited.
         desc: |
           Per-archive uncompressed-byte cap. Empty uses the app default:
-          Sonarr/Whisparr 20GB, Radarr 75GB, Lidarr 4GB, Readarr 1GB.
+          Sonarr 20GB, Radarr 75GB, Lidarr 4GB, Readarr 1GB.
           `0` or `0B` disables the cap for this instance.
       - name: split_flac
         envvar: SPLIT_FLAC
@@ -770,8 +810,9 @@ sections:
     docs: |
       Folders are a way to watch a folder for things to extract. You can use this to
       monitor your download client's "move to" path if you're not using it with a Starr app.
+      Use `[folder.software]` (env `UN_FOLDER_software_PATH`). Do not set a bare `UN_FOLDER`.
     envvar_prefix: FOLDER_
-    kind: list
+    kind: named
     params:
       - name: path
         envvar: PATH
@@ -805,16 +846,35 @@ sections:
         envvar: DISABLE_RECURSION
         default: false
         recommend: *BOOLEAN
-        short: Setting this to true disables extracting archives inside archives.
-        desc: Unpackerr extracts archives inside archives. Set this to true to disable recursive extractions.
+        short: Extract archives found inside other archives. Default is enabled.
+        uishort: When true, do not extract archives found inside other archives.
+        desc: Nested archives are extracted by default. Disable recursion to extract only the outer archive.
       - name: max_bytes
         envvar: MAX_BYTES
         default: ''
         recommend:
           - name: Unlimited
             value: ''
+          - value: 5GB
+          - value: 8GB
+          - value: 10GB
+          - value: 15GB
           - value: 20GB
+          - value: 25GB
+          - value: 30GB
+          - value: 35GB
+          - value: 40GB
+          - value: 45GB
+          - value: 50GB
+          - value: 75GB
+          - value: 100GB
+          - value: 150GB
           - value: 200GB
+          - value: 500GB
+          - value: 1TB
+          - value: 2TB
+          - value: 5TB
+          - value: 10TB
         short: Per-archive byte cap. Empty (the default) is unlimited.
         desc: |
           Per-archive uncompressed-byte cap. Empty is unlimited. `0` or `0B` is also unlimited.
@@ -913,7 +973,7 @@ sections:
       # Works with notifiarr.com, or natively with Discord/Telegram/Slack/etc.
       # Discord can edit one message per extract when update_existing = true.
       # Can possibly be used with other services by providing a custom template_path.
-      ###### Don't forget to uncomment [[webhook]] and url at a minimum !!!!
+      ###### Don't forget to uncomment [webhook.0] and url at a minimum !!!!
     docs: |
       This application can send a webhook when an extraction queues, starts, finishes,
       fails, is imported, and/or is deleted. Configure 1 or more webhook URLs below.
@@ -948,7 +1008,7 @@ sections:
         title clickable and include an **Open UI** markdown link. Channel webhooks often
         cannot show Discord component buttons, so the link is used instead.
     envvar_prefix: WEBHOOK_
-    kind: list
+    kind: named
     params:
       - name: url
         envvar: URL
@@ -1005,8 +1065,8 @@ sections:
         example: ['readarr', 'lidarr']
         recommend: *APPS
         kind: list
-        short: 'List of apps to exclude: radarr, sonarr, folders, etc.'
-        desc: 'List of apps to exclude. None by default. This is an example:'
+        short: 'Apps or instance names to skip: sonarr, Sportarr, folder, etc.'
+        desc: 'Dialect tokens skip every instance of that API. Any other value matches an instance name. None by default. This is an example:'
       - name: template_path
         envvar: TEMPLATE_PATH
         default: ''
@@ -1112,9 +1172,9 @@ sections:
       #####################
       # Executes a script or command when an extraction queues, starts, finishes, and/or is deleted.
       # All data is passed in as environment variables. Try /usr/bin/env to see what variables are available.
-      ###### Don't forget to uncomment [[cmdhook]] at a minimum !!!!
+      ###### Don't forget to uncomment [cmdhook.0] at a minimum !!!!
     envvar_prefix: CMDHOOK_
-    kind: list
+    kind: named
     params:
       - name: command
         envvar: COMMAND
@@ -1160,10 +1220,10 @@ sections:
         example: ['readarr', 'lidarr']
         recommend: *APPS
         kind: list
-        short: 'List of apps to exclude: radarr, sonarr, folders, etc.'
+        short: 'Apps or instance names to skip: sonarr, Sportarr, folder, etc.'
         desc: |
           ===> Optional Command Hook Configuration <===
-          List of apps to exclude. None by default. This is an example:
+          Dialect tokens skip every instance of that API. Any other value matches an instance name. None by default. This is an example:
       - name: timeout
         envvar: TIMEOUT
         default: 10s

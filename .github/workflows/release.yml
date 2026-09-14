@@ -28,6 +28,46 @@ on:
 permissions:
   contents: read
 jobs:
+  channel:
+    if: github.repository == 'Unpackerr/unpackerr'
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.channel.outputs.channel }}
+      extra: ${{ steps.channel.outputs.extra }}
+      revision: ${{ steps.revision.outputs.revision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'schedule' && 'refs/heads/main' || github.ref }}
+      - name: Count git revisions
+        id: revision
+        run: echo "revision=$(git rev-list --count --all || echo 0)" >> "${GITHUB_OUTPUT}"
+      - name: Choose release channel
+        id: channel
+        env:
+          REVISION: ${{ steps.revision.outputs.revision }}
+        run: |
+          set -euo pipefail
+          extra=
+          if [[ "${GITHUB_EVENT_NAME}" == schedule ]]; then
+            channel=nightly
+            extra=--nightly
+          elif [[ "${GITHUB_EVENT_NAME}" == workflow_dispatch && "${GITHUB_REF}" == refs/heads/main ]]; then
+            channel=nightly
+            extra=--nightly
+          elif [[ "${GITHUB_EVENT_NAME}" == push && "${GITHUB_REF}" == refs/tags/v* ]]; then
+            channel=release
+          elif [[ "${GITHUB_EVENT_NAME}" == push && "${GITHUB_REF}" == refs/heads/unstable ]]; then
+            channel=unstable
+            extra=--nightly
+          else
+            echo "refusing to release from ${GITHUB_REF} (${GITHUB_EVENT_NAME})" >&2
+            exit 1
+          fi
+          echo "channel=${channel}" >> "${GITHUB_OUTPUT}"
+          echo "extra=${extra}" >> "${GITHUB_OUTPUT}"
+          echo "CHANNEL=${channel} extra=${extra}"
 
   docker-ghcr-build-push:
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/unstable'

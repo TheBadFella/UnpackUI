@@ -198,9 +198,9 @@ func TestBuildWebStateUsesFriendlyFolderDisplayName(t *testing.T) {
 	unpackerr.folders = &Folders{
 		Folders: map[string]*Folder{
 			"/downloads/Example.Release": {
-				updated: now,
-				status:  EXTRACTED,
-				config: &FolderConfig{
+				Updated: now,
+				Status:  EXTRACTED,
+				Config: &FolderConfig{
 					DeleteAfter: &cnfg.Duration{Duration: 5 * time.Minute},
 				},
 			},
@@ -298,9 +298,9 @@ func TestBuildWebStateDoesNotDuplicateCompletedItemsAcrossRefreshes(t *testing.T
 	unpackerr.folders = &Folders{
 		Folders: map[string]*Folder{
 			"/downloads/sample-large-zip-file.zip": {
-				updated: now,
-				status:  EXTRACTED,
-				config: &FolderConfig{
+				Updated: now,
+				Status:  EXTRACTED,
+				Config: &FolderConfig{
 					DeleteAfter: &cnfg.Duration{Duration: 5 * time.Minute},
 				},
 			},

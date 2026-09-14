@@ -1,29 +1,31 @@
-package unpackerr
+package hooks
 
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/url"
 	"os"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/Unpackerr/unpackerr/pkg/extract"
 	"golift.io/cnfg"
 	"golift.io/starr"
 )
 
-// WebhookPayload defines the data sent to notifarr.com (and other) webhooks.
-type WebhookPayload struct {
+// Payload defines the data sent to notifarr.com (and other) webhooks.
+type Payload struct {
 	Path    string         `json:"path"`                // Path for the extracted item.
 	App     starr.App      `json:"app"`                 // Application Triggering Event
 	IDs     map[string]any `json:"ids,omitempty"`       // Arbitrary IDs from each app.
-	Event   ExtractStatus  `json:"unpackerr_eventtype"` // The type of the event.
+	Event   extract.Status `json:"unpackerr_eventtype"` // The type of the event.
 	Title   string         `json:"event_title"`         // Friendly event title for human-facing notifications.
 	Retries uint           `json:"retries,omitempty"`   // Extraction retry count.
 	Time    time.Time      `json:"time"`                // Time of this event.
 	Data    *XtractPayload `json:"data,omitempty"`      // Payload from extraction process.
-	Config  *WebhookConfig `json:"-"`                   // Payload from extraction process.
+	Config  *Config        `json:"-"`                   // Payload from extraction process.
 	WebURL  string         `json:"webUrl,omitempty"`    // URL to the UI.
 	// Application Metadata.
 	Go       string    `json:"go"`       // Version of go compiled with
@@ -53,7 +55,7 @@ type XtractPayload struct {
 // when not using discord.com (below), or a custom template file.
 const WebhookTemplateNotifiarr = `{
   "path": {{encode .Path}},
-  "app": "{{.App}}",
+  "app": {{encode .App}},
   "ids": {
     {{$s := separator ",\n"}}{{range $key, $value := .IDs}}{{call $s}}"{{$key}}": {{encode $value}}{{end}}
   },
@@ -87,7 +89,7 @@ const WebhookTemplateTelegram = `{
   "disable_web_page_preview": true,
   "text": "<b><a href=\"https://github.com/Unpackerr/unpackerr/releases\">Unpackerr</a></b>: {{.Title -}}
     \n<b>Title</b>: {{rawencode (index .IDs "title") -}}
-    \n<b>App</b>: {{.App -}}
+    \n<b>App</b>: {{htmlencode .App -}}
     \n\n<b>Path</b>: <code>{{rawencode .Path}}</code>
   {{- if .Data }}\n
     {{- if .Data.Elapsed.Duration}}\n <b>Elapsed</b>: {{.Data.Elapsed}}{{end -}}
@@ -230,7 +232,7 @@ const WebhookTemplateSlack = `
         },
         {
           "type": "mrkdwn",
-          "text": "*App*\n{{.App}}"
+          "text": {{encode (print "*App*\n" .App)}}
         }{{ if .Data }}
         {{ if .Data.Bytes }},{
           "type": "mrkdwn",
@@ -267,11 +269,12 @@ const WebhookTemplateSlack = `
 // Template returns a template specific to this webhook.
 //
 //nolint:wrapcheck
-func (w *WebhookConfig) Template() (*template.Template, error) {
+func (w *Config) Template() (*template.Template, error) {
 	template := template.New("webhook").Funcs(template.FuncMap{
 		"encode":       func(v any) string { b, _ := json.Marshal(v); return string(b) },
 		"rawencode":    func(v any) string { b, _ := json.Marshal(v); return strings.Trim(string(b), `"`) }, // yuck
 		"formencode":   url.QueryEscape,
+		"htmlencode":   func(v any) string { return html.EscapeString(fmt.Sprint(v)) },
 		"separator":    separator,
 		"humanbytes":   humanbytes,
 		"displaytitle": discordDisplayTitle,
@@ -360,17 +363,21 @@ func humanbytes(size uint64) string {
 	return fmt.Sprintf("%.1f%ciB", float64(size)/float64(div), "KMGTPE"[exp])
 }
 
-func friendlyEventTitle(status ExtractStatus) string {
+func FriendlyEventTitle(status extract.Status) string {
 	switch status {
-	case QUEUED:
+	case extract.QUEUED:
 		return "New Archive Detected"
-	case EXTRACTING:
+	case extract.EXTRACTING:
 		return "Extraction Started"
-	case EXTRACTED:
+	case extract.EXTRACTED:
 		return "Extraction Complete"
-	case DELETED:
+	case extract.DELETED:
 		return "Source Deleted"
 	default:
 		return status.Desc()
 	}
+}
+
+func friendlyEventTitle(status extract.Status) string {
+	return FriendlyEventTitle(status)
 }

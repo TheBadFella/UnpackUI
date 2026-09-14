@@ -197,11 +197,11 @@ func (u *Unpackerr) buildWaitingFolderWebItems(
 	}
 
 	for name, folder := range u.folders.Folders {
-		if _, ok := u.Map[name]; ok || folder == nil || folder.status != WAITING {
+		if _, ok := u.Map[name]; ok || folder == nil || folder.Status != WAITING {
 			continue
 		}
 
-		if !folderHasExtractableContent(name, folder.config) {
+		if !folderHasExtractableContent(name, folder.Config) {
 			continue
 		}
 
@@ -337,23 +337,23 @@ func buildWebStatusItem(name string, item *Extract, folder *Folder, now time.Tim
 
 func buildWaitingFolderStatusItem(name string, folder *Folder, now time.Time) webStatusItem {
 	reason := ""
-	if folder.config != nil && folder.config.Path != "" {
-		reason = "Watching folder: " + folder.config.Path
+	if folder.Config != nil && folder.Config.Path != "" {
+		reason = "Watching folder: " + folder.Config.Path
 	}
 
 	return webStatusItem{
-		ID:         webStatusItemID(name, folder.status, folder.updated),
+		ID:         webStatusItemID(name, folder.Status, folder.Updated),
 		Key:        webStatusItemKey(name, name, FolderString),
 		Active:     true,
 		Completed:  false,
 		App:        FolderString,
-		Elapsed:    now.Sub(folder.updated).Round(time.Second).String(),
+		Elapsed:    now.Sub(folder.Updated).Round(time.Second).String(),
 		Name:       webStatusLabel(name),
 		Path:       name,
 		Reason:     reason,
-		Status:     folder.status.String(),
-		StatusText: webStatusText(folder.status, FolderString),
-		UpdatedAt:  folder.updated.Format(time.RFC3339),
+		Status:     folder.Status.String(),
+		StatusText: webStatusText(folder.Status, FolderString),
+		UpdatedAt:  folder.Updated.Format(time.RFC3339),
 	}
 }
 
@@ -474,11 +474,11 @@ func webStatusDeleteTiming(item *Extract, folder *Folder, now time.Time) (string
 	case item == nil:
 		return "", ""
 	case item.App == FolderString:
-		if item.Status != EXTRACTED || folder == nil || folder.config == nil || folder.config.DeleteAfter == nil {
+		if item.Status != EXTRACTED || folder == nil || folder.Config == nil || folder.Config.DeleteAfter == nil {
 			return "", ""
 		}
 
-		return webStatusDeleteWindow(item.Updated, folder.config.DeleteAfter.Duration, now)
+		return webStatusDeleteWindow(item.Updated, folder.Config.DeleteAfter.Duration, now)
 	case item.Status == IMPORTED:
 		return webStatusDeleteWindow(item.Updated, item.DeleteDelay, now)
 	default:
@@ -662,7 +662,7 @@ func (u *Unpackerr) currentStats() *Stats {
 				continue
 			}
 
-			addStatusCount(stats, folder.status)
+			addStatusCount(stats, folder.Status)
 		}
 	}
 

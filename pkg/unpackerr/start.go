@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/bytefmt"
+	"github.com/Unpackerr/unpackerr/pkg/hooks"
 	"github.com/Unpackerr/unpackerr/pkg/ui"
 	flag "github.com/spf13/pflag"
 	"golift.io/cnfg"
@@ -24,41 +25,40 @@ import (
 )
 
 const (
-	defaultMaxRetries       = 2    // two retries after the first try (3 attempts).
-	defaultMaxFiles         = 1000 // Starr cap. Folders default to 0 (unlimited).
-	defaultMaxRatio         = 5.0  // Starr cap. Folders default to 0 (unlimited).
-	defaultSonarrMaxBytes   = "20GB"
-	defaultRadarrMaxBytes   = "75GB"
-	defaultLidarrMaxBytes   = "4GB"
-	defaultReadarrMaxBytes  = "1GB"
-	defaultWhisparrMaxBytes = "20GB"
-	defaultMaxNested        = 8 // Starr extras cap. Folders default to 0 (unlimited).
-	defaultExtrasMaxDepth   = 3 // Starr extras walk. Folders default to 0 (unlimited).
-	defaultFileMode         = 0o644
-	defaultLogFileMode      = 0o600
-	defaultDirMode          = 0o755
-	defaultTimeout          = 10 * time.Second
-	minimumInterval         = 15 * time.Second
-	defaultInterval         = 2 * time.Minute
-	cleanerInterval         = 5 * time.Second
-	defaultRetryDelay       = 5 * time.Minute
-	defaultStartDelay       = time.Minute
-	minimumDeleteDelay      = time.Second
-	defaultDeleteDelay      = 5 * time.Minute
-	staleItemTimeout        = 24 * time.Hour // Safety net: items stuck at intermediate states are cleaned up.
-	defaultHistory          = 200            // JSONL cap; tray still shows trayHistory names.
-	trayHistory             = 10             // items kept in the GUI history menu.
-	suffix                  = "_unpackerred" // suffix for unpacked folders.
-	updateChanBuf           = 100            // Size of xtractr callback update channels.
-	signalBuf               = 4              // Hold HUP/TERM until waitForExit starts.
-	defaultFolderBuf        = 20000          // Channel queue size for file system events.
-	minimumFolderBuf        = 1000           // Minimum size of the folder event buffer.
-	defaultLogFileMb        = 10
-	defaultLogFiles         = 10
-	helpLink                = "GoLift Discord: https://golift.io/discord" // prints on start and on exit.
-	windows                 = "windows"
-	bits8                   = 8
-	base32                  = 32
+	defaultMaxRetries      = 2    // two retries after the first try (3 attempts).
+	defaultMaxFiles        = 1000 // Starr cap. Folders default to 0 (unlimited).
+	defaultMaxRatio        = 5.0  // Starr cap. Folders default to 0 (unlimited).
+	defaultSonarrMaxBytes  = "20GB"
+	defaultRadarrMaxBytes  = "75GB"
+	defaultLidarrMaxBytes  = "4GB"
+	defaultReadarrMaxBytes = "1GB"
+	defaultMaxNested       = 8 // Starr extras cap. Folders default to 0 (unlimited).
+	defaultExtrasMaxDepth  = 3 // Starr extras walk. Folders default to 0 (unlimited).
+	defaultFileMode        = 0o644
+	defaultLogFileMode     = 0o600
+	defaultDirMode         = 0o755
+	defaultTimeout         = 10 * time.Second
+	minimumInterval        = 15 * time.Second
+	defaultInterval        = 2 * time.Minute
+	cleanerInterval        = 5 * time.Second
+	defaultRetryDelay      = 5 * time.Minute
+	defaultStartDelay      = time.Minute
+	minimumDeleteDelay     = time.Second
+	defaultDeleteDelay     = 5 * time.Minute
+	staleItemTimeout       = 24 * time.Hour // Safety net: items stuck at intermediate states are cleaned up.
+	defaultHistory         = 400            // JSONL cap; tray still shows trayHistory names.
+	trayHistory            = 10             // items kept in the GUI history menu.
+	suffix                 = "_unpackerred" // suffix for unpacked folders.
+	updateChanBuf          = 100            // Size of xtractr callback update channels.
+	signalBuf              = 4              // Hold HUP/TERM until waitForExit starts.
+	defaultFolderBuf       = 20000          // Channel queue size for file system events.
+	minimumFolderBuf       = 1000           // Minimum size of the folder event buffer.
+	defaultLogFileMb       = 10
+	defaultLogFiles        = 10
+	helpLink               = "GoLift Discord: https://golift.io/discord" // prints on start and on exit.
+	windows                = "windows"
+	bits8                  = 8
+	base32                 = 32
 )
 
 // Unpackerr stores all the running data.
@@ -67,24 +67,25 @@ type Unpackerr struct {
 	*Config
 	*History
 	*xtractr.Xtractr
-	metrics  *metrics
-	folders  *Folders
-	sigChan  chan os.Signal
-	updates  chan *xtractr.Response
-	progChan chan *ExtractProgress
-	hookChan chan *hookQueueItem
-	delChan  chan *fileDeleteReq
-	taskChan chan *mainTask // HTTP hands config applies and queue actions to Run().
-	workChan chan []func()
+	metrics    *metrics
+	folders    *Folders
+	sigChan    chan os.Signal
+	updates    chan *xtractr.Response
+	progChan   chan *ExtractProgress
+	hookWorker *hooks.Worker
+	delChan    chan *fileDeleteReq
+	taskChan   chan *mainTask // HTTP hands config applies and queue actions to Run().
+	workChan   chan []func()
 	*Logger
 	rotatorr *rotatorr.Logger
 	httpLog  *rotatorr.Logger
 	menu     map[string]ui.MenuItem
 	// Live Config is owned by the main goroutine in Run(). fileConfig is the
 	// on-disk shape (filepath: values kept) and is also written by the tray,
-	// so it and the hook slices that /api/stats counts sit under configMu.
+	// so it and the hook/Starr/folder slices that /api/stats counts sit under configMu.
 	fileConfig       *Config
-	livePasswords    StringSlice // post-env, pre-expansion; GET /live uses this
+	envUsed          map[string]string // UN_* suffixes that ParseENV wrote; immutable after startup
+	livePasswords    StringSlice       // post-env, pre-expansion; GET /live uses this
 	configMu         sync.RWMutex
 	tickers          *loopTickers
 	pendingRestart   bool
@@ -134,18 +135,18 @@ type Flags struct {
 // An empty struct will surely cause you pain, so use this!
 func New() *Unpackerr {
 	return &Unpackerr{
-		Flags:    &Flags{EnvPrefix: "UN"},
-		hookChan: make(chan *hookQueueItem, updateChanBuf),
-		delChan:  make(chan *fileDeleteReq, updateChanBuf),
-		taskChan: make(chan *mainTask, updateChanBuf),
-		sigChan:  make(chan os.Signal, signalBuf),
-		workChan: make(chan []func(), 1),
-		History:  &History{Map: make(map[string]*Extract), forgotten: make(map[string]struct{})},
-		folders:  &Folders{Folders: make(map[string]*Folder)}, // replaced by PollFolders when folders are configured.
-		updates:  make(chan *xtractr.Response, updateChanBuf),
-		progChan: make(chan *ExtractProgress),
-		menu:     make(map[string]ui.MenuItem),
-		recovery: newRecoveryState(),
+		Flags:      &Flags{EnvPrefix: "UN"},
+		hookWorker: hooks.NewWorker(updateChanBuf),
+		delChan:    make(chan *fileDeleteReq, updateChanBuf),
+		taskChan:   make(chan *mainTask, updateChanBuf),
+		sigChan:    make(chan os.Signal, signalBuf),
+		workChan:   make(chan []func(), 1),
+		History:    &History{Map: make(map[string]*Extract), forgotten: make(map[string]struct{})},
+		folders:    &Folders{Folders: make(map[string]*Folder)}, // replaced by PollFolders when folders are configured.
+		updates:    make(chan *xtractr.Response, updateChanBuf),
+		progChan:   make(chan *ExtractProgress),
+		menu:       make(map[string]ui.MenuItem),
+		recovery:   newRecoveryState(),
 		Config: &Config{
 			KeepHistory:         defaultHistory,
 			SuppressMissingURLs: true,
@@ -228,6 +229,7 @@ func Start() error {
 	}
 
 	unpackerr.setupRecoveryState()
+	unpackerr.restoreQueueFromHistory()
 	unpackerr.logStartupInfo(msg, output)
 
 	if unpackerr.webhook > 0 {
@@ -385,33 +387,15 @@ func dirIsEmpty(path string) bool {
 
 func (u *Unpackerr) ensureHookWorker() {
 	u.hookOnce.Do(func() {
-		go u.watchCmdAndWebhooks()
+		go u.hookWorker.Run(u.Logger, func() { u.inFlight.Add(-1) })
 	})
 }
 
 // queueHook publishes a hook and counts it in flight. See queueDelete.
-func (u *Unpackerr) queueHook(item *hookQueueItem) {
+func (u *Unpackerr) queueHook(item *hooks.Item) {
 	u.inFlight.Add(1)
 
-	u.hookChan <- item
-}
-
-func (u *Unpackerr) watchCmdAndWebhooks() {
-	for hook := range u.hookChan {
-		u.runHook(hook)
-	}
-}
-
-func (u *Unpackerr) runHook(hook *hookQueueItem) {
-	defer u.inFlight.Add(-1) // paired with queueHook.
-
-	if hook.URL != "" {
-		u.sendWebhookWithLog(hook.WebhookConfig, hook.WebhookPayload)
-	}
-
-	if hook.Command != "" {
-		u.runCmdhookWithLog(hook.WebhookConfig, hook.WebhookPayload)
-	}
+	u.hookWorker.Enqueue(item)
 }
 
 // ParseFlags turns CLI args into usable data.
@@ -469,6 +453,7 @@ func (u *Unpackerr) Run() {
 	u.PollFolders()                  // This initializes channel(s) used below.
 	u.recoverInterruptedFolders(now) // Re-queue watched folder items that were active before shutdown.
 	u.retrieveAppQueues(now)         // Get in-app queues on startup.
+	u.checkQueueChanges(now)         // Same pairing as the poller tick; restored IMPORTED may still be queued.
 	u.refreshWebState(now)
 
 	// This is the "main go routine" in start.go.

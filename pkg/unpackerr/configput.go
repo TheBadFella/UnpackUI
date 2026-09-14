@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 
+	"golift.io/cnfg"
 	"golift.io/cnfgfile"
 	"golift.io/starr"
 )
@@ -83,28 +84,25 @@ func (u *Unpackerr) replaceConfigSection(section ConfigSection, raw json.RawMess
 	case SectionWebserver:
 		return u.putWebserver(raw)
 	case SectionSonarr:
-		return false, putStarrList(u, raw, starr.Sonarr, SectionSonarr,
-			func(c *Config) *[]*SonarrConfig { return &c.Sonarr })
+		return false, putStarrList[SonarrConfig, *SonarrConfig](u, raw, starr.Sonarr, SectionSonarr,
+			func(c *Config) *InstanceMap[SonarrConfig] { return &c.Sonarr })
 	case SectionRadarr:
-		return false, putStarrList(u, raw, starr.Radarr, SectionRadarr,
-			func(c *Config) *[]*RadarrConfig { return &c.Radarr })
+		return false, putStarrList[RadarrConfig, *RadarrConfig](u, raw, starr.Radarr, SectionRadarr,
+			func(c *Config) *InstanceMap[RadarrConfig] { return &c.Radarr })
 	case SectionLidarr:
-		return false, putStarrList(u, raw, starr.Lidarr, SectionLidarr,
-			func(c *Config) *[]*LidarrConfig { return &c.Lidarr })
+		return false, putStarrList[LidarrConfig, *LidarrConfig](u, raw, starr.Lidarr, SectionLidarr,
+			func(c *Config) *InstanceMap[LidarrConfig] { return &c.Lidarr })
 	case SectionReadarr:
-		return false, putStarrList(u, raw, starr.Readarr, SectionReadarr,
-			func(c *Config) *[]*ReadarrConfig { return &c.Readarr })
-	case SectionWhisparr:
-		return false, putStarrList(u, raw, starr.Whisparr, SectionWhisparr,
-			func(c *Config) *[]*RadarrConfig { return &c.Whisparr })
+		return false, putStarrList[ReadarrConfig, *ReadarrConfig](u, raw, starr.Readarr, SectionReadarr,
+			func(c *Config) *InstanceMap[ReadarrConfig] { return &c.Readarr })
 	case SectionFolders:
 		return u.putFolders(raw)
 	case SectionWebhooks:
 		return false, u.putHooks(raw, u.validateWebhookList, SectionWebhooks,
-			func(c *Config) *[]*WebhookConfig { return &c.Webhook })
+			func(c *Config) *InstanceMap[WebhookConfig] { return &c.Webhook })
 	case SectionCmdhooks:
 		return false, u.putHooks(raw, u.validateCmdhookList, SectionCmdhooks,
-			func(c *Config) *[]*WebhookConfig { return &c.Cmdhook })
+			func(c *Config) *InstanceMap[WebhookConfig] { return &c.Cmdhook })
 	default:
 		return false, fmt.Errorf("%w: %s", errUnknownSection, section)
 	}
@@ -154,11 +152,16 @@ func unmarshalStrict(raw json.RawMessage, dest any) error {
 }
 
 // unmarshalObject is unmarshalStrict plus a guard against a bare {}, which
-// would otherwise zero every field in an object section.
-func unmarshalObject(raw json.RawMessage, dest any) error {
+// would otherwise zero every field in an object section. ignore keys (PUT-only
+// sidecars such as uiCurrentKdf) do not count as section content.
+func unmarshalObject(raw json.RawMessage, dest any, ignore ...string) error {
 	var probe map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &probe); err != nil {
 		return wrapJSONErr(err)
+	}
+
+	for _, key := range ignore {
+		delete(probe, key)
 	}
 
 	if len(probe) == 0 {
@@ -310,7 +313,7 @@ func walkMapStrings(val reflect.Value, visit func(string) error) error {
 
 // commitConfig stages the change onto a clone of fileConfig, writes the TOML,
 // then publishes live. A failed write changes nothing. Runs on the main loop;
-// configMu covers fileConfig and the hook slices that /api/stats reads.
+// configMu covers fileConfig and the hook/Starr/folder slices that /api/stats reads.
 func (u *Unpackerr) commitConfig(mutateFile func(*Config), applyLive func()) error {
 	u.configMu.Lock()
 	defer u.configMu.Unlock()
@@ -329,6 +332,42 @@ func (u *Unpackerr) commitConfig(mutateFile func(*Config), applyLive func()) err
 	applyLive()
 
 	return nil
+}
+
+func (u *Unpackerr) cloneFileConfig() *Config {
+	if u.fileConfig == nil {
+		return &Config{}
+	}
+
+	return cloneConfig(u.fileConfig)
+}
+
+// overlayEnv applies current UN_* values onto cfg. PUT writes the request body
+// as the file document; live is clone(file)+ParseENV so env-only slugs still
+// appear after a save that omitted them. A client that PUTs live overlay values
+// persists them — there is no peel safety net.
+func (u *Unpackerr) overlayEnv(cfg *Config) error {
+	if cfg == nil || len(u.envUsed) == 0 {
+		return nil
+	}
+
+	_, err := cnfg.ParseENV(cfg, u.EnvPrefix)
+	if err != nil {
+		return fmt.Errorf("environment variables: %w", err)
+	}
+
+	return nil
+}
+
+func (u *Unpackerr) applyEnvOverlay(mutate func(*Config)) (*Config, error) {
+	preview := u.cloneFileConfig()
+	mutate(preview)
+
+	if err := u.overlayEnv(preview); err != nil {
+		return nil, err
+	}
+
+	return preview, nil
 }
 
 func (u *Unpackerr) putGeneral(raw json.RawMessage) (bool, error) {
@@ -360,7 +399,7 @@ func (u *Unpackerr) putGeneral(raw json.RawMessage) (bool, error) {
 	restart := generalRestartRequired(u.Config, &staged)
 	historyWasOff := u.KeepHistory == 0
 
-	return restart, u.commitConfig(func(cfg *Config) {
+	if err := u.commitConfig(func(cfg *Config) {
 		applyGeneral(cfg, next)
 	}, func() {
 		applyGeneral(u.Config, next)
@@ -370,11 +409,17 @@ func (u *Unpackerr) putGeneral(raw json.RawMessage) (bool, error) {
 		clampConfig(u.Config)
 		u.ensureTrayRing()
 		u.resetTickers()
+	}); err != nil {
+		return restart, err
+	}
 
-		if historyWasOff && u.KeepHistory > 0 {
-			u.loadHistory() // histPath is only resolved while history is enabled.
-		}
-	})
+	// After configMu: restore takes History.mu, and /api/stats does the reverse.
+	if historyWasOff && u.KeepHistory > 0 {
+		u.loadHistory() // histPath is only resolved while history is enabled.
+		u.restoreQueueFromHistory()
+	}
+
+	return restart, nil
 }
 
 // generalRestartRequired lists the general fields the main loop cannot re-apply
@@ -397,10 +442,15 @@ func generalRestartRequired(cur, next *Config) bool {
 		next.DeleteDelay != cur.DeleteDelay
 }
 
+type webserverPut struct {
+	WebServer
+	UICurrentKDF string `json:"uiCurrentKdf"`
+}
+
 //nolint:funlen // break it up more one day.
 func (u *Unpackerr) putWebserver(raw json.RawMessage) (bool, error) {
-	var next WebServer
-	if err := unmarshalObject(raw, &next); err != nil {
+	var next webserverPut
+	if err := unmarshalObject(raw, &next, "uiCurrentKdf"); err != nil {
 		return false, err
 	}
 
@@ -410,33 +460,38 @@ func (u *Unpackerr) putWebserver(raw json.RawMessage) (bool, error) {
 		return false, err
 	}
 
+	currentKDF := strings.TrimSpace(next.UICurrentKDF)
 	submitted := next.UIPassword
 	omitted := submitted.Val() == ""
 	fromFile := strings.HasPrefix(submitted.Val(), filePrefix)
 
-	if err := u.rejectNewFilepaths(SectionWebserver, &next); err != nil {
+	if err := u.rejectNewFilepaths(SectionWebserver, &next.WebServer); err != nil {
 		return false, err
 	}
+
+	liveSnap := u.cloneLiveWebserver()
+	fileSnap := u.cloneFileWebserver()
 
 	if !omitted {
 		if err := expandCryptPassFile(&next.UIPassword); err != nil {
 			return false, err
 		}
 
-		if err := normalizeStoredPassword(&next.UIPassword, u.uiPasswordUser()); err != nil {
+		if err := normalizeStoredPassword(&next.UIPassword, u.uiPasswordUser(), fromFile); err != nil {
+			return false, err
+		}
+
+		if err := u.confirmUIPasswordChange(submitted, fileSnap.UIPassword, currentKDF, fromFile); err != nil {
 			return false, err
 		}
 	}
-
-	liveSnap := u.cloneLiveWebserver()
-	fileSnap := u.cloneFileWebserver()
 
 	// Blank keys round-trip from a redacted GET. File keys fill from the file
 	// only so an env-overlay key never lands on disk; live fills from live then file.
 	fileOnly := &WebServer{APIKeys: cloneAPIKeys(next.APIKeys)}
 	keepNamedAPIKeys(fileOnly, fileSnap)
 	dropEmptyAPIKeys(fileOnly)
-	keepNamedAPIKeys(&next, liveSnap, fileSnap)
+	keepNamedAPIKeys(&next.WebServer, liveSnap, fileSnap)
 
 	if omitted {
 		next.UIPassword = liveSnap.UIPassword
@@ -448,7 +503,7 @@ func (u *Unpackerr) putWebserver(raw json.RawMessage) (bool, error) {
 
 	next.allow = MakeIPs(next.Upstreams)
 
-	fileWeb := cloneWebserver(&next)
+	fileWeb := cloneWebserver(&next.WebServer)
 	fileWeb.APIKeys = fileOnly.APIKeys
 
 	switch {
@@ -462,25 +517,38 @@ func (u *Unpackerr) putWebserver(raw json.RawMessage) (bool, error) {
 		return false, err
 	}
 
-	restart := webserverRestartRequired(liveSnap, &next)
+	// Round-tripping the file hash must not replace a live overlay (env password).
+	if keepLiveUIPassword(omitted, fromFile, submitted, fileSnap.UIPassword) {
+		next.UIPassword = liveSnap.UIPassword
+	}
+
+	// GET/PUT are file-shaped. Env can overlay live listen/metrics, so compare
+	// the file snapshot to what we are about to write, not live vs the PUT body.
+	restart := webserverRestartRequired(fileSnap, fileWeb)
 
 	return restart, u.commitConfig(func(cfg *Config) {
 		cfg.Webserver = fileWeb
 	}, func() {
-		u.applyLiveWebserverAuth(&next)
+		u.applyLiveWebserverAuth(&next.WebServer)
 	})
 }
 
 func webserverRestartRequired(cur, next *WebServer) bool {
-	return cur.ListenAddr != next.ListenAddr ||
-		cur.URLBase != next.URLBase ||
-		cur.SSLCrtFile != next.SSLCrtFile ||
-		cur.SSLKeyFile != next.SSLKeyFile ||
-		cur.Metrics != next.Metrics ||
-		cur.Pprof != next.Pprof ||
-		cur.LogFile != next.LogFile ||
-		cur.LogFiles != next.LogFiles ||
-		cur.LogFileMb != next.LogFileMb
+	curCopy := cloneWebserver(cur)
+	nextCopy := cloneWebserver(next)
+
+	curCopy.normalizeURLBase()
+	nextCopy.normalizeURLBase()
+
+	return curCopy.ListenAddr != nextCopy.ListenAddr ||
+		curCopy.URLBase != nextCopy.URLBase ||
+		curCopy.SSLCrtFile != nextCopy.SSLCrtFile ||
+		curCopy.SSLKeyFile != nextCopy.SSLKeyFile ||
+		curCopy.Metrics != nextCopy.Metrics ||
+		curCopy.Pprof != nextCopy.Pprof ||
+		curCopy.LogFile != nextCopy.LogFile ||
+		curCopy.LogFiles != nextCopy.LogFiles ||
+		curCopy.LogFileMb != nextCopy.LogFileMb
 }
 
 func dropEmptyAPIKeys(web *WebServer) {
@@ -571,24 +639,58 @@ func (u *Unpackerr) uiPasswordUser() string {
 	return defaultUIUser
 }
 
-func normalizeStoredPassword(pass *CryptPass, fallback string) error {
+func keepLiveUIPassword(omitted, fromFile bool, submitted, file CryptPass) bool {
+	return omitted || (!fromFile && submitted.Val() == file.Val())
+}
+
+func (u *Unpackerr) confirmUIPasswordChange(submitted, file CryptPass, currentKDF string, fromFile bool) error {
+	live := u.uiPassword()
+	if live.Type() != AuthPassword {
+		return nil
+	}
+
+	raw := submitted.Val()
+	if raw == "" || raw == live.Val() || raw == file.Val() || fromFile {
+		return nil
+	}
+
+	if !live.Valid(live.Username(), currentKDF) {
+		return errCurrentUIPassword
+	}
+
+	return nil
+}
+
+func normalizeStoredPassword(pass *CryptPass, fallback string, allowPlain bool) error {
 	if pass.Val() == "" || pass.IsCrypted() || pass.Webauth() {
 		return nil
 	}
 
-	user, plain := splitUserPass(pass.Val(), fallback)
+	user, secret := splitUserPass(pass.Val(), fallback)
+	if allowPlain {
+		return pass.SetPlain(user, secret)
+	}
 
-	return pass.SetPlain(user, plain)
+	if !isKDFHex(secret) {
+		return errPlaintextUIPassword
+	}
+
+	if reservedUIUser(user) {
+		return errReservedUIUser
+	}
+
+	return pass.Set(user, secret)
 }
 
-// putStarrList replaces one Starr app list. The file copy keeps filepath:
-// values; the live copy is expanded, validated, and given clients. Queues
-// carry over by url+apikey so an unchanged app keeps polling state.
+// putStarrList replaces one Starr app map. The file copy is the PUT body
+// (filepath: kept as written); the live copy is that body plus ParseENV,
+// then expanded, validated, and given clients. Queues carry over by
+// url+apikey so an unchanged app keeps polling.
 func putStarrList[T any, P starrApp[T]](
-	unpackerr *Unpackerr, raw json.RawMessage, app starr.App, section ConfigSection, field func(*Config) *[]P,
+	unpackerr *Unpackerr, raw json.RawMessage, app starr.App, section ConfigSection, field func(*Config) *InstanceMap[T],
 ) error {
-	var list []P
-	if err := unmarshalList(raw, &list); err != nil {
+	var list InstanceMap[T]
+	if err := unmarshalInstances(raw, &list); err != nil {
 		return err
 	}
 
@@ -596,24 +698,50 @@ func putStarrList[T any, P starrApp[T]](
 		return err
 	}
 
-	fileList := cloneStarrList(list)
+	fileList := cloneStarrMap[T, P](list)
 
-	if err := expandFilepaths(&list); err != nil {
+	preview, err := unpackerr.applyEnvOverlay(func(cfg *Config) {
+		*field(cfg) = cloneStarrMap[T, P](list)
+	})
+	if err != nil {
 		return err
 	}
 
-	for _, item := range list {
-		if err := unpackerr.validateApp(item.conf(), app); err != nil {
+	liveList := *field(preview)
+	if err := expandFilepaths(&liveList); err != nil {
+		return err
+	}
+
+	for key, item := range liveList {
+		if err := validateInstanceSlug(key); err != nil {
 			return err
 		}
 
-		item.connect()
+		if item == nil {
+			return errNilConfigEntry
+		}
+
+		server := asStarr[T, P](item)
+		if err := unpackerr.validateApp(server.conf(), app, key); err != nil {
+			// Env overlay may recreate a slug the PUT omitted. Incomplete
+			// leftovers (URL in env, key in the deleted file row) must not
+			// 400 the save; startup already skips those. A PUT-body row
+			// still 400s after overlay fills env secrets.
+			if _, inPut := list[key]; !inPut && skipInvalidApp(err) {
+				delete(liveList, key)
+				continue
+			}
+
+			return fmt.Errorf("%s instance %q: %w", app, key, err)
+		}
+
+		server.connect()
 	}
 
 	return unpackerr.commitConfig(func(cfg *Config) { *field(cfg) = fileList }, func() {
 		live := field(unpackerr.Config)
-		carryQueues(*live, list)
-		*live = list
+		carryQueues[T, P](*live, liveList)
+		*live = liveList
 
 		unpackerr.ensureWorkThreads(unpackerr.starrAppCount())
 	})
@@ -623,15 +751,25 @@ func starrIdentity(conf *StarrConfig) string {
 	return conf.URL + "\x00" + conf.APIKey
 }
 
-func carryQueues[T any, P starrApp[T]](prev, next []P) {
+func carryQueues[T any, P starrApp[T]](prev, next InstanceMap[T]) {
 	seen := make(map[string]P, len(prev))
 	for _, app := range prev {
-		seen[starrIdentity(app.conf())] = app
+		if app == nil {
+			continue
+		}
+
+		server := asStarr[T, P](app)
+		seen[starrIdentity(server.conf())] = server
 	}
 
 	for _, app := range next {
-		if old, ok := seen[starrIdentity(app.conf())]; ok {
-			app.takeQueue(old)
+		if app == nil {
+			continue
+		}
+
+		server := asStarr[T, P](app)
+		if old, ok := seen[starrIdentity(server.conf())]; ok {
+			server.takeQueue(old)
 		}
 	}
 }
@@ -642,7 +780,11 @@ func (u *Unpackerr) putFolders(raw json.RawMessage) (bool, error) {
 		return false, err
 	}
 
-	for _, folder := range next.Folder {
+	for key, folder := range next.Folder {
+		if err := validateInstanceSlug(key); err != nil {
+			return false, err
+		}
+
 		if folder == nil {
 			return false, errNilConfigEntry
 		}
@@ -652,13 +794,24 @@ func (u *Unpackerr) putFolders(raw json.RawMessage) (bool, error) {
 		return false, err
 	}
 
-	fileList := cloneFolderList(next.Folder)
+	fileList := cloneFolderMap(next.Folder)
 
-	if err := expandFilepaths(&next.Folder); err != nil {
+	preview, err := u.applyEnvOverlay(func(cfg *Config) {
+		cfg.Folder.Interval = next.Interval
+		cfg.Folder.Buffer = next.Buffer
+		cfg.Folders = cloneFolderMap(next.Folder)
+	})
+	if err != nil {
 		return false, err
 	}
 
-	if err := validateFolderList(next.Folder); err != nil {
+	if err := expandFilepaths(&preview.Folders); err != nil {
+		return false, err
+	}
+
+	dropInvalidEnvOverlay(next.Folder, preview.Folders, validateFolderList)
+
+	if err := validateFolderList(preview.Folders); err != nil {
 		return false, err
 	}
 
@@ -668,20 +821,20 @@ func (u *Unpackerr) putFolders(raw json.RawMessage) (bool, error) {
 		cfg.Folder.Buffer = next.Buffer
 		cfg.Folders = fileList
 	}, func() {
-		u.Folder.Interval = next.Interval
-		u.Folder.Buffer = next.Buffer
-		u.Folders = next.Folder
+		u.Folder.Interval = preview.Folder.Interval
+		u.Folder.Buffer = preview.Folder.Buffer
+		u.Folders = preview.Folders
 	})
 }
 
 func (u *Unpackerr) putHooks(
 	raw json.RawMessage,
-	validate func([]*WebhookConfig) error,
+	validate func(InstanceMap[WebhookConfig]) error,
 	section ConfigSection,
-	field func(*Config) *[]*WebhookConfig,
+	field func(*Config) *InstanceMap[WebhookConfig],
 ) error {
-	var list []*WebhookConfig
-	if err := unmarshalList(raw, &list); err != nil {
+	var list InstanceMap[WebhookConfig]
+	if err := unmarshalInstances(raw, &list); err != nil {
 		return err
 	}
 
@@ -689,20 +842,44 @@ func (u *Unpackerr) putHooks(
 		return err
 	}
 
-	fileList := cloneHookList(list)
+	fileList := cloneHookMap(list)
 
-	if err := expandFilepaths(&list); err != nil {
+	preview, err := u.applyEnvOverlay(func(cfg *Config) {
+		*field(cfg) = cloneHookMap(list)
+	})
+	if err != nil {
 		return err
 	}
 
-	if err := validate(list); err != nil {
+	liveList := *field(preview)
+	if err := expandFilepaths(&liveList); err != nil {
+		return err
+	}
+
+	dropInvalidEnvOverlay(list, liveList, validate)
+
+	if err := validate(liveList); err != nil {
 		return err
 	}
 
 	return u.commitConfig(func(cfg *Config) {
 		*field(cfg) = fileList
 	}, func() {
-		*field(u.Config) = list
+		*field(u.Config) = liveList
 		u.ensureHookWorker()
 	})
+}
+
+// dropInvalidEnvOverlay removes live slugs that ParseENV created (not in the
+// PUT body) when they fail validation. PUT-body slugs stay and still 400.
+func dropInvalidEnvOverlay[T any](put, live InstanceMap[T], validate func(InstanceMap[T]) error) {
+	for key, item := range live {
+		if _, inPut := put[key]; inPut {
+			continue
+		}
+
+		if err := validate(InstanceMap[T]{key: item}); err != nil {
+			delete(live, key)
+		}
+	}
 }

@@ -261,13 +261,9 @@ func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, ite
 	}
 
 	u.folders.Folders[item.Path] = &Folder{
-		updated: updated,
-		status:  WAITING,
-		config:  cfg,
-	}
-
-	if outputPath := folderDerivedOutputPath(item.Path); outputPath != "" {
-		u.folders.Outputs[filepath.Clean(outputPath)] = item.Path
+		Updated: updated,
+		Status:  WAITING,
+		Config:  cfg,
 	}
 
 	item.Status = WAITING.String()
