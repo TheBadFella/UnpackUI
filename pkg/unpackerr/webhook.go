@@ -33,6 +33,11 @@ func (u *Unpackerr) runAllHooks(item *Extract) {
 }
 
 func (u *Unpackerr) hookPayload(item *Extract) *hooks.Payload {
+	var webURL string
+	if u != nil && u.Config != nil {
+		webURL = u.WebURL
+	}
+
 	payload := &hooks.Payload{
 		Path:    item.Path,
 		App:     starr.App(item.Label()),
@@ -42,7 +47,7 @@ func (u *Unpackerr) hookPayload(item *Extract) *hooks.Payload {
 		Event:   item.Status,
 		Title:   friendlyEventTitle(item.Status),
 		Retries: item.Retries,
-		WebURL:  u.WebURL,
+		WebURL:  webURL,
 		// Application Metadata.
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
@@ -53,7 +58,7 @@ func (u *Unpackerr) hookPayload(item *Extract) *hooks.Payload {
 		Started:  version.Started,
 	}
 
-	if item.Status <= EXTRACTED && item.Resp != nil {
+	if item.Resp != nil {
 		payload.Data = &hooks.XtractPayload{
 			Files:   hooks.StringSlice(item.Resp.NewFiles),
 			File:    item.Resp.NewFiles,

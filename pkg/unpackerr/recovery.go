@@ -407,7 +407,7 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 			continue
 		}
 
-		if pathWithin(path, cfgPath) && !cfg.isExcludedPath(path) {
+		if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
 			return cfg
 		}
 	}
@@ -422,7 +422,7 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 		}
 
 		cfgPath := filepath.Clean(cfg.Path)
-		if pathWithin(path, cfgPath) && !cfg.isExcludedPath(path) {
+		if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
 			return cfg
 		}
 	}

@@ -796,6 +796,7 @@ func TestValidateAppSkipLogsInstanceSlug(t *testing.T) {
 	var logs bytes.Buffer
 
 	unpack := New()
+	unpack.SuppressMissingURLs = false
 	unpack.Error.SetOutput(&logs)
 
 	err := unpack.validateApp(&StarrConfig{}, starr.Readarr, "0")

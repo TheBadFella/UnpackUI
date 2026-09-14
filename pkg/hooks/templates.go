@@ -178,7 +178,7 @@ const WebhookTemplateDiscord = `{
 `
 
 const WebhookTemplatePushover = `token={{token}}&user={{channel}}&html=1&title={{formencode .Title}}&` +
-	`{{if nickname}}device={{nickname}}&{{end}}message=<pre><b>App</b>: {{.App}}
+	`{{if nickname}}device={{nickname}}&{{end}}message=<pre><b>App</b>: {{formencode (htmlencode .App)}}
 <b>Name</b>: {{formencode (index .IDs "title")}}
 <b>Path</b>: {{formencode .Path}}
 {{ if .Data -}}

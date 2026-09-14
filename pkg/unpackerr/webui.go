@@ -268,8 +268,10 @@ func sortWebStatusItems(items []webStatusItem) {
 func (u *Unpackerr) currentWebBuffers() webStatusBuffers {
 	buffers := webStatusBuffers{
 		Deletes:       len(u.delChan),
-		Hooks:         len(u.hookChan),
 		XtractUpdates: len(u.updates),
+	}
+	if u.hookWorker != nil {
+		buffers.Hooks = u.hookWorker.Len()
 	}
 	if u.folders == nil {
 		return buffers
@@ -1750,7 +1752,7 @@ const statusPageHTML = `<!doctype html>
 	      statGrid.innerHTML = statOrder.map(([key, label]) => (
 	        '<article class="card tone-' + key + '">' +
 	          '<div class="label">' + label + '</div>' +
-	          '<div class="value">' + (stats[key.charAt(0).toUpperCase() + key.slice(1)] ?? 0) + '</div>' +
+	          '<div class="value">' + (stats[key] ?? 0) + '</div>' +
 	        '</article>'
 	      )).join('');
 	    }
