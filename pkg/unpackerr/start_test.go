@@ -1,11 +1,14 @@
 package unpackerr
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/Unpackerr/unpackerr/pkg/folders"
+	"golift.io/cnfg"
 	"golift.io/starr"
 	"golift.io/xtractr"
 )
@@ -187,7 +190,6 @@ func TestApplyMaxBytes(t *testing.T) {
 		{starr.Radarr, defaultRadarrMaxBytes},
 		{starr.Lidarr, defaultLidarrMaxBytes},
 		{starr.Readarr, defaultReadarrMaxBytes},
-		{starr.Whisparr, defaultWhisparrMaxBytes},
 	}
 
 	for _, testCase := range cases {
@@ -234,30 +236,69 @@ func TestValidateFoldersExtrasDefaults(t *testing.T) {
 	t.Parallel()
 
 	unpack := New()
-	unpack.Folders = []*FolderConfig{
+	unpack.Folders = instanceMap([]*FolderConfig{
 		{Path: "unset"},
 		{Path: "custom", MaxNested: 32, ExtrasMaxDepth: 6, AllowSymlinks: true},
 		{Path: "unlimited", MaxNested: -1, ExtrasMaxDepth: -1},
-	}
+	})
 
 	if err := unpack.validateFolders(); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
 
-	if unpack.Folders[0].MaxNested != 0 ||
-		unpack.Folders[0].ExtrasMaxDepth != 0 ||
-		unpack.Folders[0].MaxFiles != 0 ||
-		unpack.Folders[0].MaxRatio != 0 ||
-		unpack.Folders[0].maxBytes != 0 {
-		t.Fatalf("unset must stay unlimited: %+v", unpack.Folders[0])
+	if unpack.Folders["0"].MaxNested != 0 ||
+		unpack.Folders["0"].ExtrasMaxDepth != 0 ||
+		unpack.Folders["0"].MaxFiles != 0 ||
+		unpack.Folders["0"].MaxRatio != 0 ||
+		unpack.Folders["0"].ResolvedMaxBytes != 0 {
+		t.Fatalf("unset must stay unlimited: %+v", unpack.Folders["0"])
 	}
 
-	if unpack.Folders[1].MaxNested != 32 || unpack.Folders[1].ExtrasMaxDepth != 6 || !unpack.Folders[1].AllowSymlinks {
-		t.Fatalf("custom: %+v", unpack.Folders[1])
+	folder := unpack.Folders["1"]
+	if folder.MaxNested != 32 || folder.ExtrasMaxDepth != 6 || !folder.AllowSymlinks {
+		t.Fatalf("custom: %+v", folder)
 	}
 
-	if unpack.Folders[2].MaxNested != -1 || unpack.Folders[2].ExtrasMaxDepth != -1 {
-		t.Fatalf("unlimited: %+v", unpack.Folders[2])
+	if unpack.Folders["2"].MaxNested != -1 || unpack.Folders["2"].ExtrasMaxDepth != -1 {
+		t.Fatalf("unlimited: %+v", unpack.Folders["2"])
+	}
+}
+
+func TestValidateFoldersRequiresPath(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	unpack.Folders = InstanceMap[FolderConfig]{
+		"foo2": {DeleteOrig: true},
+	}
+
+	err := unpack.validateFolders()
+	if !errors.Is(err, folders.ErrNoPath) {
+		t.Fatalf("empty path: %v", err)
+	}
+
+	if err.Error() != `folder "foo2": path is required` {
+		t.Fatalf("error %q", err)
+	}
+}
+
+func TestValidateFoldersEnvWithoutPath(t *testing.T) {
+	t.Setenv("UN_FOLDER_foo2_DELETE_ORIGINAL", "true")
+
+	unpack := New()
+
+	if _, err := cnfg.ParseENV(unpack.Config, unpack.EnvPrefix); err != nil {
+		t.Fatal(err)
+	}
+
+	got := unpack.Folders["foo2"]
+	if got == nil || !got.DeleteOrig || got.Path != "" {
+		t.Fatalf("env overlay %+v", got)
+	}
+
+	err := unpack.validateFolders()
+	if !errors.Is(err, folders.ErrNoPath) {
+		t.Fatalf("env folder without path: %v", err)
 	}
 }
 

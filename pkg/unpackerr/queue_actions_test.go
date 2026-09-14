@@ -1,6 +1,7 @@
 package unpackerr
 
 import (
+	"bytes"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -61,6 +62,50 @@ func TestQueueRetryAndForget(t *testing.T) {
 	}
 }
 
+func TestQueueForgetImportedAndDeleted(t *testing.T) {
+	t.Parallel()
+
+	var logs bytes.Buffer
+
+	unpack := testAuthUnpackerr(t)
+	unpack.Info.SetOutput(&logs)
+	unpack.Map["/dl/imp"] = &Extract{Path: "/dl/imp", Status: IMPORTED, App: starr.Sonarr}
+	unpack.Map["/dl/gone"] = &Extract{Path: "/dl/gone", Status: DELETED, App: starr.Sonarr}
+
+	withKey := func(req *http.Request) {
+		req.Header.Set(headerAPIKey, unpack.Webserver.adminAPIKey())
+	}
+
+	imp := doAuth(t, unpack, http.MethodPost, "/api/queue/forget", `{"id":"/dl/imp"}`, withKey)
+	if imp.Code != http.StatusOK {
+		t.Fatalf("forget imported %d %s", imp.Code, imp.Body.String())
+	}
+
+	if unpack.Finished != 0 {
+		t.Fatalf("imported forget must not count finished: %d", unpack.Finished)
+	}
+
+	if _, exists := unpack.Map["/dl/imp"]; exists {
+		t.Fatal("imported item still in map")
+	}
+
+	logged := logs.String()
+	if !strings.Contains(logged, "User forgot imported item") ||
+		!strings.Contains(logged, "skipping file cleanup") ||
+		!strings.Contains(logged, "/dl/imp") {
+		t.Fatalf("imported forget log: %s", logged)
+	}
+
+	gone := doAuth(t, unpack, http.MethodPost, "/api/queue/forget", `{"id":"/dl/gone"}`, withKey)
+	if gone.Code != http.StatusOK {
+		t.Fatalf("forget deleted %d %s", gone.Code, gone.Body.String())
+	}
+
+	if unpack.Finished != 1 {
+		t.Fatalf("deleted forget should count finished, got %d", unpack.Finished)
+	}
+}
+
 func TestQueueRetryFolder(t *testing.T) {
 	t.Parallel()
 
@@ -73,7 +118,7 @@ func TestQueueRetryFolder(t *testing.T) {
 		Retries: 3,
 	}
 	unpack.folders = &Folders{Folders: map[string]*Folder{
-		"/watch/fail": {status: EXTRACTFAILED, noRetry: true, retries: 99, updated: time.Now()},
+		"/watch/fail": {Status: EXTRACTFAILED, NoRetry: true, Retries: 99, Updated: time.Now()},
 	}}
 
 	withKey := func(req *http.Request) {
@@ -91,7 +136,7 @@ func TestQueueRetryFolder(t *testing.T) {
 	}
 
 	folder := unpack.folders.Folders["/watch/fail"]
-	if folder == nil || folder.status != WAITING || folder.noRetry || folder.retries != 0 {
+	if folder == nil || folder.Status != WAITING || folder.NoRetry || folder.Retries != 0 {
 		t.Fatalf("folder retry %+v", folder)
 	}
 }
@@ -102,7 +147,7 @@ func TestQueueForgetFolder(t *testing.T) {
 	unpack := testAuthUnpackerr(t)
 	unpack.Map["/watch/gone"] = &Extract{App: FolderString, Path: "/watch/gone", Status: EXTRACTFAILED}
 	unpack.folders = &Folders{Folders: map[string]*Folder{
-		"/watch/gone": {status: EXTRACTFAILED},
+		"/watch/gone": {Status: EXTRACTFAILED},
 	}}
 
 	withKey := func(req *http.Request) {
@@ -178,7 +223,7 @@ func TestForgottenStarrTitle(t *testing.T) {
 	t.Parallel()
 
 	unpack := testAuthUnpackerr(t)
-	unpack.Radarr = []*RadarrConfig{{
+	unpack.Radarr = instanceMap([]*RadarrConfig{{
 		Protocols: defaultProtocol,
 		Queue: &radarr.Queue{Records: []*radarr.QueueRecord{{
 			Title:      "Movie",
@@ -186,7 +231,8 @@ func TestForgottenStarrTitle(t *testing.T) {
 			Protocol:   starr.Protocol("torrent"),
 			OutputPath: "/dl/Movie",
 		}}},
-	}}
+	}})
+	unpack.Radarr["0"].polled = true
 	unpack.Map["Movie"] = &Extract{App: starr.Radarr, Path: "/dl/Movie", Status: EXTRACTFAILED, NoRetry: true}
 
 	withKey := func(req *http.Request) {
@@ -198,25 +244,48 @@ func TestForgottenStarrTitle(t *testing.T) {
 		t.Fatalf("forget %d %s", forgetOK.Code, forgetOK.Body.String())
 	}
 
-	unpack.checkRadarrQueue(time.Now())
+	checkStarrQueue(unpack, unpack.Radarr, starr.Radarr, time.Now())
 
 	if _, exists := unpack.Map["Movie"]; exists {
 		t.Fatal("forgotten title recreated from Starr queue")
 	}
 
-	unpack.Radarr[0].Queue.Records = nil
+	unpack.Radarr["0"].Queue.Records = nil
 	unpack.sweepForgotten()
 
-	unpack.Radarr[0].Queue.Records = []*radarr.QueueRecord{{
+	unpack.Radarr["0"].Queue.Records = []*radarr.QueueRecord{{
 		Title:      "Movie",
 		Status:     "completed",
 		Protocol:   starr.Protocol("torrent"),
 		OutputPath: "/dl/Movie",
 	}}
-	unpack.checkRadarrQueue(time.Now())
+	checkStarrQueue(unpack, unpack.Radarr, starr.Radarr, time.Now())
 
 	if _, exists := unpack.Map["Movie"]; !exists {
 		t.Fatal("title should track again after leaving the Starr queue")
+	}
+}
+
+func TestSweepForgottenSkipsUnpolledSnapshot(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	unpack.Sonarr = instanceMap([]*SonarrConfig{{}})
+	unpack.Radarr = instanceMap([]*RadarrConfig{{}})
+	unpack.Radarr["0"].polled = true
+	unpack.forgotten["show"] = struct{}{}
+
+	unpack.sweepForgotten()
+
+	if !unpack.isForgotten("show") {
+		t.Fatal("swept tombstone while Sonarr has not polled")
+	}
+
+	unpack.Sonarr["0"].polled = true
+	unpack.sweepForgotten()
+
+	if unpack.isForgotten("show") {
+		t.Fatal("tombstone should drop after every app has polled empty")
 	}
 }
 

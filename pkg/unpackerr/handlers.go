@@ -13,39 +13,10 @@ import (
 	"golift.io/xtractr"
 )
 
-// Extract holds data for files being extracted.
-type Extract struct {
-	Syncthing   bool
-	SplitFlac   bool
-	Retries     uint
-	Path        string // Local path (resolved for extraction on this host).
-	OutputPath  string // Original path from Starr app (may be UNC/remote — used for ManualImport).
-	App         starr.App
-	URL         string
-	Updated     time.Time
-	DeleteDelay time.Duration
-	DeleteOrig  bool
-	Status      ExtractStatus
-	IDs         map[string]any
-	Resp        *xtractr.Response
-	XProg       *ExtractProgress
-	// PreFiles maps cleaned full paths present in each archive dest before
-	// extraction to their Lstat info (nil when the stat failed). Dest folders
-	// come from FindCompressedFiles so nested archive dirs are included.
-	// Snapshot once per queue item; retries must not fold in leftovers that
-	// failed to clear.
-	PreFiles map[string]os.FileInfo
-	// NoRetry is set for limit errors, remnant_action=off, or exhausted retries.
-	// EXTRACTFAILED must not re-enter the retry loop or be promoted to DELETED
-	// (that bounces a still-completed Starr item back to WAITING).
-	NoRetry bool
-	// MaxBytes is the resolved byte cap for this Starr item (0 = unlimited).
-	MaxBytes uint64
-}
-
 // StarrConfig is the shared config items for all starr apps.
 type StarrConfig struct {
 	starr.Config
+	Name        string        `json:"name"         toml:"name"         xml:"name"         yaml:"name"`
 	Path        string        `json:"path"         toml:"path"         xml:"path"         yaml:"path"`
 	Paths       StringSlice   `json:"paths"        toml:"paths"        xml:"paths"        yaml:"paths"`
 	Protocols   string        `json:"protocols"    toml:"protocols"    xml:"protocols"    yaml:"protocols"`
@@ -54,10 +25,39 @@ type StarrConfig struct {
 	Syncthing   bool          `json:"syncthing"    toml:"syncthing"    xml:"syncthing"    yaml:"syncthing"`
 	ValidSSL    bool          `json:"valid_ssl"    toml:"valid_ssl"    xml:"valid_ssl"    yaml:"valid_ssl"`
 	Timeout     cnfg.Duration `json:"timeout"      toml:"timeout"      xml:"timeout"      yaml:"timeout"`
-	// MaxBytes overrides the app default (Sonarr/Whisparr 20GB, Radarr 75GB, Lidarr 4GB, Readarr 1GB).
+	// MaxBytes overrides the app default (Sonarr 20GB, Radarr 75GB, Lidarr 4GB, Readarr 1GB).
 	// Empty uses that default. `0` or `0B` is unlimited.
 	MaxBytes string `json:"maxBytes" toml:"max_bytes" xml:"max_bytes" yaml:"maxBytes"`
 	maxBytes uint64
+	// Last poll snapshot for GET /api/stats starrQueues. Published under History.mu.
+	lastQueued    int
+	lastRetrieved int
+	lastPollErr   string
+	polled        bool // true after a successful GetQueue in this process (Queue != nil).
+}
+
+func (c *StarrConfig) takePoll(old *StarrConfig) {
+	if c == nil || old == nil {
+		return
+	}
+
+	c.lastQueued = old.lastQueued
+	c.lastRetrieved = old.lastRetrieved
+	c.lastPollErr = old.lastPollErr
+	c.polled = old.polled
+}
+
+func (c *StarrConfig) hasPolled() bool { return c != nil && c.polled }
+
+// Label is the human-facing instance name, or app when Name is empty.
+func (c *StarrConfig) Label(app starr.App) string {
+	if c != nil {
+		if name := strings.TrimSpace(c.Name); name != "" {
+			return name
+		}
+	}
+
+	return string(app)
 }
 
 // checkQueueChanges checks each item for state changes from the app queues.
@@ -69,34 +69,37 @@ func (u *Unpackerr) checkQueueChanges(now time.Time) {
 		switch {
 		case data.App == FolderString:
 			continue // folders are handled in folder.go.
+		case !u.haveQitem(name, data.App) && !u.queueSnapshotReady(data):
+			// Queue == nil is "never fetched", not "empty"; wait for a successful poll.
+			u.Debugf("%s: Queue not polled yet; not treating as imported: %s", data.Label(), name)
 		case !u.haveQitem(name, data.App):
 			// This fires when an items becomes missing (imported/deleted) from the application queue.
 			switch elapsed := now.Sub(data.Updated); {
 			case data.Status == WAITING:
 				// A waiting item just fell out of the queue. We never extracted it. Remove it and move on.
 				delete(u.Map, name)
-				u.Printf("[%v] Imported: %v (not extracted, removing from history)", data.App, name)
+				u.Printf("[%v] Imported: %v (not extracted, removing from history)", data.Label(), name)
 			case data.Status > IMPORTED:
 				u.Debugf("Already imported? %s", name)
 			case data.Status == IMPORTED:
 				u.Debugf("%v: Awaiting Delete Delay (%v remains): %v",
-					data.App, data.DeleteDelay-elapsed.Round(time.Second), name)
+					data.Label(), data.DeleteDelay-elapsed.Round(time.Second), name)
 			default:
 				u.updateQueueStatus(&newStatus{Name: name, Status: IMPORTED, Resp: data.Resp}, now, true)
-				u.Printf("[%v] Imported: %v (delete in %v)", data.App, name, data.DeleteDelay)
+				u.Printf("[%v] Imported: %v (delete in %v)", data.Label(), name, data.DeleteDelay)
 			}
 		case data.Status == IMPORTED:
 			// The item fell out of the app queue and came back. Reset it.
-			u.Printf("%s: Extraction Not Imported: %s - De-queued and returned.", data.App, name)
+			u.Printf("%s: Extraction Not Imported: %s - De-queued and returned.", data.Label(), name)
 			data.Status = EXTRACTED
 		case data.Status > IMPORTED:
 			// The item fell out of the app queue and came back. Reset it.
-			u.Printf("%s: Extraction Restarting: %s - Deleted Item De-queued and returned.", data.App, name)
+			u.Printf("%s: Extraction Restarting: %s - Deleted Item De-queued and returned.", data.Label(), name)
 			data.Status = WAITING
 			data.Updated = now
 		}
 
-		u.Printf("[%s] Status: %s (%v, elapsed: %v) %s", data.App, name, data.Status.Desc(),
+		u.Printf("[%s] Status: %s (%v, elapsed: %v) %s", data.Label(), name, data.Status.Desc(),
 			now.Sub(data.Updated).Round(time.Second), data.XProg)
 	}
 }
@@ -114,7 +117,7 @@ func (u *Unpackerr) extractCompletedDownloads(now time.Time) {
 	jobs := make([]pending, 0)
 
 	for name, item := range u.Map {
-		if item.App != FolderString && item.Status < QUEUED {
+		if item.App != FolderString && item.Status < QUEUED && u.queueSnapshotReady(item) {
 			jobs = append(jobs, pending{name: name, item: item})
 		}
 	}
@@ -130,7 +133,7 @@ func (u *Unpackerr) extractCompletedDownloads(now time.Time) {
 // This is called by extractCompletedDownloads() via the main routine in start.go.
 func (u *Unpackerr) extractCompletedDownload(name string, now time.Time, item *Extract) {
 	if d := u.StartDelay.Duration - now.Sub(item.Updated); d > time.Second { // wiggle room.
-		u.Printf("[%s] Waiting for Start Delay: %v (%v remains)", item.App, name, d.Round(time.Second))
+		u.Printf("[%s] Waiting for Start Delay: %v (%v remains)", item.Label(), name, d.Round(time.Second))
 		return
 	}
 
@@ -138,10 +141,10 @@ func (u *Unpackerr) extractCompletedDownload(name string, now time.Time, item *E
 	if len(files) == 0 {
 		if _, err := os.Stat(item.Path); err != nil {
 			u.Printf("[%s] Completed item still waiting: %s, no extractable files found at: %s (stat err: %v)",
-				item.App, name, item.Path, err)
+				item.Label(), name, item.Path, err)
 		} else {
 			u.Printf("[%s] Completed item still waiting: %s, no extractable files found at: %s (%s Activity Queue status: %v)",
-				item.App, name, item.Path, item.App, item.IDs["reason"])
+				item.Label(), name, item.Path, item.Label(), item.IDs["reason"])
 		}
 
 		return
@@ -149,7 +152,7 @@ func (u *Unpackerr) extractCompletedDownload(name string, now time.Time, item *E
 
 	if item.Syncthing {
 		if tmpFile := u.hasSyncThingFile(item.Path); tmpFile != "" {
-			u.Printf("[%s] Completed item still syncing: %s, found Syncthing .tmp file: %s", item.App, name, tmpFile)
+			u.Printf("[%s] Completed item still syncing: %s, found Syncthing .tmp file: %s", item.Label(), name, tmpFile)
 			return
 		}
 	}
@@ -157,7 +160,7 @@ func (u *Unpackerr) extractCompletedDownload(name string, now time.Time, item *E
 	// Snapshot once per queue item: retries must not recapture leftovers that
 	// failed to clear into download content.
 	snap, err := keepDirSnapshot(item.PreFiles, archiveSnapshotPaths(item.Path, files)...)
-	u.markItemQueued(item, snap, err, now)
+	u.markItemQueued(name, item, snap, err, now)
 
 	// This queues the extraction. Which may start right away.
 	archiveTypes := []string{".rar", ".r00", ".zip", ".7z", ".7z.001", ".gz", ".tgz", ".tar", ".tar.gz", ".bz2", ".tbz2"}
@@ -185,18 +188,25 @@ func (u *Unpackerr) extractCompletedDownload(name string, now time.Time, item *E
 	u.logQueuedDownload(queueSize, item, files)
 }
 
-func (u *Unpackerr) markItemQueued(item *Extract, snap map[string]os.FileInfo, snapErr error, now time.Time) {
+func (u *Unpackerr) markItemQueued(
+	name string,
+	item *Extract,
+	snap map[string]os.FileInfo,
+	snapErr error,
+	now time.Time,
+) {
 	u.lockHistory()
 	defer u.unlockHistory()
 
 	if snapErr != nil {
-		u.Errorf("[%s] Snapshot dests for remnant check: %v", item.App, snapErr)
+		u.Errorf("[%s] Snapshot dests for remnant check: %v", item.Label(), snapErr)
 	} else {
 		item.PreFiles = snap
 	}
 
 	item.Status = QUEUED
 	item.Updated = now
+	u.maybeRecordHistory(name, item)
 }
 
 func (u *Unpackerr) logQueuedDownload(queueSize int, item *Extract, files xtractr.ArchiveList) {
@@ -206,8 +216,8 @@ func (u *Unpackerr) logQueuedDownload(queueSize int, item *Extract, files xtract
 	}
 
 	u.Printf("[%s] Extraction Queued: %s, retries: %d, %s, delete orig: %v, queue size: %d",
-		item.App, item.Path, item.Retries, count, item.DeleteOrig, queueSize)
-	u.updateHistory(string(item.App) + ": " + item.Path)
+		item.Label(), item.Path, item.Retries, count, item.DeleteOrig, queueSize)
+	u.updateHistory(item.Label() + ": " + item.Path)
 }
 
 func (u *Unpackerr) getPasswordFromPath(path string) string {
@@ -237,7 +247,7 @@ func (u *Unpackerr) checkExtractDone(now time.Time) {
 			// Remove the item from history some time after it's deleted.
 			u.Finished++
 			delete(u.Map, name)
-			u.Printf("[%s] Finished, Removed History: %v", item.App, name)
+			u.Printf("[%s] Finished, Removed History: %v", item.Label(), name)
 		case item.App == FolderString:
 			continue // folders are handled in folder.go.
 		case item.Status == EXTRACTFAILED && item.NoRetry:
@@ -250,21 +260,26 @@ func (u *Unpackerr) checkExtractDone(now time.Time) {
 			item.Status = WAITING
 			item.Updated = now
 			u.Printf("[%s] Extract failed %v ago, triggering restart (%d/%d): %v",
-				item.App, elapsed.Round(time.Second), item.Retries, u.maxRetries(), name)
+				item.Label(), elapsed.Round(time.Second), item.Retries, u.maxRetries(), name)
 		case item.Status == EXTRACTFAILED && item.Retries >= u.maxRetries():
 			// Stay EXTRACTFAILED. DELETED is > IMPORTED, so checkQueueChanges
 			// would bounce a still-completed Starr item back to WAITING.
 			item.NoRetry = true
 			u.updateQueueStatus(&newStatus{Name: name, Status: EXTRACTFAILED, Resp: item.Resp}, now, true)
 			u.Printf("[%s] Retries exhausted (%d/%d), giving up: %v",
-				item.App, item.Retries, u.maxRetries(), name)
+				item.Label(), item.Retries, u.maxRetries(), name)
 		case (item.Status == EXTRACTED || item.Status == EXTRACTING || item.Status == QUEUED) &&
 			elapsed >= staleItemTimeout:
 			// Safety net: items stuck at intermediate states for too long are cleaned up
 			// to prevent unbounded map growth (e.g. Starr app never imports the item).
 			u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: item.Resp}, now, true)
 			u.Printf("[%s] Stale item removed after %v at status %s: %v",
-				item.App, elapsed.Round(time.Second), item.Status.Desc(), name)
+				item.Label(), elapsed.Round(time.Second), item.Status.Desc(), name)
+		case item.Status == IMPORTED && elapsed >= item.DeleteDelay &&
+			(!u.queueSnapshotReady(item) || u.haveQitem(name, item.App)):
+			// Still in Starr, or we have not polled this process; checkQueueChanges will
+			// reset IMPORTED→EXTRACTED when the title is back in the queue.
+			u.Debugf("%s: not deleting imported item still queued or unpolled: %s", item.Label(), name)
 		case item.Status == IMPORTED && elapsed >= item.DeleteDelay:
 			var webhook bool
 
@@ -340,7 +355,7 @@ func (u *Unpackerr) handleXtractrCallback(resp *xtractr.Response) { //nolint:fun
 		// This case wins over resp.Error, so log a password/corrupt-archive
 		// error here the way the folder callback logs before remnant cleanup.
 		if resp.Error != nil {
-			u.Errorf("[%s] Extraction Failed: %s: %v", item.App, resp.X.Name, resp.Error)
+			u.Errorf("[%s] Extraction Failed: %s: %v", item.Label(), resp.X.Name, resp.Error)
 		}
 
 		u.Retries++
@@ -348,13 +363,13 @@ func (u *Unpackerr) handleXtractrCallback(resp *xtractr.Response) { //nolint:fun
 		item.Status = WAITING
 		item.Updated = now
 		item.Resp = resp
-		u.Printf("[%s] Cleared interrupted-extraction remnant(s), restarting extraction: %s", item.App, resp.X.Name)
+		u.Printf("[%s] Cleared interrupted-extraction remnant(s), restarting extraction: %s", item.Label(), resp.X.Name)
 	case remnants:
 		if remnantAction(u.RemnantAction) == "off" {
 			item.NoRetry = true
 		}
 
-		u.Errorf("[%s] Extraction blocked by interrupted-extraction remnant(s): %s", item.App, resp.X.Name)
+		u.Errorf("[%s] Extraction blocked by interrupted-extraction remnant(s): %s", item.Label(), resp.X.Name)
 		u.updateQueueStatus(&newStatus{Name: resp.X.Name, Status: EXTRACTFAILED, Resp: resp}, now, true)
 	case resp.Error != nil:
 		if xtractr.IsLimitError(resp.Error) {
@@ -378,7 +393,7 @@ func (u *Unpackerr) handleXtractrCallback(resp *xtractr.Response) { //nolint:fun
 
 // Looking for a message that looks like:
 // "No files found are eligible for import in /downloads/Downloading/Space.Warriors.S99E88.GrOuP.1080p.WEB.x264".
-func (u *Unpackerr) getDownloadPath(outputPath string, app starr.App, title string, paths []string) string {
+func (u *Unpackerr) getDownloadPath(outputPath, label, title string, paths []string) string {
 	var errs []error
 
 	// Try all the user provided paths.
@@ -394,44 +409,33 @@ func (u *Unpackerr) getDownloadPath(outputPath string, app starr.App, title stri
 	}
 
 	// Print the errors for each user-provided path.
-	u.Debugf("%s: Errors encountered looking for %s path: %q", app, title, errs)
+	u.Debugf("%s: Errors encountered looking for %s path: %q", label, title, errs)
 
 	// The title often differs from the actual folder name (e.g. torrent names include genre tags).
 	// Try the folder name from outputPath against configured paths — the folder name is the real
 	// directory on disk. This also handles cross-platform setups where outputPath is a UNC/Windows
 	// path but the configured paths are local Linux mounts of the same share.
 	if outputPath != "" {
-		outputFolder := filepath.Base(filepath.FromSlash(strings.ReplaceAll(outputPath, `\`, `/`)))
+		outputFolder := crossPlatformBase(outputPath)
 		if outputFolder != "" && outputFolder != "." && outputFolder != title {
 			for _, path := range paths {
 				candidate := filepath.Join(path, outputFolder)
 
 				if _, err := os.Stat(candidate); err == nil {
-					u.Debugf("%s: Resolved via outputPath folder name: %s -> %s", app, outputPath, candidate)
+					u.Debugf("%s: Resolved via outputPath folder name: %s -> %s", label, outputPath, candidate)
 					return candidate
 				}
 			}
 		}
 
-		u.Debugf("%s: Configured paths do not exist; trying 'outputPath': %s", app, outputPath)
+		u.Debugf("%s: Configured paths do not exist; trying 'outputPath': %s", label, outputPath)
 
 		return outputPath
 	}
 
-	u.Debugf("%s: Configured paths do not exist and 'outputPath' is empty for: %s", app, title)
+	u.Debugf("%s: Configured paths do not exist and 'outputPath' is empty for: %s", label, title)
 
 	return filepath.Join(paths[0], title) // useless, but return something. :(
-}
-
-// isComplete is run so many times in different places that it became a method.
-func (u *Unpackerr) isComplete(status string, protocol starr.Protocol, protos string) bool {
-	for s := range strings.FieldsSeq(strings.ReplaceAll(protos, ",", " ")) {
-		if strings.EqualFold(string(protocol), s) {
-			return strings.EqualFold(status, "completed")
-		}
-	}
-
-	return false
 }
 
 // added for https://github.com/Unpackerr/unpackerr/issues/235

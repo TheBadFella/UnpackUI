@@ -35,7 +35,7 @@ services:
     - UN_LOG_FILE_MB=10
     - UN_LOG_FILE_MODE=0600
     - UN_STATE_FILE=/downloads/unpackerr.state.json
-    - UN_KEEP_HISTORY=200
+    - UN_KEEP_HISTORY=400
     - UN_INTERVAL=2m
     - UN_PROGRESS=15s
     - UN_START_DELAY=1m
@@ -63,6 +63,7 @@ services:
     - UN_FOLDERS_INTERVAL=1s
     - UN_FOLDERS_BUFFER=20000
     ## Sonarr Settings
+    - UN_SONARR_0_NAME=
     - UN_SONARR_0_URL=http://sonarr:8989
     - UN_SONARR_0_API_KEY=0123456789abcdef0123456789abcdef
     - UN_SONARR_0_HTTP_USER=
@@ -78,6 +79,7 @@ services:
     - UN_SONARR_0_VALID_SSL=false
     - UN_SONARR_0_MAX_BYTES=
     ## Radarr Settings
+    - UN_RADARR_0_NAME=
     - UN_RADARR_0_URL=http://radarr:7878
     - UN_RADARR_0_API_KEY=0123456789abcdef0123456789abcdef
     - UN_RADARR_0_HTTP_USER=
@@ -93,6 +95,7 @@ services:
     - UN_RADARR_0_VALID_SSL=false
     - UN_RADARR_0_MAX_BYTES=
     ## Lidarr Settings
+    - UN_LIDARR_0_NAME=
     - UN_LIDARR_0_URL=http://lidarr:8686
     - UN_LIDARR_0_API_KEY=0123456789abcdef0123456789abcdef
     - UN_LIDARR_0_HTTP_USER=
@@ -109,6 +112,7 @@ services:
     - UN_LIDARR_0_MAX_BYTES=
     - UN_LIDARR_0_SPLIT_FLAC=false
     ## Readarr Settings
+    - UN_READARR_0_NAME=
     - UN_READARR_0_URL=http://readarr:8787
     - UN_READARR_0_API_KEY=0123456789abcdef0123456789abcdef
     - UN_READARR_0_HTTP_USER=
@@ -123,21 +127,6 @@ services:
     - UN_READARR_0_SYNCTHING=false
     - UN_READARR_0_VALID_SSL=false
     - UN_READARR_0_MAX_BYTES=
-    ## Whisparr Settings
-    - UN_WHISPARR_0_URL=http://whisparr:6969
-    - UN_WHISPARR_0_API_KEY=0123456789abcdef0123456789abcdef
-    - UN_WHISPARR_0_HTTP_USER=
-    - UN_WHISPARR_0_HTTP_PASS=
-    - UN_WHISPARR_0_USERNAME=
-    - UN_WHISPARR_0_PASSWORD=
-    - UN_WHISPARR_0_PATHS_0=/downloads
-    - UN_WHISPARR_0_PROTOCOLS=torrent,TorrentDownloadProtocol
-    - UN_WHISPARR_0_TIMEOUT=10s
-    - UN_WHISPARR_0_DELETE_DELAY=5m
-    - UN_WHISPARR_0_DELETE_ORIG=false
-    - UN_WHISPARR_0_SYNCTHING=false
-    - UN_WHISPARR_0_VALID_SSL=false
-    - UN_WHISPARR_0_MAX_BYTES=
     ## Watch Folders
     - UN_FOLDER_0_PATH=/downloads/auto_extract
     - UN_FOLDER_0_EXTRACT_PATH=
@@ -184,4 +173,4 @@ services:
     - UN_CMDHOOK_0_EXCLUDE_1=lidarr
     - UN_CMDHOOK_0_TIMEOUT=10s
 
-## => Content Auto Generated, 07 SEP 2026 20:14 UTC
+## => Content Auto Generated, 13 SEP 2026 07:48 UTC

@@ -27,12 +27,13 @@ func TestOpenAPIUnauthenticated(t *testing.T) {
 	}
 
 	paths, _ := doc["paths"].(map[string]any)
-	if _, ok := paths["/api/stats"]; !ok {
-		t.Fatal("missing /api/stats")
-	}
-
-	if _, ok := paths["/api/config/{section}/live"]; !ok {
-		t.Fatal("missing live config GET")
+	for _, route := range []string{
+		"/api/stats", "/api/config/{section}/live", "/api/config/help",
+		"/api/config/env", "/api/system/export", "/api/browse",
+	} {
+		if _, ok := paths[route]; !ok {
+			t.Fatalf("missing %s", route)
+		}
 	}
 
 	login := openAPIPath(t, paths, "/api/auth/login")
@@ -125,6 +126,29 @@ func TestOpenAPILoginRequestOnlyRequiresKDF(t *testing.T) {
 
 	if len(required) != 1 || required[0] != "kdf" {
 		t.Fatalf("LoginRequest.required %v", required)
+	}
+}
+
+func TestOpenAPIConfigSectionUsesAnyOf(t *testing.T) {
+	t.Parallel()
+
+	var doc map[string]any
+	if err := json.Unmarshal(openapiJSON, &doc); err != nil {
+		t.Fatal(err)
+	}
+
+	comps, _ := doc["components"].(map[string]any)
+	schemas, _ := comps["schemas"].(map[string]any)
+
+	for _, name := range []string{"ConfigSection", "ConfigSectionPut"} {
+		schema, _ := schemas[name].(map[string]any)
+		if _, ok := schema["anyOf"]; !ok {
+			t.Fatalf("%s missing anyOf: %v", name, schema)
+		}
+
+		if _, ok := schema["oneOf"]; ok {
+			t.Fatalf("%s still uses oneOf", name)
+		}
 	}
 }
 

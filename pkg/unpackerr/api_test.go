@@ -3,8 +3,11 @@ package unpackerr
 import (
 	"encoding/json"
 	"net/http"
+	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/Unpackerr/unpackerr/pkg/configdef"
 )
 
 func TestStatsAndSystemRequireAuth(t *testing.T) {
@@ -185,5 +188,183 @@ func TestMetricsRejectsSessionAndProxyAuth(t *testing.T) {
 		req.RemoteAddr = "192.0.2.1:9999"
 	}); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("proxy metrics %d", rec.Code)
+	}
+}
+
+func TestConfigHelp(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+
+	if rec := doAuth(t, unpack, http.MethodGet, "/api/config/help", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("help unauth %d", rec.Code)
+	}
+
+	withKey := func(req *http.Request) {
+		req.Header.Set(headerAPIKey, unpack.Webserver.adminAPIKey())
+	}
+
+	helpRec := doAuth(t, unpack, http.MethodGet, "/api/config/help", "", withKey)
+	if helpRec.Code != http.StatusOK {
+		t.Fatalf("help %d %s", helpRec.Code, helpRec.Body.String())
+	}
+
+	var help map[string]configdef.FieldHelp
+	if err := json.Unmarshal(helpRec.Body.Bytes(), &help); err != nil {
+		t.Fatal(err)
+	}
+
+	if help["config.general.debug"].Short == "" {
+		t.Fatalf("missing general.debug help: %+v", help["config.general.debug"])
+	}
+
+	if help["config.starr.url"].Short == "" {
+		t.Fatal("missing starr.url help")
+	}
+
+	if help["config.webhook.url"].Env != "UN_WEBHOOK_0_URL" {
+		t.Fatalf("webhook env %q", help["config.webhook.url"].Env)
+	}
+
+	if help["config.cmdhook.command"].Env != "UN_CMDHOOK_0_COMMAND" {
+		t.Fatalf("cmdhook env %q", help["config.cmdhook.command"].Env)
+	}
+}
+
+func TestLiveExport(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.ConfigFile = "/tmp/unpackerr.conf"
+
+	withKey := func(req *http.Request) {
+		req.Header.Set(headerAPIKey, unpack.Webserver.adminAPIKey())
+	}
+
+	exportRec := doAuth(t, unpack, http.MethodGet, "/api/system/export", "", withKey)
+	if exportRec.Code != http.StatusOK {
+		t.Fatalf("export %d %s", exportRec.Code, exportRec.Body.String())
+	}
+
+	var out map[string]string
+	if err := json.Unmarshal(exportRec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out["text"], "Live Settings") || !strings.Contains(out["text"], unpack.ConfigFile) {
+		t.Fatalf("export text %q", out["text"])
+	}
+
+	if !strings.Contains(out["text"], "Version:") ||
+		!strings.Contains(out["text"], runtime.GOOS+"/"+runtime.GOARCH) {
+		t.Fatalf("export missing version/os %q", out["text"])
+	}
+}
+
+func TestLiveExportOmitsWithoutConfigRead(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.Webhook = instanceMap([]*WebhookConfig{{
+		Name: "https://example.com/hook?token=hook-secret",
+	}})
+	unpack.Cmdhook = instanceMap([]*WebhookConfig{{
+		Name:    "cmd",
+		Command: "/usr/bin/env token=cmd-secret",
+	}})
+
+	infoKey := strings.Repeat("I", apiKeyMinLen)
+	unpack.Webserver.Roles = map[string]Role{
+		"info": {Permissions: []string{PermReadSystemInfo}},
+	}
+	unpack.Webserver.APIKeys = append(unpack.Webserver.APIKeys, APIKey{
+		Name:  "info",
+		Key:   infoKey,
+		Roles: []string{"info"},
+	})
+
+	withKey := func(req *http.Request) {
+		req.Header.Set(headerAPIKey, infoKey)
+	}
+
+	exportRec := doAuth(t, unpack, http.MethodGet, "/api/system/export", "", withKey)
+	if exportRec.Code != http.StatusOK {
+		t.Fatalf("export %d %s", exportRec.Code, exportRec.Body.String())
+	}
+
+	var out map[string]string
+	if err := json.Unmarshal(exportRec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+
+	text := out["text"]
+	if !strings.Contains(text, "omitted (need "+PermReadConfig(SectionWebhooks)+")") ||
+		!strings.Contains(text, "omitted (need "+PermReadConfig(SectionCmdhooks)+")") {
+		t.Fatalf("export missing omit lines %q", text)
+	}
+
+	if strings.Contains(text, "hook-secret") || strings.Contains(text, "cmd-secret") {
+		t.Fatalf("secret leaked in export %q", text)
+	}
+}
+
+func TestConfigEnv(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.envUsed = map[string]string{ //nolint:gosec // test fixtures, not live secrets
+		"DEBUG":              "true",
+		"SONARR_0_API_KEY":   "secret-from-env",
+		"SONARR_0_HTTP_PASS": "basic-auth-pass",
+	}
+
+	if rec := doAuth(t, unpack, http.MethodGet, "/api/config/env", "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("env unauth %d", rec.Code)
+	}
+
+	withAdmin := func(req *http.Request) {
+		req.Header.Set(headerAPIKey, unpack.Webserver.adminAPIKey())
+	}
+
+	adminRec := doAuth(t, unpack, http.MethodGet, "/api/config/env", "", withAdmin)
+	if adminRec.Code != http.StatusOK {
+		t.Fatalf("env %d %s", adminRec.Code, adminRec.Body.String())
+	}
+
+	var admin map[string]string
+	if err := json.Unmarshal(adminRec.Body.Bytes(), &admin); err != nil {
+		t.Fatal(err)
+	}
+
+	if admin["DEBUG"] != "true" || admin["SONARR_0_API_KEY"] != "secret-from-env" ||
+		admin["SONARR_0_HTTP_PASS"] != "basic-auth-pass" {
+		t.Fatalf("admin env %v", admin)
+	}
+
+	readKey := strings.Repeat("E", apiKeyMinLen)
+	unpack.Webserver.Roles = map[string]Role{
+		"envread": {Permissions: []string{PermReadConfig(SectionGeneral)}},
+	}
+	unpack.Webserver.APIKeys = append(unpack.Webserver.APIKeys, APIKey{
+		Name:  "envread",
+		Key:   readKey,
+		Roles: []string{"envread"},
+	})
+
+	readRec := doAuth(t, unpack, http.MethodGet, "/api/config/env", "", func(req *http.Request) {
+		req.Header.Set(headerAPIKey, readKey)
+	})
+	if readRec.Code != http.StatusOK {
+		t.Fatalf("env read %d %s", readRec.Code, readRec.Body.String())
+	}
+
+	var limited map[string]string
+	if err := json.Unmarshal(readRec.Body.Bytes(), &limited); err != nil {
+		t.Fatal(err)
+	}
+
+	if limited["DEBUG"] != "true" || limited["SONARR_0_API_KEY"] != "" ||
+		limited["SONARR_0_HTTP_PASS"] != "" {
+		t.Fatalf("limited env %v", limited)
 	}
 }
