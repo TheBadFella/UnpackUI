@@ -38,6 +38,7 @@ const (
 )
 
 var (
+	ErrInvalidStatus   = hooks.ErrInvalidStatus
 	friendlyEventTitle = hooks.FriendlyEventTitle
 	discordWaitURL     = hooks.DiscordWaitURL
 	discordEditURL     = hooks.DiscordEditURL
