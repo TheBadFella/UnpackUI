@@ -97,6 +97,8 @@ func (u *Unpackerr) historyDeleteHandler(response http.ResponseWriter, request *
 	switch err := u.deleteHistoryID(itemID); {
 	case errors.Is(err, errHistoryNotFound):
 		writeJSON(response, http.StatusNotFound, map[string]string{"error": err.Error()})
+	case errors.Is(err, errHistoryInFlight):
+		writeJSON(response, http.StatusConflict, map[string]string{"error": err.Error()})
 	case err != nil:
 		writeJSON(response, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	default:
@@ -143,6 +145,8 @@ func (u *Unpackerr) retryQueueID(itemID string) error {
 	item.Status = WAITING
 	item.Updated = now
 
+	u.notifyQueueLocked()
+
 	return nil
 }
 
@@ -159,6 +163,8 @@ func (u *Unpackerr) retryFolderLocked(itemID string, item *Extract, now time.Tim
 	item.NoRetry = false
 	item.Status = WAITING
 	item.Updated = now
+
+	u.notifyQueueLocked()
 
 	return nil
 }
@@ -200,6 +206,7 @@ func (u *Unpackerr) forgetQueueID(itemID string) error {
 	}
 
 	u.markHistoryForgotten(itemID)
+	u.notifyQueueLocked()
 
 	return nil
 }

@@ -92,7 +92,7 @@ type Unpackerr struct {
 	inFlight         atomic.Int64 // queued-or-running delete and hook work.
 	workThreads      int
 	hookOnce         sync.Once
-	uiPassMu         sync.RWMutex // live webserver auth: UIPassword, APIKeys, Roles, keyPerms, Upstreams, allow
+	uiPassMu         sync.RWMutex // live UIPassword, UIRoleHeader, APIKeys, Roles, keyPerms, Upstreams, WSOrigins, allow
 	uiPasswordNotice string
 	uiPasswordGenErr error
 	configWriteErr   error
@@ -104,6 +104,9 @@ type Unpackerr struct {
 	records          []HistoryRecord
 	webState         atomic.Pointer[webStatusSnapshot]
 	recovery         *recoveryState
+	hub              *liveHub
+	appLogTee        *logTee
+	httpLogTee       *logTee
 }
 
 type fileDeleteReq struct {
@@ -116,10 +119,11 @@ type fileDeleteReq struct {
 
 // Logger provides a struct we can pass into other packages.
 type Logger struct {
-	HTTP  *log.Logger
-	Info  *log.Logger
-	Error *log.Logger
-	Debug *log.Logger
+	HTTP    *log.Logger
+	Info    *log.Logger
+	Error   *log.Logger
+	Debug   *log.Logger
+	onError func(string)
 }
 
 // Flags are our CLI input flags.
@@ -134,7 +138,7 @@ type Flags struct {
 // New returns an UnpackerPoller struct full of defaults.
 // An empty struct will surely cause you pain, so use this!
 func New() *Unpackerr {
-	return &Unpackerr{
+	unpackerr := &Unpackerr{
 		Flags:      &Flags{EnvPrefix: "UN"},
 		hookWorker: hooks.NewWorker(updateChanBuf),
 		delChan:    make(chan *fileDeleteReq, updateChanBuf),
@@ -147,6 +151,7 @@ func New() *Unpackerr {
 		progChan:   make(chan *ExtractProgress),
 		menu:       make(map[string]ui.MenuItem),
 		recovery:   newRecoveryState(),
+		hub:        newLiveHub(),
 		Config: &Config{
 			KeepHistory:         defaultHistory,
 			SuppressMissingURLs: true,
@@ -174,6 +179,11 @@ func New() *Unpackerr {
 			Debug: log.New(io.Discard, "[DEBUG] ", log.Lshortfile|log.Lmicroseconds|log.Ldate),
 		},
 	}
+
+	unpackerr.hub.statsFn = unpackerr.stats
+	unpackerr.onError = unpackerr.hub.notifyError
+
+	return unpackerr
 }
 
 // Start runs the app.
@@ -247,6 +257,7 @@ func Start() error {
 	unpackerr.ensureHookWorker()
 
 	go unpackerr.watchDeleteChannel()
+	go unpackerr.hub.run()
 
 	unpackerr.refreshWebState(version.Started)
 	unpackerr.startWebServer()

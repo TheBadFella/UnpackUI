@@ -43,6 +43,7 @@ func (u *Unpackerr) registerAPIRoutes() {
 	u.Webserver.handleGet(basePath("config/{section}/live"), u.requireConfigPerm(false, u.configGetLiveHandler))
 	u.Webserver.handleGet(basePath("config/{section}"), u.requireConfigPerm(false, u.configGetHandler))
 	u.Webserver.handlePut(basePath("config/{section}"), u.requireConfigPerm(true, u.configPutHandler))
+	u.Webserver.handlePost(basePath("config/{section}/test"), u.requireConfigPerm(true, u.configTestHandler))
 }
 
 func (u *Unpackerr) statsHandler(response http.ResponseWriter, request *http.Request) {
@@ -114,7 +115,8 @@ func (u *Unpackerr) envPairsPublic(info authInfo) map[string]string {
 	star := info.allows(PermAll)
 
 	for key, val := range used {
-		if !star && envValueSecret(key) {
+		// Login secret stays blank even for *. Other secrets are visible to *.
+		if envAlwaysRedact(key) || (!star && envValueSecret(key)) {
 			out[key] = ""
 			continue
 		}
