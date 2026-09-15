@@ -37,9 +37,8 @@ const (
 	EXTRACTEDNOTHING = extract.EXTRACTEDNOTHING
 )
 
-var (
-	ErrInvalidStatus   = hooks.ErrInvalidStatus
-	friendlyEventTitle = hooks.FriendlyEventTitle
-	discordWaitURL     = hooks.DiscordWaitURL
-	discordEditURL     = hooks.DiscordEditURL
-)
+var ErrInvalidStatus = hooks.ErrInvalidStatus
+
+func friendlyEventTitle(status ExtractStatus) string {
+	return hooks.FriendlyEventTitle(status)
+}

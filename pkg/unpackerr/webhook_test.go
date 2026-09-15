@@ -130,7 +130,6 @@ func TestBuildWebhookPayloadKeepsDataForDeletedEvent(t *testing.T) {
 	}
 }
 
-
 func TestDiscordTemplateIncludesExtraFields(t *testing.T) {
 	t.Parallel()
 	assertDiscordTemplateContains(t, extraFieldsDiscordTestPayload(), []string{
@@ -179,13 +178,13 @@ func extraFieldsDiscordTestPayload() *WebhookPayload {
 func TestHookPayloadUsesLabel(t *testing.T) {
 	t.Parallel()
 
-	u := &Unpackerr{}
-	payload := u.hookPayload(&Extract{App: starr.Sonarr, Name: "Sportarr", Path: "/dl"})
+	unpack := &Unpackerr{}
+	payload := unpack.hookPayload(&Extract{App: starr.Sonarr, Name: "Sportarr", Path: "/dl"})
 	if payload.App != "Sportarr" {
 		t.Fatalf("payload.App = %q, want Sportarr", payload.App)
 	}
 
-	plain := u.hookPayload(&Extract{App: starr.Sonarr, Path: "/dl"})
+	plain := unpack.hookPayload(&Extract{App: starr.Sonarr, Path: "/dl"})
 	if plain.App != starr.Sonarr {
 		t.Fatalf("unnamed payload.App = %q, want %s", plain.App, starr.Sonarr)
 	}

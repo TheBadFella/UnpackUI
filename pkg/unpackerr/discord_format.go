@@ -5,9 +5,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
-
-	"golift.io/cnfg"
 )
 
 // Matches common scene/P2P release tags that end the show/movie title.
@@ -123,21 +120,4 @@ func isMediaToken(part string) bool {
 	}
 
 	return false
-}
-
-func shortDuration(duration cnfg.Duration) string {
-	if duration.Duration <= 0 {
-		return ""
-	}
-
-	return duration.Duration.Round(time.Second).String()
-}
-
-func formatDiscordTime(value time.Time) string {
-	if value.IsZero() {
-		return ""
-	}
-
-	// Discord timestamps should match the host clock, not UTC.
-	return value.In(time.Local).Format("1/2/2006 3:04 PM") //nolint:gosmopolitan
 }

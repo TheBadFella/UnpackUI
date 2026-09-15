@@ -75,7 +75,7 @@ type Config struct {
 	LogFiles      int                        `json:"logFiles"          toml:"log_files"      xml:"log_files"      yaml:"logFiles"`
 	LogFileMb     int                        `json:"logFileMb"         toml:"log_file_mb"    xml:"log_file_mb"    yaml:"logFileMb"`
 	LogFileMode   string                     `json:"logFileMode"       toml:"log_file_mode"  xml:"log_file_mode"  yaml:"logFileMode"`
-	StateFile     string                     `json:"stateFile"          toml:"state_file"     xml:"state_file"     yaml:"stateFile"`
+	StateFile     string                     `json:"stateFile"         toml:"state_file"     xml:"state_file"     yaml:"stateFile"`
 	MaxRetries    uint                       `json:"maxRetries"        toml:"max_retries"    xml:"max_retries"    yaml:"maxRetries"`
 	RemnantAction string                     `json:"remnantAction"     toml:"remnant_action" xml:"remnant_action" yaml:"remnantAction"`
 	FileMode      string                     `json:"fileMode"          toml:"file_mode"      xml:"file_mode"      yaml:"fileMode"`
@@ -89,7 +89,7 @@ type Config struct {
 	Progress      cnfg.Duration              `json:"progress"          toml:"progress"       xml:"progress"       yaml:"progress"`
 	KeepHistory   uint                       `json:"keepHistory"       toml:"keep_history"   xml:"keep_history"   yaml:"keepHistory"`
 	Passwords     StringSlice                `json:"passwords"         toml:"passwords"      xml:"password"       yaml:"passwords"`
-	WebURL        string                     `json:"webUrl"             toml:"web_url"        xml:"web_url"        yaml:"webUrl"`
+	WebURL        string                     `json:"webUrl"            toml:"web_url"        xml:"web_url"        yaml:"webUrl"`
 	Webserver     *WebServer                 `json:"webserver"         toml:"webserver"      xml:"webserver"      yaml:"webserver"`
 	Lidarr        InstanceMap[LidarrConfig]  `json:"lidarr,omitempty"  toml:"lidarr"         xml:"lidarr"         yaml:"lidarr,omitempty"`
 	Radarr        InstanceMap[RadarrConfig]  `json:"radarr,omitempty"  toml:"radarr"         xml:"radarr"         yaml:"radarr,omitempty"`
