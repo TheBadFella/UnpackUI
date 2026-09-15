@@ -11,10 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Unpackerr/unpackerr/pkg/extract"
 	"golift.io/cnfg"
 	"golift.io/starr"
-
-	"github.com/Unpackerr/unpackerr/pkg/extract"
 )
 
 // Errors produced by this package.
