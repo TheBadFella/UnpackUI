@@ -41,6 +41,18 @@ func (u *Unpackerr) handleProgress(exp *ExtractProgress) {
 
 	xprog.Progress = exp.Progress
 	xprog.UpdatedAt = now
+
+	if u.hub != nil && exp.Extract != nil {
+		itemID := exp.Path
+		for name, item := range u.Map {
+			if item == exp.Extract {
+				itemID = name
+				break
+			}
+		}
+
+		u.hub.notifyProgress(queueFromExtract(itemID, exp.Extract))
+	}
 }
 
 func (u *Unpackerr) printProgress(now time.Time) {

@@ -24,6 +24,8 @@ github.com/cavaliergopher/rpm v1.3.0 h1:UHX46sasX8MesUXXQ+UbkFLUX4eUWTlEcX8jcnRB
 github.com/cavaliergopher/rpm v1.3.0/go.mod h1:vEumo1vvtrHM1Ov86f6+k8j7zNKOxQfHDCAIcR/36ZI=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
+github.com/coder/websocket v1.8.15 h1:6B2JPeOGlpff2Uz6vOEH1Vzpi0iUz20A+lPVhPHtNUA=
+github.com/coder/websocket v1.8.15/go.mod h1:NX3SzP+inril6yawo5CQXx8+fk145lPDC6pumgx0mVg=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dchest/jsmin v1.0.0 h1:Y2hWXmGZiRxtl+VcTksyucgTlYxnhPzTozCwx9gy9zI=
@@ -166,8 +168,8 @@ golift.io/cnfg v0.4.1-0.20260913183411-6fc2ae31e285 h1:G9YosSJhsk6ehmYBTqKu0ZoxU
 golift.io/cnfg v0.4.1-0.20260913183411-6fc2ae31e285/go.mod h1:+u238cgJJf1shXJmzMV4I7+F3EACg3NfKSe/g9yRKMY=
 golift.io/cnfgfile v0.0.0-20240713024420-a5436d84eb48 h1:c7cJWRr0cUnFHKtq072esKzhQHKlFA5YRY/hPzQrdko=
 golift.io/cnfgfile v0.0.0-20240713024420-a5436d84eb48/go.mod h1:zHm9o8SkZ6Mm5DfGahsrEJPsogyR0qItP59s5lJ98/I=
-golift.io/rotatorr v0.0.0-20260901062538-fc9f05905af3 h1:Hx5CAKKNwjQ6w6syMCPyQWh3kHlQ4OdVqNv4kvq3RM0=
-golift.io/rotatorr v0.0.0-20260901062538-fc9f05905af3/go.mod h1:4KG63rTdnxi59XRrI67U8TLbBrm3JlilXV1K65kmRMM=
+golift.io/rotatorr v0.0.0-20260908070935-a77ea24793b3 h1:krjFXwFRaDdwGak4QLMv6rz8SZzenpWC0LtCJ4z/77U=
+golift.io/rotatorr v0.0.0-20260908070935-a77ea24793b3/go.mod h1:QGPcYSS8zUaCZV7APOklcAuEevhOmY/KFFnqPJy/8w8=
 golift.io/starr v1.4.0 h1:0R+sW9/wgO1lHh65qINLrkK2jLtcV+s07l+8Py6YmJ8=
 golift.io/starr v1.4.0/go.mod h1:Oz8bBp9Rg697u5oxSbF4LmFn9iV3nHx/cF3DH/fyhdY=
 golift.io/udf v0.0.1 h1:kEcJVzqqR+IEWGMuPjuVPT9DzXRDukEgsizKAKn1LF8=

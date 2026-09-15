@@ -350,6 +350,7 @@ func (u *Unpackerr) folderXtractrCallback(resp *xtractr.Response) {
 	if !found || item == nil {
 		delete(u.folders.Folders, resp.X.Name)
 		delete(u.Map, resp.X.Name)
+		u.notifyQueueLocked()
 		u.unlockHistory()
 		u.recoveryClearFolder(resp.X.Name)
 
@@ -497,6 +498,7 @@ func (u *Unpackerr) syncFolderQueue(dirPath string) {
 	if !ok {
 		if item := u.Map[dirPath]; item != nil && item.App == FolderString && item.Status == WAITING {
 			delete(u.Map, dirPath)
+			u.notifyQueueLocked()
 		}
 
 		return
@@ -517,6 +519,10 @@ func (u *Unpackerr) syncFolderQueue(dirPath string) {
 	}
 
 	item.Updated = folder.Updated
+
+	if u.hub != nil {
+		u.hub.notifyProgress(queueFromExtract(dirPath, item))
+	}
 }
 
 func (u *Unpackerr) checkWaitingFolder(name string, folder *Folder, now time.Time) {
@@ -546,6 +552,7 @@ func (u *Unpackerr) checkFolderStats(now time.Time) { //nolint:funlen // status 
 				u.folders.Remove(name)
 				u.lockHistory()
 				delete(u.Map, name)
+				u.notifyQueueLocked()
 				u.unlockHistory()
 				delete(u.folders.Folders, name)
 				u.recoveryClearFolder(name)
@@ -646,6 +653,8 @@ func (u *Unpackerr) updateQueueStatus(data *newStatus, now time.Time, sendHook b
 			u.runAllHooks(u.Map[data.Name])
 		}
 
+		u.notifyQueueLocked()
+
 		return u.Map[data.Name]
 	}
 
@@ -661,6 +670,7 @@ func (u *Unpackerr) updateQueueStatus(data *newStatus, now time.Time, sendHook b
 	}
 
 	u.maybeRecordHistory(data.Name, u.Map[data.Name])
+	u.notifyQueueLocked()
 
 	return u.Map[data.Name]
 }

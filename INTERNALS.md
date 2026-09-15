@@ -165,7 +165,7 @@ Empty / missing secret file is an error on PUT (400) when the `filepath:` was al
 
 ### Env (`UN_*`)
 
-Env overlays **live only**. They are not merged into `fileConfig`. Starr / folder / hook PUTs write the request body as the file snapshot, then overlay live with `ParseENV` (cnfg now overlays existing map entries instead of replacing them). Env-only slugs keep polling. They land in `fileConfig` only if the PUT body included them. PUT `{}` (or a legacy `[]`) clears file instances; live still has `UN_SONARR_uhd_*` / `UN_READARR_0_*`. Env-only extra keys/roles exist at runtime until restart unless you add them in the PUT body. General scalars (`UN_INTERVAL`, `UN_PASSWORDS`, …) still overlay only at startup. The official UI must GET the file section (not `/live`) so it does not persist overlay values.
+Env overlays **live only**. They are not merged into `fileConfig`. Starr / folder / hook / general PUTs write the request body as the file snapshot, then overlay live with `ParseENV` (cnfg now overlays existing map entries instead of replacing them). Env-only slugs keep polling. They land in `fileConfig` only if the PUT body included them. PUT `{}` (or a legacy `[]`) clears file instances; live still has `UN_SONARR_uhd_*` / `UN_READARR_0_*`. Env-only extra keys/roles exist at runtime until restart unless you add them in the PUT body. General scalars (`UN_INTERVAL`, `UN_PASSWORDS`, …) follow the same overlay: a save that omits them keeps the env value on live. The official UI must GET the file section (not `/live`) so it does not persist overlay values.
 
 `UN_WEBSERVER_UI_PASSWORD`:
 
@@ -237,6 +237,16 @@ Reply:
 
 `pendingRestart` is sticky OR: one folders PUT then a general PUT that does not need restart still restarts when idle.
 
+### POST `/api/config/{section}/test`
+
+Permission: `config:{section}:write` (same as PUT). Does not persist.
+
+**Starr** (`sonarr` / `radarr` / `lidarr` / `readarr`): POST the current form `url`, `apiKey`, `valid_ssl`, `timeout`, and `slug`. Blank URL/API key are filled from the **live** instance matching `slug` (env-only / redacted GET). A new Starr client is built; live `Queue` is not mutated. Reply is `{queued, retrieved, torrents, nzbs, other?, elapsed}` (`elapsed` is a Go duration, rounded to 1ms). Bad URL/key is **400**. Remote GetQueue errors are **424** `{error, elapsed}`.
+
+**Hooks** (`webhooks` / `cmdhooks`): overlay posted fields onto a clone of the live hook (or a new hook). Non-empty strings replace live values; omitted strings keep them. `shell` and `ignoreSsl` override when present (including `false`); omitted keep live. `event` defaults to `extracted`; `app` defaults to Sonarr (`sonarr` / `radarr` / `lidarr` / `readarr` / `folder` or a named instance). `hooks.Fire` runs on the HTTP goroutine (not the hook worker). Reply is `{status, reply, elapsed}` with `reply` clipped to 2048 runes. Missing URL/command is **400**. Delivery failure is **424** `{error, elapsed}`.
+
+**general**, **webserver**, **folders**: **400** `this section cannot be tested`.
+
 ---
 
 ## Idle restart
@@ -272,15 +282,16 @@ Index is `GET {urlbase}{$}` so `GET /` is not a ServeMux prefix match (that woul
 | POST | `{urlbase}api/queue/retry` | yes | `system:queue:write` | `{id}`; only `extractfailed`; Starr → `WAITING`; folder resets on main loop |
 | POST | `{urlbase}api/queue/forget` | yes | `system:queue:write` | Terminal statuses only; in-progress **409**; Starr titles get a tombstone until they leave the upstream queue |
 | GET | `{urlbase}api/history` | yes | `system:history:read` | Durable JSONL-backed rows |
-| POST | `{urlbase}api/history/clear` | yes | `system:history:write` | |
-| POST | `{urlbase}api/history/delete` | yes | `system:history:write` | `{id}` |
+| POST | `{urlbase}api/history/clear` | yes | `system:history:write` | Finished rows only; keeps queued/extracting/extracted/deleting resume checkpoints |
+| POST | `{urlbase}api/history/delete` | yes | `system:history:write` | `{id}`; in-progress **409** |
 | GET | `{urlbase}api/browse` | yes | `system:browse:read` | `?dir=`; empty → home; file path lists parent; unreadable path (Stat or ReadDir) with readable parent is 200 + `error`; both fail → 406. `mom` is empty at a volume root. Windows empty/`/`/`\` lists `C:\`–`Z:\` that exist. |
 | POST | `{urlbase}api/browse` | yes | `system:browse:write` | `{path}`; folder `MkdirAll` 0755 (existing folders succeed) |
 | GET | `{urlbase}api/config/help` | yes | any auth | English field help from definitions.yml |
-| GET | `{urlbase}api/config/env` | yes | any auth | UN_* overlays from startup; secret values blank unless `*` |
+| GET | `{urlbase}api/config/env` | yes | any auth | UN_* overlays from startup; secret values blank unless `*`; `WEBSERVER_UI_PASSWORD` always blank (key kept so the UI can lock the field) |
 | GET | `{urlbase}api/config/{section}` | yes | `config:{section}:read` | File snapshot |
 | GET | `{urlbase}api/config/{section}/live` | yes | `config:{section}:read` | Running copy |
 | PUT | `{urlbase}api/config/{section}` | yes | `config:{section}:write` | Replace section |
+| POST | `{urlbase}api/config/{section}/test` | yes | `config:{section}:write` | Starr queue probe or one-shot hook Fire. Does not persist. general/webserver/folders → 400. Remote failure → 424 |
 | GET | `/metrics` (+ urlbase) | **API key / Bearer only** | `system:metrics:read` | No session cookie, no webauth/noauth |
 | GET | `/debug/pprof/…` | none extra | — | Only if `pprof = true`. Treat as a loaded gun. |
 
@@ -297,9 +308,11 @@ Order in `authenticate`:
 1. `X-Api-Key` (exact key lookup → that key’s permissions)
 2. `Authorization: Bearer …` (same)
 3. Proxy `webauth` / header auth if `ui_password` is that type **and** `RemoteAddr` is in `upstreams`
-4. Session cookie (login). Session identity gets **all** permissions and the generated/admin API key in `authInfo.apiKey`.
+4. Session cookie (login). Session identity gets **all** permissions and the generated/admin API key in `authInfo.apiKey`. A leftover password session is **not** used when `ui_password` is `webauth` or `noauth`.
 
 `noauth` is a `ui_password` type for the UI, not “skip API auth”.
+
+`webauth` requires the username header. `ui_role_header` empty keeps those proxy users as admin. Once a header name is set, the value must be built-in `admin` or a `[webserver.roles]` name (comma, semicolon, pipe, or space lists are unioned). Missing, empty, or unknown is **401**, not admin. `noauth` ignores `ui_role_header`; its username header is optional identity only.
 
 Login body: PBKDF2-HMAC-SHA-256 of the password, salt `unpackerr:`+username, 210000 iterations, 32-byte hex in `kdf`. Never send plaintext. Default username `admin` if `name` omitted. `webauth` login returns **403**.
 
@@ -325,7 +338,7 @@ Custom roles are a map of name → permission list. Env for roles is picky: do *
 
 Path: next to the log file if rotating, else next to the config file, else `~/.unpackerr/unpackerr.history.jsonl`.
 
-Append-only one line per persisted transition (`queued`, `extracting`, `extractfailed`, `extracted`, `extractednothing`, `imported`, `deleting`, `deleted`, `deletefailed`). Compact on load and when appends reach `2 × keep_history`. `histMu` covers records + file; HTTP reads, main loop appends. `GET /api/history` still returns only completed or failed rows.
+Append-only one line per persisted transition (`queued`, `extracting`, `extractfailed`, `extracted`, `extractednothing`, `imported`, `deleting`, `deleted`, `deletefailed`). Compact on load and when appends reach `2 × keep_history`. `histMu` covers records + file; HTTP reads, main loop appends. `GET /api/history` still returns only completed or failed rows. `keep_history` caps those durable rows only; in-progress checkpoints (`queued` / `extracting` / `extracted` / `deleting`) sit on top until they finish. Clear and delete skip those rows so a UI clear cannot wipe restart resume; delete of those IDs is **409**. The live hub upserts only durable rows and sends `delete` for an in-flight ID so the UI history table does not keep extracting items.
 
 On startup (after `validateApps`) rows newer than 72 hours are copied into `History.Map` so a crash can resume import-wait and delete-delay. `queued` becomes `waiting` (extract again). `extracting` / `deleting` become `extractfailed` so remnant cleanup can run on retry. Folder rows are not restored. Forgotten rows stay in the file with `forgotten: true` and are not put back on the live queue (the in-memory tombstone is rehydrated so a poll cannot recreate them). `sweepForgotten` waits until every configured Starr instance has polled this process before dropping a tombstone; a nil queue is not absence. `checkQueueChanges` must not treat `Queue == nil` as imported — that is “never polled this process”, not an empty queue. Startup pairs `retrieveAppQueues` with `checkQueueChanges`. `checkExtractDone` does not delete an `IMPORTED` item that is still in a polled Starr queue, or before that poll.
 
