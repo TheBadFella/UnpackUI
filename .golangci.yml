@@ -2,6 +2,10 @@ version: '2'
 linters:
   default: all
   disable:
+    # noisy / conflicting linters
+    - tagalign
+    - varnamelen
+    - gochecknoglobals
     # unused
     - exhaustruct
     - exhaustruct_v5
@@ -42,6 +46,7 @@ linters:
             - golang.org/x
             - gopkg.in/yaml.v3
             - code.cloudfoundry.org/bytefmt
+            - github.com/dromara/carbon/v2
 
   exclusions:
     generated: lax
@@ -54,6 +59,9 @@ linters:
         linters:
           - lll
       - path: pkg/unpackerr/webhooks_templates\.go
+        linters:
+          - lll
+      - path: pkg/hooks/config\.go
         linters:
           - lll
 

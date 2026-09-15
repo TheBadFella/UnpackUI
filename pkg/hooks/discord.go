@@ -255,10 +255,6 @@ func (w *Config) SupportsDiscordUpdate() bool {
 	return strings.Contains(lower, "discord.com") || strings.Contains(lower, "discordapp.com")
 }
 
-func (w *Config) supportsDiscordUpdate() bool {
-	return w.SupportsDiscordUpdate()
-}
-
 func isTerminalWebhookEvent(event extract.Status) bool {
 	switch event {
 	case extract.DELETED, extract.EXTRACTEDNOTHING:
@@ -285,10 +281,6 @@ func DiscordWaitURL(rawURL string) string {
 	return parsed.String()
 }
 
-func discordWaitURL(rawURL string) string {
-	return DiscordWaitURL(rawURL)
-}
-
 func DiscordEditURL(rawURL, messageID string) string {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
@@ -302,8 +294,4 @@ func DiscordEditURL(rawURL, messageID string) string {
 	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/messages/" + messageID
 
 	return parsed.String()
-}
-
-func discordEditURL(rawURL, messageID string) string {
-	return DiscordEditURL(rawURL, messageID)
 }

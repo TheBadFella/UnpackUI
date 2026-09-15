@@ -83,7 +83,6 @@ func (w *WebServer) validateURLBase() error {
 	return nil
 }
 
-
 func (u *Unpackerr) startWebServer() {
 	if !u.Webserver.Enabled() {
 		return
