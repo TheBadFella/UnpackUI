@@ -67,6 +67,36 @@ func TestStatsAndSystemRequireAuth(t *testing.T) {
 	}
 }
 
+func TestStatsRoutePreservesUpstreamAndCompatibilityFields(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.Map["waiting"] = &Extract{Status: WAITING}
+	unpack.Map["extracting"] = &Extract{Status: EXTRACTING}
+
+	rec := doAuth(t, unpack, http.MethodGet, "/api/stats", "", func(req *http.Request) {
+		req.Header.Set(headerAPIKey, unpack.Webserver.adminAPIKey())
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("stats %d %s", rec.Code, rec.Body.String())
+	}
+
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode stats: %v", err)
+	}
+
+	for _, field := range []string{
+		"waiting", "stackFS", "stackXtractr", "stackFolder", "stackHook", "stackDel", "stackTask",
+		"active", "completed", "webhookOK", "webhookFailed", "cmdhookOK", "cmdhookFailed",
+		"uptime", "generatedAt",
+	} {
+		if _, ok := payload[field]; !ok {
+			t.Errorf("stats response missing %q", field)
+		}
+	}
+}
+
 func TestSystemReportsRelativeLogFolder(t *testing.T) {
 	t.Parallel()
 
