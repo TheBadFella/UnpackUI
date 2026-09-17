@@ -46,7 +46,8 @@
     "Download": "Downloaden",
     "Cancel": "Annuleren",
     "Close": "Sluiten",
-    "Test": "Testen"
+    "Test": "Testen",
+    "ResetColumns": "Kolommen resetten"
   },
   "phrases": {
     "EnvironmentVariable": "Omgevingsvariabele: <code>{variableName}</code>",
@@ -86,6 +87,8 @@
     "ReservedUsername": "De gebruikersnamen webauth, noauth en filepath zijn gereserveerd, en een gebruikersnaam mag geen dubbele punt bevatten.",
     "FilterPlaceholder": "Filteren…",
     "Empty": "—",
+    "Output": "Uitvoer",
+    "DeletesIn": "Verwijdert over",
     "URLMustBeginWithHttp": "URL moet beginnen met http:// of https://",
     "URLInvalid": "Dat is geen geldige URL.",
     "APIKeyMustBeCountCharactersOrLonger": "API-sleutel moet minstens {count} tekens zijn.",
@@ -199,6 +202,7 @@
       "Status": "Status",
       "Item": "Item",
       "Progress": "Voortgang",
+      "ETA": "ETA",
       "Retries": "Pogingen",
       "Updated": "Bijgewerkt",
       "Actions": "Acties",

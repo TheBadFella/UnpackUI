@@ -12,7 +12,7 @@ below.
 | `UN_STATE_FILE` | automatic | Stores watched-folder recovery state so interrupted work can be re-queued after restart. Use a writable persistent path, or `off` to disable recovery. |
 | `UN_WEB_URL` | empty | Sets the externally reachable status UI URL used by native Discord links. It does not enable the web server by itself. |
 | `UN_WEBSERVER_API` | `false` | Legacy compatibility setting. The authenticated API is available whenever `UN_WEBSERVER_LISTEN_ADDR` is set. |
-| `UN_WEBSERVER_UI` | `false` | Enables the status dashboard, its detailed status API, adaptive polling, and clear-completed action. |
+| `UN_WEBSERVER_UI` | `false` | Enables the Svelte dashboard. It reads the upstream stats, queue, history, system, and WebSocket APIs. |
 | `UN_WEBHOOK_<n>_UPDATE_EXISTING` | `false` | For native Discord hooks, creates one message per extraction and edits it as status changes. Replace `<n>` with the zero-based webhook index. |
 
 These are UnpackUI additions. Settings such as `UN_REMNANT_ACTION` are inherited
