@@ -26,6 +26,22 @@ type systemInfo struct {
 	Logs       string    `json:"logs"`
 }
 
+// statsResponse keeps the upstream Stats payload intact while retaining the
+// flat aggregate fields used by older UnpackUI/Homepage clients. The
+// compatibility fields are deliberately additive so upstream API consumers
+// can decode the response without a fork-specific schema.
+type statsResponse struct {
+	*Stats
+	Active        int    `json:"active"`
+	Completed     int    `json:"completed"`
+	WebhookOK     uint   `json:"webhookOK"`
+	WebhookFailed uint   `json:"webhookFailed"`
+	CmdhookOK     uint   `json:"cmdhookOK"`
+	CmdhookFailed uint   `json:"cmdhookFailed"`
+	Uptime        string `json:"uptime"`
+	GeneratedAt   string `json:"generatedAt"`
+}
+
 func (u *Unpackerr) registerAPIRoutes() {
 	base := path.Join(u.Webserver.URLBase, "api")
 	basePath := func(b string) string { return path.Join(base, b) }
@@ -49,8 +65,27 @@ func (u *Unpackerr) registerAPIRoutes() {
 	u.Webserver.handlePost(basePath("config/{section}/test"), u.requireConfigPerm(true, u.configTestHandler))
 }
 
-func (u *Unpackerr) statsHandler(response http.ResponseWriter, request *http.Request) {
-	u.webStatsAPI(response, request)
+func (u *Unpackerr) statsHandler(response http.ResponseWriter, _ *http.Request) {
+	stats := u.stats()
+	compat := statsResponse{
+		Stats:         stats,
+		WebhookOK:     stats.HookOK,
+		WebhookFailed: stats.HookFail,
+		CmdhookOK:     stats.CmdOK,
+		CmdhookFailed: stats.CmdFail,
+		Uptime:        time.Since(version.Started).Round(time.Second).String(),
+		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	if snapshot := u.webState.Load(); snapshot != nil {
+		compat.Active = snapshot.ActiveCount
+		compat.Completed = snapshot.CompletedCount
+	} else {
+		compat.Active = int(stats.Waiting + stats.Queued + stats.Extracting + stats.Failed)
+		compat.Completed = len(u.historySnapshot())
+	}
+
+	writeJSON(response, http.StatusOK, compat)
 }
 
 func (u *Unpackerr) queueHandler(response http.ResponseWriter, _ *http.Request) {
