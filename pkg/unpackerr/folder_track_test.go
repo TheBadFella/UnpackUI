@@ -68,6 +68,55 @@ func TestFolderWaitingShowsInQueue(t *testing.T) {
 	}
 }
 
+func TestMediaOnlyFolderStaysOutOfQueueAndRecovery(t *testing.T) {
+	t.Parallel()
+
+	watch := t.TempDir()
+	cfg := &FolderConfig{Path: watch}
+	unpack := New()
+	unpack.Folder.Buffer = 32
+	unpack.StateFile = filepath.Join(t.TempDir(), defaultStateFile)
+	unpack.recovery = newRecoveryState()
+
+	tracker, err := unpack.Folder.NewWatcher([]*FolderConfig{cfg}, unpack.Logger, updateChanBuf, suffix)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		if tracker.Watcher != nil {
+			tracker.Watcher.Close()
+		}
+
+		if tracker.FSNotify != nil {
+			_ = tracker.FSNotify.Close()
+		}
+	})
+
+	unpack.folders = tracker
+	itemPath := filepath.Join(watch, "episode")
+	if err := os.Mkdir(itemPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	mediaPath := filepath.Join(itemPath, "episode.mkv")
+	if err := os.WriteFile(mediaPath, []byte("video"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	unpack.processEvent(&eventData{Config: cfg, Name: "episode", File: mediaPath, Op: "test"}, time.Now())
+
+	if item := unpack.Map[itemPath]; item != nil {
+		t.Fatalf("media-only folder entered waiting queue: %+v", item)
+	}
+	if item := unpack.recovery.Folders[itemPath]; item != nil {
+		t.Fatalf("media-only folder entered recovery state: %+v", item)
+	}
+	if _, err := os.Stat(unpack.StateFile); !os.IsNotExist(err) {
+		t.Fatalf("media-only folder wrote recovery file: %v", err)
+	}
+}
+
 func TestCheckFolderStatsDropsMissingWaiting(t *testing.T) {
 	t.Parallel()
 
@@ -116,5 +165,64 @@ func TestCheckFolderStatsDropsMissingWaiting(t *testing.T) {
 
 	if _, ok := unpack.folders.Folders[archive]; ok {
 		t.Fatal("folder still tracked after checkFolderStats")
+	}
+}
+
+func TestCheckFolderStatsCopiesRetriesToHistory(t *testing.T) {
+	t.Parallel()
+
+	const name = "/watch/corrupt"
+
+	unpack := New()
+	unpack.MaxRetries = 1
+	unpack.RetryDelay.Duration = time.Second
+	unpack.KeepHistory = 10
+	unpack.histPath = filepath.Join(t.TempDir(), historyFileName)
+
+	now := time.Now()
+	failedAt := now.Add(-time.Minute)
+	unpack.folders.Folders[name] = &Folder{
+		Status:  EXTRACTFAILED,
+		Retries: 0,
+		Updated: failedAt,
+		Config:  &FolderConfig{Path: name},
+	}
+	unpack.Map[name] = &Extract{
+		App:     FolderString,
+		Path:    name,
+		Status:  EXTRACTFAILED,
+		Retries: 0,
+		Updated: failedAt,
+	}
+
+	unpack.checkFolderStats(now)
+
+	item := unpack.Map[name]
+	if item == nil || item.Retries != 1 || item.Status != WAITING {
+		t.Fatalf("retry copy %+v", item)
+	}
+
+	if unpack.Retries != 1 {
+		t.Fatalf("stats retries %d", unpack.Retries)
+	}
+
+	folder := unpack.folders.Folders[name]
+	if folder == nil || folder.Retries != 1 || folder.Status != WAITING {
+		t.Fatalf("folder retry %+v", folder)
+	}
+
+	folder.Status = EXTRACTFAILED
+	folder.Updated = failedAt
+	item.Status = EXTRACTFAILED
+
+	unpack.checkFolderStats(now.Add(time.Minute))
+
+	if _, ok := unpack.folders.Folders[name]; ok {
+		t.Fatal("exhausted folder still tracked")
+	}
+
+	got := unpack.historySnapshot()
+	if len(got) != 1 || got[0].Retries != 1 || got[0].Status != DELETED {
+		t.Fatalf("history %+v", got)
 	}
 }

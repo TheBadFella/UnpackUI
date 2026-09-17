@@ -60,7 +60,7 @@ log_file_mode = "0600"
 ## In-flight Starr items are also written so a restart can put EXTRACTED
 ## and IMPORTED work back on the live queue for 72 hours; they do not
 ## count against this number. The history API still lists only completed
-## or failed rows. The tray menu still shows only the last 10 names.
+## or failed rows.
 ## `0` disables history and restart resume.
 keep_history = 400
 
@@ -150,10 +150,12 @@ passwords = []
  ui_password = ""
 ## Used with webauth (proxy header auth). Empty keeps those proxy users
 ## as admin. Ignored for noauth and local password login. Set this to a
-## header the reverse proxy fills, for example X-Webauth-Role. The value
-## must be a built-in admin or a custom [webserver.roles] name. Comma,
-## semicolon, pipe, or space separated lists are unioned. A selected
-## header that is missing, empty, or unknown is access denied, not admin.
+## header the reverse proxy fills, for example X-Webauth-Role or
+## X-Authentik-Groups. Matching names are a built-in admin or a custom
+## [webserver.roles] name. Comma, semicolon, pipe, or space separated
+## lists are unioned; extra IdP groups are ignored. A selected header
+## that is missing, empty, or has no matching role is access denied,
+## not admin.
 ## example: ui_role_header = "X-Webauth-Role"
  ui_role_header = ""
 ## Recommend setting a log file for HTTP requests. Otherwise, they go with other logs.
@@ -211,9 +213,8 @@ passwords = []
 ## Identify each instance with a short key: [sonarr.uhd], [folder.tv].       ##
 ## Changed in v1.0.0 (September 2026): map keys, not [[array]] list rows.    ##
 ## You MUST uncomment the [header.0], url and api_key for any Starr app.     ##
-## The [sonarr.0] and [radarr.0] headers come uncommented. Uncomment the url ##
-## and api_key if they are in use. Comment them with a hash if they are not. ##
-## Uncomment the [lidarr.0] and/or [readarr.0] headers and values if in use. ##
+## Uncomment [sonarr.0], [radarr.0], [lidarr.0], and/or [readarr.0] plus the ##
+## url and api_key if that app is in use.                                    ##
 ## Do not set a bare UN_SONARR / UN_FOLDER / UN_WEBHOOK / UN_CMDHOOK.        ##
 ###############################################################################
 ###############################################################################
@@ -222,9 +223,7 @@ passwords = []
 ###############################################################################
 ###############################################################################
 
-## Leaving the [sonarr.0] header uncommented (no leading hash #) without also
-## uncommenting the api_key (remove the hash #) will produce a startup warning.
-[sonarr.0]
+#[sonarr.0]
 ## Empty uses the app name (Sonarr, Radarr, and so on). Set this for a
 ## Sonarr-compatible app such as Sportarr so logs and Discord are not
 ## tagged Sonarr. Add Whisparr as a Radarr instance with name = "Whisparr".
@@ -269,9 +268,7 @@ passwords = []
 ## `0` or `0B` disables the cap for this instance.
 # max_bytes = ""
 
-## Leaving the [radarr.0] header uncommented (no leading hash #) without also
-## uncommenting the api_key (remove the hash #) will produce a startup warning.
-[radarr.0]
+#[radarr.0]
 ## Empty uses the app name (Sonarr, Radarr, and so on). Set this for a
 ## Sonarr-compatible app such as Sportarr so logs and Discord are not
 ## tagged Sonarr. Add Whisparr as a Radarr instance with name = "Whisparr".
@@ -527,4 +524,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 15 SEP 2026 07:09 UTC
+## => Content Auto Generated, 16 SEP 2026 07:45 UTC

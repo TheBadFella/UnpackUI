@@ -129,7 +129,6 @@ func (u *Unpackerr) extractTrackedItem(name string, folder *Folder, now time.Tim
 	item := u.updateQueueStatus(&newStatus{Name: name, Status: QUEUED}, u.folders.Folders[name].Updated, true)
 	u.unlockHistory()
 	u.recoveryTrackFolder(name, folder.Config, QUEUED, folder.Updated)
-	u.updateHistory(FolderString + ": " + name)
 
 	if folder.Config.MoveBack {
 		snap, err := keepDirSnapshot(folder.PreFiles, archiveSnapshotPaths(name, found)...)
@@ -482,7 +481,11 @@ func (u *Unpackerr) processEvent(event *eventData, now time.Time) {
 	u.syncFolderQueue(dirPath)
 
 	if folder := u.folders.Folders[dirPath]; folder != nil {
-		u.recoveryTrackFolder(dirPath, folder.Config, folder.Status, folder.Updated)
+		if folder.Status == WAITING && !folderHasExtractableContent(dirPath, folder.Config) {
+			u.recoveryClearFolder(dirPath)
+		} else {
+			u.recoveryTrackFolder(dirPath, folder.Config, folder.Status, folder.Updated)
+		}
 	} else if trackedBefore {
 		u.recoveryClearFolder(dirPath)
 	}
@@ -505,6 +508,14 @@ func (u *Unpackerr) syncFolderQueue(dirPath string) {
 	}
 
 	if folder.Status != WAITING {
+		return
+	}
+	if !folderHasExtractableContent(dirPath, folder.Config) {
+		if item := u.Map[dirPath]; item != nil && item.App == FolderString && item.Status == WAITING {
+			delete(u.Map, dirPath)
+			u.notifyQueueLocked()
+		}
+
 		return
 	}
 
@@ -557,33 +568,8 @@ func (u *Unpackerr) checkFolderStats(now time.Time) { //nolint:funlen // status 
 				delete(u.folders.Folders, name)
 				u.recoveryClearFolder(name)
 			}
-		case EXTRACTFAILED == folder.Status && folder.NoRetry:
-			u.lockHistory()
-			u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: nil}, now, true)
-			u.unlockHistory()
-			delete(u.folders.Folders, name)
-			u.Printf("[Folder] Remnant left in place (remnant_action=off), giving up: %s", name)
-		case EXTRACTFAILED == folder.Status && elapsed >= u.RetryDelay.Duration &&
-			folder.Retries < u.maxRetries():
-			u.lockHistory()
-			u.Retries++
-			u.unlockHistory()
-
-			folder.Retries++
-			folder.Updated = now
-			folder.Status = WAITING
-			u.recoveryTrackFolder(name, folder.Config, folder.Status, folder.Updated)
-			u.Printf("[Folder] Re-starting Failed Extraction: %s (%d/%d, failed %v ago)",
-				folder.Config.Path, folder.Retries, u.maxRetries(), elapsed.Round(time.Second))
-		case EXTRACTFAILED == folder.Status && folder.Retries < u.maxRetries():
-			// This empty block is to avoid deleting an item that needs more retries.
-		case EXTRACTFAILED == folder.Status && folder.Retries >= u.maxRetries():
-			// Retries exhausted — clean up to prevent the item from staying in the map forever.
-			u.lockHistory()
-			u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: nil}, now, true)
-			u.unlockHistory()
-			delete(u.folders.Folders, name)
-			u.Printf("[Folder] Retries exhausted (%d/%d), giving up: %s", folder.Retries, u.maxRetries(), name)
+		case EXTRACTFAILED == folder.Status:
+			u.checkFailedFolder(name, folder, now, elapsed)
 		case EXTRACTED == folder.Status && folder.Config.DeleteAfter.Duration <= 0:
 			// if DeleteAfter is 0 we don't delete anything. we are done.
 			u.lockHistory()
@@ -594,6 +580,49 @@ func (u *Unpackerr) checkFolderStats(now time.Time) { //nolint:funlen // status 
 		case EXTRACTED == folder.Status && elapsed >= folder.Config.DeleteAfter.Duration:
 			u.deleteAfterReached(name, now, folder)
 		}
+	}
+}
+
+func (u *Unpackerr) checkFailedFolder(name string, folder *Folder, now time.Time, elapsed time.Duration) {
+	switch {
+	case folder.NoRetry:
+		u.lockHistory()
+		u.copyFolderRetriesLocked(name, folder)
+		u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: nil}, now, true)
+		u.unlockHistory()
+		u.recoveryClearFolder(name)
+		delete(u.folders.Folders, name)
+		u.Printf("[Folder] Remnant left in place (remnant_action=off), giving up: %s", name)
+	case elapsed >= u.RetryDelay.Duration && folder.Retries < u.maxRetries():
+		folder.Retries++
+		folder.Updated = now
+		folder.Status = WAITING
+
+		u.lockHistory()
+		u.Retries++
+		u.copyFolderRetriesLocked(name, folder)
+
+		if item := u.Map[name]; item != nil {
+			item.Status = WAITING
+			item.Updated = now
+		}
+
+		u.notifyQueueLocked()
+		u.unlockHistory()
+		u.recoveryTrackFolder(name, folder.Config, folder.Status, folder.Updated)
+		u.Printf("[Folder] Re-starting Failed Extraction: %s (%d/%d, failed %v ago)",
+			folder.Config.Path, folder.Retries, u.maxRetries(), elapsed.Round(time.Second))
+	case folder.Retries < u.maxRetries():
+		// Still waiting for retry_delay; do not give up yet.
+	default:
+		// Retries exhausted — clean up to prevent the item from staying in the map forever.
+		u.lockHistory()
+		u.copyFolderRetriesLocked(name, folder)
+		u.updateQueueStatus(&newStatus{Name: name, Status: DELETED, Resp: nil}, now, true)
+		u.unlockHistory()
+		u.recoveryClearFolder(name)
+		delete(u.folders.Folders, name)
+		u.Printf("[Folder] Retries exhausted (%d/%d), giving up: %s", folder.Retries, u.maxRetries(), name)
 	}
 }
 
@@ -673,4 +702,13 @@ func (u *Unpackerr) updateQueueStatus(data *newStatus, now time.Time, sendHook b
 	u.notifyQueueLocked()
 
 	return u.Map[data.Name]
+}
+
+// copyFolderRetriesLocked writes the folder retry count onto the queue/history
+// Extract. Logs and stats already increment folder.Retries; /api/history reads
+// Extract.Retries. Caller holds History.mu.
+func (u *Unpackerr) copyFolderRetriesLocked(name string, folder *Folder) {
+	if item := u.Map[name]; item != nil {
+		item.Retries = folder.Retries
+	}
 }

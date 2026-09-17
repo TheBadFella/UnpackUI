@@ -60,9 +60,6 @@ func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	if unpackerr.folders.Folders[itemPath] != folder {
 		t.Fatal("expected archive-free folder to remain tracked briefly to avoid re-queue")
 	}
-	if len(unpackerr.Items) != 0 {
-		t.Fatalf("expected archive-free folder not to enter queue history, got %v", unpackerr.Items)
-	}
 }
 
 func TestBuildWebStateOmitsMediaOnlyWatchedFolders(t *testing.T) {
