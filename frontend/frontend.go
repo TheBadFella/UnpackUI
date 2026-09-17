@@ -33,6 +33,12 @@ func init() {
 	handler = http.FileServerFS(root)
 }
 
+// HasBuiltAssets returns true if frontend dist/index.html is embedded.
+func HasBuiltAssets() bool {
+	_, err := fs.Stat(root, "index.html")
+	return err == nil
+}
+
 type responseWriter struct {
 	http.ResponseWriter
 	asset     bool
