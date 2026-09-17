@@ -69,20 +69,14 @@ func (u *Unpackerr) statsHandler(response http.ResponseWriter, _ *http.Request) 
 	stats := u.stats()
 	compat := statsResponse{
 		Stats:         stats,
+		Active:        int(stats.Waiting + stats.Queued + stats.Extracting + stats.Failed),
+		Completed:     len(u.historySnapshot()),
 		WebhookOK:     stats.HookOK,
 		WebhookFailed: stats.HookFail,
 		CmdhookOK:     stats.CmdOK,
 		CmdhookFailed: stats.CmdFail,
 		Uptime:        time.Since(version.Started).Round(time.Second).String(),
 		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
-	}
-
-	if snapshot := u.webState.Load(); snapshot != nil {
-		compat.Active = snapshot.ActiveCount
-		compat.Completed = snapshot.CompletedCount
-	} else {
-		compat.Active = int(stats.Waiting + stats.Queued + stats.Extracting + stats.Failed)
-		compat.Completed = len(u.historySnapshot())
 	}
 
 	writeJSON(response, http.StatusOK, compat)

@@ -155,3 +155,20 @@ func TestWebRoutesIndexHonorsURLBase(t *testing.T) {
 		t.Fatalf("root index %d %q", rec.Code, rec.Body.String())
 	}
 }
+
+func TestWebRoutesDoNotRegisterLegacyStatusEndpoints(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	unpack.Webserver.router = http.NewServeMux()
+	unpack.webRoutes()
+
+	for _, route := range []string{"/api/status", "/api/status/clear-completed"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, route, nil)
+		unpack.Webserver.router.ServeHTTP(rec, req)
+		if strings.HasPrefix(rec.Header().Get("Content-Type"), "application/json") {
+			t.Fatalf("legacy route %s still returned a JSON API payload", route)
+		}
+	}
+}

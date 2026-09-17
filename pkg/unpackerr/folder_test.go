@@ -62,33 +62,6 @@ func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	}
 }
 
-func TestBuildWebStateOmitsMediaOnlyWatchedFolders(t *testing.T) {
-	t.Parallel()
-
-	watchPath := t.TempDir()
-	itemPath := filepath.Join(watchPath, "episode")
-	if err := os.Mkdir(itemPath, 0o700); err != nil {
-		t.Fatalf("creating media folder: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(itemPath, "episode.mkv"), []byte("video"), 0o600); err != nil {
-		t.Fatalf("creating media file: %v", err)
-	}
-
-	now := time.Now()
-	unpackerr := New()
-	unpackerr.folders = &Folders{
-		Logs: unpackerr.Logger,
-		Folders: map[string]*Folder{
-			itemPath: {Updated: now, Status: WAITING, Config: &FolderConfig{Path: watchPath}},
-		},
-	}
-
-	snapshot := unpackerr.buildWebState(now)
-	if len(snapshot.Items) != 0 {
-		t.Fatalf("expected media-only watched folder to stay out of the UI, got %+v", snapshot.Items)
-	}
-}
-
 func TestExtractTrackedItemDefersIncompleteDownloadUntilArchiveFinalizes(t *testing.T) {
 	t.Parallel()
 

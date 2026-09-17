@@ -46,7 +46,8 @@
     "Download": "Download",
     "Cancel": "Cancel",
     "Close": "Close",
-    "Test": "Test"
+    "Test": "Test",
+    "ResetColumns": "Reset columns"
   },
   "phrases": {
     "EnvironmentVariable": "Environment variable: <code>{variableName}</code>",
@@ -86,6 +87,8 @@
     "ReservedUsername": "Usernames webauth, noauth, and filepath are reserved, and a username cannot contain a colon.",
     "FilterPlaceholder": "Filter…",
     "Empty": "—",
+    "Output": "Output",
+    "DeletesIn": "Deletes in",
     "URLMustBeginWithHttp": "URL must begin with http:// or https://",
     "URLInvalid": "That is not a valid URL.",
     "APIKeyMustBeCountCharactersOrLonger": "API key must be at least {count} characters.",
@@ -199,6 +202,7 @@
       "Status": "Status",
       "Item": "Item",
       "Progress": "Progress",
+      "ETA": "ETA",
       "Retries": "Retries",
       "Updated": "Updated",
       "Actions": "Actions",
