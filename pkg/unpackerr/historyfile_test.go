@@ -7,7 +7,52 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golift.io/xtractr"
 )
+
+func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().Round(time.Second)
+	item := &Extract{
+		App:         "Sonarr",
+		Path:        "/downloads/Show.S01E01",
+		Status:      IMPORTED,
+		Updated:     now,
+		DeleteDelay: 5 * time.Minute,
+		IDs:         map[string]any{"title": "Show S01E01", "reason": "download complete", "secret": "omit"},
+		XProg: &ExtractProgress{
+			Progress: &xtractr.Progress{
+				Total: 1000,
+				Wrote: 500,
+				XFile: &xtractr.XFile{FilePath: "/downloads/Show.S01E01/show.rar"},
+			},
+			StartedAt: now.Add(-10 * time.Second),
+			UpdatedAt: now,
+		},
+	}
+	item.XProg.Extract = item
+
+	queue := queueFromExtract("show-1", item)
+	if queue.Title != "Show S01E01" || queue.Reason != "download complete" {
+		t.Fatalf("queue details %+v", queue)
+	}
+	if queue.DeleteAt == nil || !queue.DeleteAt.Equal(now.Add(5*time.Minute)) {
+		t.Fatalf("queue delete time %+v", queue.DeleteAt)
+	}
+	if queue.SpeedBytesPerSecond == 0 || queue.ETASeconds == 0 {
+		t.Fatalf("queue progress timing %+v", queue)
+	}
+
+	record := historyFromExtract("show-1", item)
+	if record.Title != queue.Title || record.Reason != queue.Reason {
+		t.Fatalf("history details %+v", record)
+	}
+	if record.DeleteAt == nil || queue.DeleteAt == nil || !record.DeleteAt.Equal(*queue.DeleteAt) {
+		t.Fatalf("history delete time %+v", record.DeleteAt)
+	}
+}
 
 func TestHistoryUpsertAndCap(t *testing.T) {
 	t.Parallel()
