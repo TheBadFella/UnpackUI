@@ -46,8 +46,7 @@
     "Download": "Λήψη",
     "Cancel": "Ακύρωση",
     "Close": "Κλείσιμο",
-    "Test": "Δοκιμή",
-    "ResetColumns": "Επαναφορά στηλών"
+    "Test": "Δοκιμή"
   },
   "phrases": {
     "EnvironmentVariable": "Μεταβλητή περιβάλλοντος: <code>{variableName}</code>",
@@ -87,8 +86,6 @@
     "ReservedUsername": "Τα ονόματα webauth, noauth και filepath είναι δεσμευμένα, και το όνομα χρήστη δεν μπορεί να περιέχει άνω και κάτω τελεία.",
     "FilterPlaceholder": "Φίλτρο…",
     "Empty": "—",
-    "Output": "Έξοδος",
-    "DeletesIn": "Διαγράφεται σε",
     "URLMustBeginWithHttp": "Το URL πρέπει να ξεκινά με http:// ή https://",
     "URLInvalid": "Μη έγκυρο URL.",
     "APIKeyMustBeCountCharactersOrLonger": "Το κλειδί API πρέπει να έχει τουλάχιστον {count} χαρακτήρες.",
@@ -202,7 +199,6 @@
       "Status": "Κατάσταση",
       "Item": "Αντικείμενο",
       "Progress": "Πρόοδος",
-      "ETA": "ETA",
       "Retries": "Επανάληψεις",
       "Updated": "Ενημερώθηκε",
       "Actions": "Ενέργειες",
