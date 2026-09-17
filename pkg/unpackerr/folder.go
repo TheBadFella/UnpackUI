@@ -552,7 +552,7 @@ func (u *Unpackerr) checkWaitingFolder(name string, folder *Folder, now time.Tim
 
 // checkFolderStats runs at an interval to see if any folders need work done on them.
 // This runs on an interval ticker in the main go routine.
-func (u *Unpackerr) checkFolderStats(now time.Time) { //nolint:funlen // status cases are clearer together.
+func (u *Unpackerr) checkFolderStats(now time.Time) {
 	for name, folder := range u.folders.Folders {
 		switch elapsed := now.Sub(folder.Updated); {
 		case WAITING == folder.Status:

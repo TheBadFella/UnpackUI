@@ -493,36 +493,7 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 		queue.Progress = item.Note
 	}
 
-	if item.XProg != nil {
-		now := time.Now()
-		if prog := item.XProg.String(); prog != "no progress yet" {
-			queue.Progress = prog
-		}
-
-		if prog := item.XProg.Progress; prog != nil {
-			queue.Percent = prog.Percent()
-			queue.Wrote = prog.Wrote
-			queue.Total = prog.Total
-			queue.Read = prog.Read
-			queue.Compressed = prog.Compressed
-			queue.Files = prog.Files
-			queue.Count = prog.Count
-			queue.Archives = item.XProg.Archives
-			queue.Extracted = item.XProg.Extracted
-
-			if speed, ok := item.XProg.Speed(now); ok {
-				queue.SpeedBytesPerSecond = speed
-			}
-			if eta, ok := item.XProg.ETA(now); ok {
-				queue.ETASeconds = int64(eta / time.Second)
-			}
-
-			if prog.XFile != nil {
-				rel := strings.TrimPrefix(prog.XFile.FilePath, item.Path)
-				queue.Archive = strings.TrimLeft(filepath.ToSlash(rel), `/\`)
-			}
-		}
-	}
+	applyExtractProgress(&queue, item)
 
 	if item.Resp != nil && item.Resp.Error != nil {
 		queue.Error = item.Resp.Error.Error()
@@ -534,6 +505,45 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 	}
 
 	return queue
+}
+
+func applyExtractProgress(queue *QueueItem, item *Extract) {
+	if item.XProg == nil {
+		return
+	}
+
+	now := time.Now()
+	if prog := item.XProg.String(); prog != "no progress yet" {
+		queue.Progress = prog
+	}
+
+	prog := item.XProg.Progress
+	if prog == nil {
+		return
+	}
+
+	queue.Percent = prog.Percent()
+	queue.Wrote = prog.Wrote
+	queue.Total = prog.Total
+	queue.Read = prog.Read
+	queue.Compressed = prog.Compressed
+	queue.Files = prog.Files
+	queue.Count = prog.Count
+	queue.Archives = item.XProg.Archives
+	queue.Extracted = item.XProg.Extracted
+
+	if speed, ok := item.XProg.Speed(now); ok {
+		queue.SpeedBytesPerSecond = speed
+	}
+
+	if eta, ok := item.XProg.ETA(now); ok {
+		queue.ETASeconds = int64(eta / time.Second)
+	}
+
+	if prog.XFile != nil {
+		rel := strings.TrimPrefix(prog.XFile.FilePath, item.Path)
+		queue.Archive = strings.TrimLeft(filepath.ToSlash(rel), `/\`)
+	}
 }
 
 func (u *Unpackerr) deleteHistoryID(itemID string) error {
