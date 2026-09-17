@@ -54,7 +54,7 @@ const STATUS_COLORS: Record<string, string> = {
   deleting: 'warning',
   deletefailed: 'danger',
   'delete failed': 'danger',
-  deleted: 'dark',
+  deleted: 'success',
   extractednothing: 'secondary',
   'extracted nothing': 'secondary',
 }

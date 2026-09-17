@@ -154,41 +154,40 @@
     aria-expanded={open}
   />
   <Collapse isOpen={open} navbar>
-    <Nav class="me-auto" navbar>
-      {#if wide && settingItems.length}
-        <Dropdown nav isOpen={settingsOpen} toggle={toggleSettings} autoClose="outside">
-          <DropdownToggle
-            nav
-            caret
-            class={router.path.startsWith('/settings') ? 'active' : ''}
-          >
-            {$_('nav.Settings')}
-          </DropdownToggle>
-          <DropdownMenu>
-            {#each settingItems as item (item.href)}
-              <DropdownItem
-                active={settingActive(item.href)}
-                on:click={(e) => go(e, item.href)}
-              >
-                {item.label}
-              </DropdownItem>
-            {/each}
-          </DropdownMenu>
-        </Dropdown>
-      {/if}
-    </Nav>
+    <Nav class="me-auto" navbar></Nav>
     {#if wide}
-      <Nav navbar>
+      <Nav class="ms-auto d-flex align-items-center gap-2" navbar>
+        {#if settingItems.length}
+          <Dropdown nav isOpen={settingsOpen} toggle={toggleSettings} autoClose="outside">
+            <DropdownToggle
+              nav
+              caret
+              class="nav-ui-btn {router.path.startsWith('/settings') ? 'active' : ''}"
+            >
+              {$_('nav.Settings')}
+            </DropdownToggle>
+            <DropdownMenu end>
+              {#each settingItems as item (item.href)}
+                <DropdownItem
+                  active={settingActive(item.href)}
+                  on:click={(e) => go(e, item.href)}
+                >
+                  {item.label}
+                </DropdownItem>
+              {/each}
+            </DropdownMenu>
+          </Dropdown>
+        {/if}
         <Dropdown nav isOpen={userOpen} toggle={toggleUser} autoClose="outside">
           <DropdownToggle
             nav
             caret
-            class={router.path === '/trust' ||
+            class="nav-ui-btn {router.path === '/trust' ||
             router.path === '/system' ||
             router.path === '/logs' ||
             router.path.startsWith('/logs/')
               ? 'active'
-              : ''}
+              : ''}"
             title={profile.info?.username ?? ''}
           >
             {profile.info?.username ?? ''}

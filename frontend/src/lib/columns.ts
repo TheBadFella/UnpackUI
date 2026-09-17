@@ -1,25 +1,29 @@
-export type ColumnDefaults<K extends string> = Record<K, number>
+export type ColumnWidths<K extends string> = Record<K, number | string>
 
-const minimumColumnWidth = 64
+const minimumColumnWidth = 50
 
 export function loadColumnWidths<K extends string>(
   storageKey: string,
-  defaults: ColumnDefaults<K>,
-): ColumnDefaults<K> {
+  defaults: ColumnWidths<K>,
+): ColumnWidths<K> {
   const output = { ...defaults }
 
   if (typeof localStorage === 'undefined') return output
 
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) ?? '') as Record<
-      string,
-      unknown
-    >
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return output
+    const saved = JSON.parse(raw) as Record<string, unknown>
 
     for (const key of Object.keys(defaults) as K[]) {
-      const value = Number(saved?.[key])
-      if (Number.isFinite(value) && value >= minimumColumnWidth) {
-        output[key] = Math.round(value)
+      const val = saved?.[key]
+      if (typeof val === 'string' && val.endsWith('%')) {
+        output[key] = val
+      } else {
+        const num = Number(val)
+        if (Number.isFinite(num) && num >= minimumColumnWidth) {
+          output[key] = Math.round(num)
+        }
       }
     }
   } catch {
@@ -31,7 +35,7 @@ export function loadColumnWidths<K extends string>(
 
 export function saveColumnWidths<K extends string>(
   storageKey: string,
-  widths: ColumnDefaults<K>,
+  widths: ColumnWidths<K>,
 ): void {
   if (typeof localStorage === 'undefined') return
 
@@ -44,8 +48,8 @@ export function saveColumnWidths<K extends string>(
 
 export function resetColumnWidths<K extends string>(
   storageKey: string,
-  defaults: ColumnDefaults<K>,
-): ColumnDefaults<K> {
+  defaults: ColumnWidths<K>,
+): ColumnWidths<K> {
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(storageKey)
@@ -57,6 +61,11 @@ export function resetColumnWidths<K extends string>(
   return { ...defaults }
 }
 
-export function clampColumnWidth(width: number): number {
-  return Math.max(minimumColumnWidth, Math.round(width))
+export function clampColumnWidth(width: number, min = minimumColumnWidth): number {
+  return Math.max(min, Math.round(width))
+}
+
+export function colStyle(val: number | string | undefined, fallback = 'auto'): string {
+  if (val === undefined) return fallback
+  return typeof val === 'number' ? `${val}px` : val
 }

@@ -90,6 +90,7 @@
     "FilterPlaceholder": "Filter…",
     "Empty": "—",
     "Output": "Output",
+    "Details": "Details",
     "DeletesIn": "Deletes in",
     "URLMustBeginWithHttp": "URL must begin with http:// or https://",
     "URLInvalid": "That is not a valid URL.",
