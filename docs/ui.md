@@ -47,7 +47,9 @@ The dashboard combines the upstream API resources with the live WebSocket:
 The UI derives active/completed counts and relative times in the browser. It
 uses the upstream status labels and keeps marker files named
 `_unpackerred*.txt` out of extracted-file details. Queue and history tables are
-responsive; desktop column widths are saved per browser and can be reset.
+responsive; desktop column widths are saved per browser and can be reset. The
+`Hide completed` control only dismisses rows in the current browser, while
+`Clear all` permanently removes persisted history after confirmation.
 
 ## HTTP endpoints
 

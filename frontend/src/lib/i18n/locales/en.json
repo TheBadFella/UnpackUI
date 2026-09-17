@@ -46,7 +46,10 @@
     "Download": "Download",
     "Cancel": "Cancel",
     "Close": "Close",
-    "Test": "Test"
+    "Test": "Test",
+    "ResetColumns": "Reset columns",
+    "HideCompleted": "Hide completed",
+    "ShowHidden": "Show hidden"
   },
   "phrases": {
     "EnvironmentVariable": "Environment variable: <code>{variableName}</code>",
@@ -86,6 +89,8 @@
     "ReservedUsername": "Usernames webauth, noauth, and filepath are reserved, and a username cannot contain a colon.",
     "FilterPlaceholder": "Filter…",
     "Empty": "—",
+    "Output": "Output",
+    "DeletesIn": "Deletes in",
     "URLMustBeginWithHttp": "URL must begin with http:// or https://",
     "URLInvalid": "That is not a valid URL.",
     "APIKeyMustBeCountCharactersOrLonger": "API key must be at least {count} characters.",
@@ -143,9 +148,10 @@
       "DisabledHint": "Password login is turned off. Sign in through the reverse proxy. If the proxy sent you here, none of the groups matched admin or a configured role."
     },
     "dashboard": {
-      "Title": "Overview",
-      "intro": "Live queue, extract counts, and finished history for this Unpackerr.",
-      "ActiveQueue": "Activity",
+      "Title": "Unpackerr Status",
+      "intro": "Live extraction progress.",
+      "ActiveQueue": "Tracked items",
+      "TrackedHint": "Current queue plus completed items that stay visible until you clear them.",
       "Live": "Live",
       "Starrs": "Starr apps",
       "StarrsHint": "Sonarr, Radarr, Lidarr, and Readarr instances in the config.",
@@ -199,6 +205,7 @@
       "Status": "Status",
       "Item": "Item",
       "Progress": "Progress",
+      "ETA": "ETA",
       "Retries": "Retries",
       "Updated": "Updated",
       "Actions": "Actions",

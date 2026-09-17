@@ -18,7 +18,6 @@
     ModalFooter,
   } from '@sveltestrap/sveltestrap'
   import { _ } from '../lib/i18n/Translate.svelte'
-  import PageIntro from '../components/PageIntro.svelte'
   import { api } from '../lib/api'
   import { has } from '../lib/auth.svelte'
   import { systemPerm } from '../lib/perms'
@@ -28,15 +27,88 @@
     relTime,
     progressCaption,
   } from '../lib/format'
+  import {
+    formatEta,
+    formatRate,
+    itemPath,
+    itemReason,
+    itemTitle,
+    deleteRemaining,
+  } from '../lib/dashboard'
+  import {
+    clampColumnWidth,
+    loadColumnWidths,
+    resetColumnWidths,
+    saveColumnWidths,
+  } from '../lib/columns'
   import { success, failure } from '../lib/toast'
   import { live, type LiveTopic } from '../lib/socket.svelte'
   import type { BufferStat, QueueItem } from '../lib/types'
+  import githubIcon from '../assets/github.svg'
   import History from './History.svelte'
 
   let busy = $state<Record<string, boolean>>({})
   let now = $state(Date.now())
   let ageTimer: ReturnType<typeof setInterval> | undefined
   let pendingForget = $state<QueueItem | null>(null)
+
+  type QueueColumn = 'app' | 'status' | 'progress' | 'retries' | 'updated' | 'actions'
+  const queueColumnDefaults: Record<QueueColumn, number> = {
+    app: 128,
+    status: 128,
+    progress: 256,
+    retries: 88,
+    updated: 128,
+    actions: 160,
+  }
+  const queueColumnStorageKey = 'unpackerr.dashboard.queue-columns.v1'
+  let queueColumnWidths = $state({ ...queueColumnDefaults })
+  let queueResize = $state<{
+    key: QueueColumn
+    startX: number
+    startWidth: number
+  } | null>(null)
+
+  function resetQueueColumns() {
+    queueColumnWidths = resetColumnWidths(
+      queueColumnStorageKey,
+      queueColumnDefaults,
+    )
+  }
+
+  function startQueueResize(event: PointerEvent, key: QueueColumn) {
+    event.preventDefault()
+    const handle = event.currentTarget as HTMLElement
+    const heading = handle.parentElement
+    queueResize = {
+      key,
+      startX: event.clientX,
+      startWidth: heading?.getBoundingClientRect().width ?? queueColumnWidths[key],
+    }
+    document.body.classList.add('is-resizing-columns')
+  }
+
+  function moveQueueResize(event: PointerEvent) {
+    if (!queueResize) return
+    queueColumnWidths[queueResize.key] = clampColumnWidth(
+      queueResize.startWidth + event.clientX - queueResize.startX,
+    )
+  }
+
+  function finishQueueResize() {
+    if (!queueResize) return
+    saveColumnWidths(queueColumnStorageKey, queueColumnWidths)
+    queueResize = null
+    document.body.classList.remove('is-resizing-columns')
+  }
+
+  function nudgeQueueResize(event: KeyboardEvent, key: QueueColumn) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const delta = event.key === 'ArrowRight' ? 16 : -16
+    queueColumnWidths[key] = clampColumnWidth(queueColumnWidths[key] + delta)
+    saveColumnWidths(queueColumnStorageKey, queueColumnWidths)
+  }
 
   function ageLabel(ms: number): string {
     const sec = Math.max(0, Math.floor(ms / 1000))
@@ -68,6 +140,7 @@
   const uid = $props.id()
   const stats = $derived(live.stats)
   const queue = $derived(live.queue)
+  const trackedCount = $derived(queue.length + live.history.length)
   const loading = $derived(live.fetchedAt === undefined)
 
   const cards = $derived(
@@ -306,6 +379,12 @@
   }
 
   onMount(() => {
+    queueColumnWidths = loadColumnWidths(
+      queueColumnStorageKey,
+      queueColumnDefaults,
+    )
+    window.addEventListener('pointermove', moveQueueResize)
+    window.addEventListener('pointerup', finishQueueResize)
     const topics: LiveTopic[] = []
     if (canQueue) {
       topics.push('queue')
@@ -319,6 +398,9 @@
     }, 1000)
     return () => {
       if (topics.length) live.unsubscribe(topics)
+      window.removeEventListener('pointermove', moveQueueResize)
+      window.removeEventListener('pointerup', finishQueueResize)
+      document.body.classList.remove('is-resizing-columns')
     }
   })
   onDestroy(() => {
@@ -326,19 +408,52 @@
   })
 </script>
 
-<h4 class="mb-2">{$_('pages.dashboard.Title')}</h4>
-<PageIntro id="pages.dashboard" />
+<div class="dashboard-page">
+  <section class="dashboard-hero">
+    <div class="dashboard-headline">
+      <div class="dashboard-hero-copy">
+        <div class="dashboard-title-row">
+          <h1>{$_('pages.dashboard.Title')}</h1>
+          <a
+            class="repo-link"
+            href="https://github.com/TheBadFella/UnpackUI"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="UnpackUI on GitHub"
+            title="UnpackUI on GitHub"
+          >
+            <img src={githubIcon} alt="" aria-hidden="true" />
+          </a>
+        </div>
+        <p class="subtle mb-0">{$_('pages.dashboard.intro')}</p>
+      </div>
+      <div class="stamp-chip" aria-live="polite">
+        <span>
+          {#if live.connected}
+            {$_('pages.dashboard.Live')}
+          {:else if dataAge}
+            {$_('pages.dashboard.UpdatedAgo', { values: { age: dataAge } })}
+          {:else}
+            {$_('phrases.LoadingApi')}
+          {/if}
+        </span>
+      </div>
+    </div>
+  </section>
 
-{#if (canStats || canQueue) && loading}
-  <Spinner color="primary" />
-{:else}
+  {#if (canStats || canQueue) && loading}
+    <Spinner color="primary" />
+  {:else}
   {#if canStats && stats}
-    <Row class="g-2 mb-3 align-items-stretch">
+    <Row class="g-2 mb-3 align-items-stretch dashboard-stat-row">
       <Col xs="12" md="8">
         <Row class="g-2">
           {#each cards as c (c.id)}
             <Col xs="6" sm="3">
-              <Card id="{uid}-{c.id}" class="stat-card text-center h-100">
+              <Card
+                id="{uid}-{c.id}"
+                class="dashboard-panel stat-card stat-card-{c.id} text-center h-100"
+              >
                 <CardBody class="py-2 px-1">
                   <div class="stat-value text-{c.color}">{c.value}</div>
                   <div class="text-muted small text-uppercase">{c.label}</div>
@@ -381,7 +496,7 @@
   {/if}
 
   {#if canStats && starrQueues.length}
-    <Card class="mb-3">
+    <Card class="dashboard-panel mb-3 starr-queues-panel">
       <CardBody class="py-2 px-2">
         <CardTitle class="mb-2" id="{uid}-starr-queues"
           >{$_('pages.dashboard.StarrQueues')}</CardTitle
@@ -454,15 +569,15 @@
   {/if}
 
   {#if canQueue}
-    <Card>
+    <Card class="dashboard-panel activity-panel">
       <CardBody>
         <Row class="align-items-center mb-2">
           <Col>
-            <CardTitle class="mb-0"
-              >{$_('pages.dashboard.ActiveQueue')}</CardTitle
-            >
+            <CardTitle class="mb-0">{$_('pages.dashboard.ActiveQueue')}</CardTitle>
+            <div class="subtle small mt-1">{$_('pages.dashboard.TrackedHint')}</div>
           </Col>
           <Col xs="auto" class="d-flex align-items-center gap-2">
+            <span class="item-count" title="Tracked items">{trackedCount}</span>
             {#if live.connected}
               <Badge color="success">{$_('pages.dashboard.Live')}</Badge>
             {:else if dataAge}
@@ -472,32 +587,102 @@
                 })}</span
               >
             {/if}
+            <Button
+              color="secondary"
+              outline
+              size="sm"
+              type="button"
+              onclick={resetQueueColumns}
+              >{$_('buttons.ResetColumns')}</Button
+            >
           </Col>
         </Row>
         {#if queue.length === 0}
           <p class="text-muted mb-0">{$_('phrases.NothingQueued')}</p>
         {:else}
-          <Table responsive hover size="sm" class="align-middle">
+          <Table responsive hover size="sm" class="align-middle queue-table">
+            <colgroup>
+              <col style={`width: ${queueColumnWidths.app}px`} />
+              <col style={`width: ${queueColumnWidths.status}px`} />
+              <col style={`width: ${queueColumnWidths.progress}px`} />
+              <col style={`width: ${queueColumnWidths.retries}px`} />
+              <col style={`width: ${queueColumnWidths.updated}px`} />
+              <col style={`width: ${queueColumnWidths.actions}px`} />
+            </colgroup>
             <thead>
               <tr>
-                <th>{$_('pages.dashboard.App')}</th>
-                <th>{$_('pages.dashboard.Status')}</th>
-                <th class="queue-progress">{$_('pages.dashboard.Progress')}</th>
-                <th class="text-end">{$_('pages.dashboard.Retries')}</th>
-                <th>{$_('pages.dashboard.Updated')}</th>
-                <th class="text-end">{$_('pages.dashboard.Actions')}</th>
+                <th>
+                  {$_('pages.dashboard.App')}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize app column"
+                    onpointerdown={(event) => startQueueResize(event, 'app')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'app')}
+                  ></button>
+                </th>
+                <th>
+                  {$_('pages.dashboard.Status')}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize status column"
+                    onpointerdown={(event) => startQueueResize(event, 'status')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'status')}
+                  ></button>
+                </th>
+                <th class="queue-progress">
+                  {$_('pages.dashboard.Progress')}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize progress column"
+                    onpointerdown={(event) => startQueueResize(event, 'progress')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'progress')}
+                  ></button>
+                </th>
+                <th class="text-end">
+                  {$_('pages.dashboard.Retries')}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize retries column"
+                    onpointerdown={(event) => startQueueResize(event, 'retries')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'retries')}
+                  ></button>
+                </th>
+                <th>
+                  {$_('pages.dashboard.Updated')}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize updated column"
+                    onpointerdown={(event) => startQueueResize(event, 'updated')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'updated')}
+                  ></button>
+                </th>
+                <th class="text-end">
+                  {$_('pages.dashboard.Actions')}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize actions column"
+                    onpointerdown={(event) => startQueueResize(event, 'actions')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'actions')}
+                  ></button>
+                </th>
               </tr>
             </thead>
             {#each queue as item (item.id)}
               <tbody class="stack-item">
                 <tr>
-                  <td>{item.app}</td>
-                  <td
+                  <td data-label={$_('pages.dashboard.App')}>{item.app}</td>
+                  <td data-label={$_('pages.dashboard.Status')}
                     ><Badge color={statusColor(item.status)}
                       >{$_(statusPhrase(item.status))}</Badge
                     ></td
                   >
-                  <td class="small queue-progress">
+                  <td data-label={$_('pages.dashboard.Progress')} class="small queue-progress">
                     <div class="queue-progress-inner">
                       {#if showBar(item)}
                         <div class="progress mb-1">
@@ -508,6 +693,12 @@
                         </div>
                         <div class="queue-progress-caption text-muted">
                           {progressCaption(item)}
+                          {#if item.speedBytesPerSecond}
+                            · {formatRate(item.speedBytesPerSecond)}
+                          {/if}
+                          {#if item.etaSeconds}
+                            · {$_('pages.dashboard.ETA')} {formatEta(item.etaSeconds)}
+                          {/if}
                         </div>
                         <div class="text-truncate" title={item.archive || ''}>
                           {item.archive || '\u00a0'}
@@ -523,14 +714,20 @@
                           title={item.progress || ''}
                         >
                           {progressCaption(item) || $_('phrases.Empty')}
+                          {#if item.speedBytesPerSecond}
+                            · {formatRate(item.speedBytesPerSecond)}
+                          {/if}
+                          {#if item.etaSeconds}
+                            · {$_('pages.dashboard.ETA')} {formatEta(item.etaSeconds)}
+                          {/if}
                         </div>
                       {/if}
                     </div>
                   </td>
-                  <td class="text-end">{item.retries}</td>
-                  <td class="small text-nowrap">{relTime(item.updated, now)}</td
+                  <td data-label={$_('pages.dashboard.Retries')} class="text-end">{item.retries}</td>
+                  <td data-label={$_('pages.dashboard.Updated')} class="small text-nowrap">{relTime(item.updated, now)}</td
                   >
-                  <td class="text-end text-nowrap">
+                  <td data-label={$_('pages.dashboard.Actions')} class="text-end text-nowrap">
                     {#if canWrite && (item.status === 'extractfailed' || TERMINAL.includes(item.status))}
                       <ButtonGroup size="sm">
                         {#if item.status === 'extractfailed'}
@@ -558,7 +755,22 @@
                 </tr>
                 <tr class="stack-item-path">
                   <td colspan="6">
-                    <code class="wrap small">{item.id}</code>
+                    <div class="small"><strong>{itemTitle(item)}</strong></div>
+                    <code class="wrap small">{itemPath(item)}</code>
+                    {#if itemReason(item)}
+                      <div class="text-muted small">{itemReason(item)}</div>
+                    {/if}
+                    {#if item.outputPath || item.deleteAt}
+                      <details class="small mt-1">
+                        <summary>{$_('logs.Details')}</summary>
+                        {#if item.outputPath}
+                          <div>{$_('phrases.Output')}: <code>{item.outputPath}</code></div>
+                        {/if}
+                        {#if item.deleteAt}
+                          <div>{$_('phrases.DeletesIn')}: {deleteRemaining(item.deleteAt, now)}</div>
+                        {/if}
+                      </details>
+                    {/if}
                     {#if item.error}<div class="text-danger small">
                         {item.error}
                       </div>{/if}
@@ -574,10 +786,11 @@
 {/if}
 
 {#if canHistory}
-  <div class="mt-4">
+  <div class="mt-4 history-section">
     <History {now} />
   </div>
 {/if}
+</div>
 
 <Modal isOpen={pendingForget !== null} toggle={cancelForget}>
   <ModalHeader toggle={cancelForget}
