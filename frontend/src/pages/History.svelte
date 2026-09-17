@@ -42,10 +42,12 @@
     loadColumnWidths,
     resetColumnWidths,
     saveColumnWidths,
+    colStyle,
   } from '../lib/columns'
   import { success, failure } from '../lib/toast'
   import type { HistoryRecord } from '../lib/types'
   import { live } from '../lib/socket.svelte'
+  import TaskDetails from '../components/TaskDetails.svelte'
 
   let { now = Date.now() }: { now?: number } = $props()
 
@@ -54,6 +56,7 @@
   let loaded = $state(false)
   let pendingClear = $state(false)
   let dismissedIds = $state<string[]>([])
+  let selectedHistoryId = $state<string | null>(null)
 
   const dismissedStorageKey = 'unpackerr.dashboard.dismissed-history.v1'
 
@@ -65,24 +68,37 @@
     | 'retries'
     | 'finished'
     | 'actions'
-  const historyColumnDefaults: Record<HistoryColumn, number> = {
-    app: 128,
-    status: 128,
-    files: 80,
-    size: 112,
-    retries: 88,
-    finished: 160,
-    actions: 112,
+  const historyColumnDefaults: Record<HistoryColumn, string> = {
+    app: '13%',
+    status: '13%',
+    files: '8%',
+    size: '11%',
+    retries: '8%',
+    finished: '27%',
+    actions: '20%',
+  }
+  const historyColumnMins: Record<HistoryColumn, number> = {
+    app: 70,
+    status: 70,
+    files: 50,
+    size: 70,
+    retries: 50,
+    finished: 110,
+    actions: 80,
   }
   const historyColumnStorageKey = 'unpackerr.dashboard.history-columns.v1'
-  let historyColumnWidths = $state({ ...historyColumnDefaults })
+  let historyColumnWidths = $state<Record<HistoryColumn, number | string>>({ ...historyColumnDefaults })
+  let tableWidth = $state<number | null>(null)
   let historyResize = $state<{
     key: HistoryColumn
     startX: number
-    startWidth: number
+    startWidths: Record<HistoryColumn, number>
+    containerWidth: number
+    handle: HTMLElement
   } | null>(null)
 
   function resetHistoryColumns() {
+    tableWidth = null
     historyColumnWidths = resetColumnWidths(
       historyColumnStorageKey,
       historyColumnDefaults,
@@ -92,24 +108,72 @@
   function startHistoryResize(event: PointerEvent, key: HistoryColumn) {
     event.preventDefault()
     const handle = event.currentTarget as HTMLElement
+    try {
+      handle.setPointerCapture(event.pointerId)
+    } catch {}
     const heading = handle.parentElement
+    if (!heading) return
+
+    const thead = heading.parentElement
+    const ths = thead ? (Array.from(thead.children) as HTMLElement[]) : []
+    const keys: HistoryColumn[] = ['app', 'status', 'files', 'size', 'retries', 'finished']
+    if (canWrite) keys.push('actions')
+
+    const tableEl = heading.closest('table')
+    const containerWidth = tableEl?.parentElement?.clientWidth ?? tableEl?.getBoundingClientRect().width ?? 0
+
+    const startWidths: Record<HistoryColumn, number> = {} as any
+    ths.forEach((th, idx) => {
+      const colKey = keys[idx]
+      if (colKey) {
+        startWidths[colKey] = Math.round(th.getBoundingClientRect().width)
+      }
+    })
+
     historyResize = {
       key,
       startX: event.clientX,
-      startWidth: heading?.getBoundingClientRect().width ?? historyColumnWidths[key],
+      startWidths,
+      containerWidth,
+      handle,
     }
     document.body.classList.add('is-resizing-columns')
   }
 
-  function moveHistoryResize(event: PointerEvent) {
+  function moveHistoryResize(event: PointerEvent | MouseEvent) {
     if (!historyResize) return
-    historyColumnWidths[historyResize.key] = clampColumnWidth(
-      historyResize.startWidth + event.clientX - historyResize.startX,
-    )
+    const delta = event.clientX - historyResize.startX
+    const flexKey: HistoryColumn = historyResize.key === 'finished' ? 'status' : 'finished'
+
+    const minW = historyColumnMins[historyResize.key]
+    const newTargetW = Math.max(minW, Math.round(historyResize.startWidths[historyResize.key] + delta))
+    const actualDelta = newTargetW - historyResize.startWidths[historyResize.key]
+
+    const flexMinW = historyColumnMins[flexKey]
+    const newFlexW = Math.max(flexMinW, Math.round(historyResize.startWidths[flexKey] - actualDelta))
+    const absorbedDelta = historyResize.startWidths[flexKey] - newFlexW
+
+    const unabsorbed = actualDelta - absorbedDelta
+
+    const updated: Record<HistoryColumn, number | string> = { ...historyResize.startWidths }
+    updated[historyResize.key] = newTargetW
+    updated[flexKey] = newFlexW
+    historyColumnWidths = updated
+
+    if (unabsorbed > 0) {
+      tableWidth = Math.round(historyResize.containerWidth + unabsorbed)
+    } else {
+      tableWidth = null
+    }
   }
 
-  function finishHistoryResize() {
+  function finishHistoryResize(event: PointerEvent | MouseEvent) {
     if (!historyResize) return
+    try {
+      if ('pointerId' in event && historyResize.handle?.hasPointerCapture(event.pointerId)) {
+        historyResize.handle.releasePointerCapture(event.pointerId)
+      }
+    } catch {}
     saveColumnWidths(historyColumnStorageKey, historyColumnWidths)
     historyResize = null
     document.body.classList.remove('is-resizing-columns')
@@ -119,12 +183,27 @@
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const delta = event.key === 'ArrowRight' ? 16 : -16
-    historyColumnWidths[key] = clampColumnWidth(historyColumnWidths[key] + delta)
+    const flexKey: HistoryColumn = key === 'finished' ? 'status' : 'finished'
+    const curVal = typeof historyColumnWidths[key] === 'number' ? (historyColumnWidths[key] as number) : 120
+    const flexVal = typeof historyColumnWidths[flexKey] === 'number' ? (historyColumnWidths[flexKey] as number) : 300
+    const newTarget = Math.max(historyColumnMins[key], curVal + delta)
+    const newFlex = Math.max(historyColumnMins[flexKey], flexVal - (newTarget - curVal))
+    const updated: Record<HistoryColumn, number | string> = { ...historyColumnWidths }
+    updated[key] = newTarget
+    updated[flexKey] = newFlex
+    historyColumnWidths = updated
     saveColumnWidths(historyColumnStorageKey, historyColumnWidths)
   }
 
   const canWrite = has(systemPerm('history', 'write'))
   const allRows = $derived(live.history.filter(isFinishedHistory))
+  const selectedHistoryItem = $derived(
+    allRows.find((row) => row.id === selectedHistoryId) ?? null
+  )
+
+  function toggleHistorySelect(id: string) {
+    selectedHistoryId = selectedHistoryId === id ? null : id
+  }
   const rows = $derived(
     allRows.filter((row) => !dismissedIds.includes(row.id)),
   )
@@ -217,11 +296,15 @@
     )
     window.addEventListener('pointermove', moveHistoryResize)
     window.addEventListener('pointerup', finishHistoryResize)
+    window.addEventListener('mousemove', moveHistoryResize)
+    window.addEventListener('mouseup', finishHistoryResize)
     void refresh()
 
     return () => {
       window.removeEventListener('pointermove', moveHistoryResize)
       window.removeEventListener('pointerup', finishHistoryResize)
+      window.removeEventListener('mousemove', moveHistoryResize)
+      window.removeEventListener('mouseup', finishHistoryResize)
       document.body.classList.remove('is-resizing-columns')
     }
   })
@@ -285,15 +368,15 @@
     {:else if shown.length === 0}
       <p class="text-muted mb-0">{$_('phrases.NoHistory')}</p>
     {:else}
-      <Table responsive hover size="sm" class="align-middle history-table">
+      <Table responsive hover size="sm" class="align-middle history-table" style={tableWidth ? `width: ${tableWidth}px` : 'width: 100%'}>
         <colgroup>
-          <col style={`width: ${historyColumnWidths.app}px`} />
-          <col style={`width: ${historyColumnWidths.status}px`} />
-          <col style={`width: ${historyColumnWidths.files}px`} />
-          <col style={`width: ${historyColumnWidths.size}px`} />
-          <col style={`width: ${historyColumnWidths.retries}px`} />
-          <col style={`width: ${historyColumnWidths.finished}px`} />
-          {#if canWrite}<col style={`width: ${historyColumnWidths.actions}px`} />{/if}
+          <col style={`width: ${colStyle(historyColumnWidths.app)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.status)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.files)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.size)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.retries)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.finished)}`} />
+          {#if canWrite}<col style={`width: ${colStyle(historyColumnWidths.actions)}`} />{/if}
         </colgroup>
         <thead>
           <tr>
@@ -329,22 +412,26 @@
             </th>
             <th id="hist-finished" scope="col">
               {$_('pages.history.Finished')}
-              <button type="button" class="column-resizer" aria-label="Resize finished column"
-                onpointerdown={(event) => startHistoryResize(event, 'finished')}
-                onkeydown={(event) => nudgeHistoryResize(event, 'finished')}></button>
+              {#if canWrite}
+                <button type="button" class="column-resizer" aria-label="Resize finished column"
+                  onpointerdown={(event) => startHistoryResize(event, 'finished')}
+                  onkeydown={(event) => nudgeHistoryResize(event, 'finished')}></button>
+              {/if}
             </th>
             {#if canWrite}
               <th id="hist-actions" class="text-end" scope="col">
                 {$_('pages.history.Actions')}
-                <button type="button" class="column-resizer" aria-label="Resize actions column"
-                  onpointerdown={(event) => startHistoryResize(event, 'actions')}
-                  onkeydown={(event) => nudgeHistoryResize(event, 'actions')}></button>
               </th>
             {/if}
           </tr>
         </thead>
         {#each shown as row (row.id)}
-          <tbody class="stack-item">
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+          <tbody
+            class="stack-item items-row"
+            class:is-selected={selectedHistoryId === row.id}
+            onclick={() => toggleHistorySelect(row.id)}
+          >
             <tr>
               <td data-label={$_('pages.history.App')} headers="hist-app">{row.app}</td>
               <td data-label={$_('pages.history.Status')} headers="hist-status"
@@ -377,7 +464,10 @@
                     color="secondary"
                     outline
                     disabled={busy[row.id]}
-                    onclick={() => remove(row)}>{$_('buttons.Delete')}</Button
+                    onclick={(e) => {
+                      e.stopPropagation()
+                      remove(row)
+                    }}>{$_('buttons.Delete')}</Button
                   >
                 </td>
               {/if}
@@ -388,22 +478,6 @@
                 <code class="wrap small">{itemPath(row)}</code>
                 {#if itemReason(row)}
                   <div class="text-muted small">{itemReason(row)}</div>
-                {/if}
-                {#if row.outputPath || visibleFiles(row.newFiles).length}
-                  <details class="small mt-1">
-                    <summary>{$_('logs.Details')}</summary>
-                    {#if row.outputPath}
-                      <div>{$_('phrases.Output')}: <code>{row.outputPath}</code></div>
-                    {/if}
-                    {#if visibleFiles(row.newFiles).length}
-                      <div>Files:</div>
-                      <ul class="mb-0">
-                        {#each visibleFiles(row.newFiles) as file}
-                          <li><code>{file}</code></li>
-                        {/each}
-                      </ul>
-                    {/if}
-                  </details>
                 {/if}
                 {#if row.error}<div class="text-danger small">
                     {row.error}
@@ -416,6 +490,16 @@
     {/if}
   </CardBody>
 </Card>
+
+{#if selectedHistoryItem}
+  <div class="mt-3">
+    <TaskDetails
+      item={selectedHistoryItem}
+      {now}
+      onclose={() => (selectedHistoryId = null)}
+    />
+  </div>
+{/if}
 
 <Modal isOpen={pendingClear} toggle={cancelClear}>
   <ModalHeader toggle={cancelClear}

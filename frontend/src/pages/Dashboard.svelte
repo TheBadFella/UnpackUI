@@ -40,36 +40,51 @@
     loadColumnWidths,
     resetColumnWidths,
     saveColumnWidths,
+    colStyle,
   } from '../lib/columns'
   import { success, failure } from '../lib/toast'
   import { live, type LiveTopic } from '../lib/socket.svelte'
   import type { BufferStat, QueueItem } from '../lib/types'
   import githubIcon from '../assets/github.svg'
   import History from './History.svelte'
+  import TaskDetails from '../components/TaskDetails.svelte'
 
   let busy = $state<Record<string, boolean>>({})
   let now = $state(Date.now())
   let ageTimer: ReturnType<typeof setInterval> | undefined
   let pendingForget = $state<QueueItem | null>(null)
+  let selectedQueueId = $state<string | null>(null)
 
   type QueueColumn = 'app' | 'status' | 'progress' | 'retries' | 'updated' | 'actions'
-  const queueColumnDefaults: Record<QueueColumn, number> = {
-    app: 128,
-    status: 128,
-    progress: 256,
-    retries: 88,
-    updated: 128,
-    actions: 160,
+  const queueColumnDefaults: Record<QueueColumn, string> = {
+    app: '13%',
+    status: '13%',
+    progress: '36%',
+    retries: '8%',
+    updated: '14%',
+    actions: '16%',
+  }
+  const queueColumnMins: Record<QueueColumn, number> = {
+    app: 70,
+    status: 70,
+    progress: 120,
+    retries: 50,
+    updated: 70,
+    actions: 80,
   }
   const queueColumnStorageKey = 'unpackerr.dashboard.queue-columns.v1'
-  let queueColumnWidths = $state({ ...queueColumnDefaults })
+  let queueColumnWidths = $state<Record<QueueColumn, number | string>>({ ...queueColumnDefaults })
+  let queueTableWidth = $state<number | null>(null)
   let queueResize = $state<{
     key: QueueColumn
     startX: number
-    startWidth: number
+    startWidths: Record<QueueColumn, number>
+    containerWidth: number
+    handle: HTMLElement
   } | null>(null)
 
   function resetQueueColumns() {
+    queueTableWidth = null
     queueColumnWidths = resetColumnWidths(
       queueColumnStorageKey,
       queueColumnDefaults,
@@ -79,24 +94,71 @@
   function startQueueResize(event: PointerEvent, key: QueueColumn) {
     event.preventDefault()
     const handle = event.currentTarget as HTMLElement
+    try {
+      handle.setPointerCapture(event.pointerId)
+    } catch {}
     const heading = handle.parentElement
+    if (!heading) return
+
+    const thead = heading.parentElement
+    const ths = thead ? (Array.from(thead.children) as HTMLElement[]) : []
+    const keys: QueueColumn[] = ['app', 'status', 'progress', 'retries', 'updated', 'actions']
+
+    const tableEl = heading.closest('table')
+    const containerWidth = tableEl?.parentElement?.clientWidth ?? tableEl?.getBoundingClientRect().width ?? 0
+
+    const startWidths: Record<QueueColumn, number> = {} as any
+    ths.forEach((th, idx) => {
+      const colKey = keys[idx]
+      if (colKey) {
+        startWidths[colKey] = Math.round(th.getBoundingClientRect().width)
+      }
+    })
+
     queueResize = {
       key,
       startX: event.clientX,
-      startWidth: heading?.getBoundingClientRect().width ?? queueColumnWidths[key],
+      startWidths,
+      containerWidth,
+      handle,
     }
     document.body.classList.add('is-resizing-columns')
   }
 
-  function moveQueueResize(event: PointerEvent) {
+  function moveQueueResize(event: PointerEvent | MouseEvent) {
     if (!queueResize) return
-    queueColumnWidths[queueResize.key] = clampColumnWidth(
-      queueResize.startWidth + event.clientX - queueResize.startX,
-    )
+    const delta = event.clientX - queueResize.startX
+    const flexKey: QueueColumn = queueResize.key === 'progress' ? 'status' : 'progress'
+
+    const minW = queueColumnMins[queueResize.key]
+    const newTargetW = Math.max(minW, Math.round(queueResize.startWidths[queueResize.key] + delta))
+    const actualDelta = newTargetW - queueResize.startWidths[queueResize.key]
+
+    const flexMinW = queueColumnMins[flexKey]
+    const newFlexW = Math.max(flexMinW, Math.round(queueResize.startWidths[flexKey] - actualDelta))
+    const absorbedDelta = queueResize.startWidths[flexKey] - newFlexW
+
+    const unabsorbed = actualDelta - absorbedDelta
+
+    const updated: Record<QueueColumn, number | string> = { ...queueResize.startWidths }
+    updated[queueResize.key] = newTargetW
+    updated[flexKey] = newFlexW
+    queueColumnWidths = updated
+
+    if (unabsorbed > 0) {
+      queueTableWidth = Math.round(queueResize.containerWidth + unabsorbed)
+    } else {
+      queueTableWidth = null
+    }
   }
 
-  function finishQueueResize() {
+  function finishQueueResize(event: PointerEvent | MouseEvent) {
     if (!queueResize) return
+    try {
+      if ('pointerId' in event && queueResize.handle?.hasPointerCapture(event.pointerId)) {
+        queueResize.handle.releasePointerCapture(event.pointerId)
+      }
+    } catch {}
     saveColumnWidths(queueColumnStorageKey, queueColumnWidths)
     queueResize = null
     document.body.classList.remove('is-resizing-columns')
@@ -106,7 +168,15 @@
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const delta = event.key === 'ArrowRight' ? 16 : -16
-    queueColumnWidths[key] = clampColumnWidth(queueColumnWidths[key] + delta)
+    const flexKey: QueueColumn = key === 'progress' ? 'status' : 'progress'
+    const curVal = typeof queueColumnWidths[key] === 'number' ? (queueColumnWidths[key] as number) : 120
+    const flexVal = typeof queueColumnWidths[flexKey] === 'number' ? (queueColumnWidths[flexKey] as number) : 300
+    const newTarget = Math.max(queueColumnMins[key], curVal + delta)
+    const newFlex = Math.max(queueColumnMins[flexKey], flexVal - (newTarget - curVal))
+    const updated: Record<QueueColumn, number | string> = { ...queueColumnWidths }
+    updated[key] = newTarget
+    updated[flexKey] = newFlex
+    queueColumnWidths = updated
     saveColumnWidths(queueColumnStorageKey, queueColumnWidths)
   }
 
@@ -140,6 +210,13 @@
   const uid = $props.id()
   const stats = $derived(live.stats)
   const queue = $derived(live.queue)
+  const selectedQueueItem = $derived(
+    queue.find((item) => item.id === selectedQueueId) ?? null
+  )
+
+  function toggleQueueSelect(id: string) {
+    selectedQueueId = selectedQueueId === id ? null : id
+  }
   const trackedCount = $derived(queue.length + live.history.length)
   const loading = $derived(live.fetchedAt === undefined)
 
@@ -385,6 +462,8 @@
     )
     window.addEventListener('pointermove', moveQueueResize)
     window.addEventListener('pointerup', finishQueueResize)
+    window.addEventListener('mousemove', moveQueueResize)
+    window.addEventListener('mouseup', finishQueueResize)
     const topics: LiveTopic[] = []
     if (canQueue) {
       topics.push('queue')
@@ -400,6 +479,8 @@
       if (topics.length) live.unsubscribe(topics)
       window.removeEventListener('pointermove', moveQueueResize)
       window.removeEventListener('pointerup', finishQueueResize)
+      window.removeEventListener('mousemove', moveQueueResize)
+      window.removeEventListener('mouseup', finishQueueResize)
       document.body.classList.remove('is-resizing-columns')
     }
   })
@@ -600,14 +681,14 @@
         {#if queue.length === 0}
           <p class="text-muted mb-0">{$_('phrases.NothingQueued')}</p>
         {:else}
-          <Table responsive hover size="sm" class="align-middle queue-table">
+          <Table responsive hover size="sm" class="align-middle queue-table" style={queueTableWidth ? `width: ${queueTableWidth}px` : 'width: 100%'}>
             <colgroup>
-              <col style={`width: ${queueColumnWidths.app}px`} />
-              <col style={`width: ${queueColumnWidths.status}px`} />
-              <col style={`width: ${queueColumnWidths.progress}px`} />
-              <col style={`width: ${queueColumnWidths.retries}px`} />
-              <col style={`width: ${queueColumnWidths.updated}px`} />
-              <col style={`width: ${queueColumnWidths.actions}px`} />
+              <col style={`width: ${colStyle(queueColumnWidths.app)}`} />
+              <col style={`width: ${colStyle(queueColumnWidths.status)}`} />
+              <col style={`width: ${colStyle(queueColumnWidths.progress)}`} />
+              <col style={`width: ${colStyle(queueColumnWidths.retries)}`} />
+              <col style={`width: ${colStyle(queueColumnWidths.updated)}`} />
+              <col style={`width: ${colStyle(queueColumnWidths.actions)}`} />
             </colgroup>
             <thead>
               <tr>
@@ -663,18 +744,16 @@
                 </th>
                 <th class="text-end">
                   {$_('pages.dashboard.Actions')}
-                  <button
-                    type="button"
-                    class="column-resizer"
-                    aria-label="Resize actions column"
-                    onpointerdown={(event) => startQueueResize(event, 'actions')}
-                    onkeydown={(event) => nudgeQueueResize(event, 'actions')}
-                  ></button>
                 </th>
               </tr>
             </thead>
             {#each queue as item (item.id)}
-              <tbody class="stack-item">
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+              <tbody
+                class="stack-item items-row"
+                class:is-selected={selectedQueueId === item.id}
+                onclick={() => toggleQueueSelect(item.id)}
+              >
                 <tr>
                   <td data-label={$_('pages.dashboard.App')}>{item.app}</td>
                   <td data-label={$_('pages.dashboard.Status')}
@@ -735,7 +814,10 @@
                             color="primary"
                             outline
                             disabled={busy[item.id]}
-                            onclick={() => retry(item)}
+                            onclick={(e) => {
+                              e.stopPropagation()
+                              retry(item)
+                            }}
                             >{$_('buttons.Retry')}</Button
                           >
                         {/if}
@@ -745,7 +827,10 @@
                             color="secondary"
                             outline
                             disabled={busy[item.id]}
-                            onclick={() => forget(item)}
+                            onclick={(e) => {
+                              e.stopPropagation()
+                              forget(item)
+                            }}
                             >{$_('buttons.Forget')}</Button
                           >
                         {/if}
@@ -760,17 +845,6 @@
                     {#if itemReason(item)}
                       <div class="text-muted small">{itemReason(item)}</div>
                     {/if}
-                    {#if item.outputPath || item.deleteAt}
-                      <details class="small mt-1">
-                        <summary>{$_('logs.Details')}</summary>
-                        {#if item.outputPath}
-                          <div>{$_('phrases.Output')}: <code>{item.outputPath}</code></div>
-                        {/if}
-                        {#if item.deleteAt}
-                          <div>{$_('phrases.DeletesIn')}: {deleteRemaining(item.deleteAt, now)}</div>
-                        {/if}
-                      </details>
-                    {/if}
                     {#if item.error}<div class="text-danger small">
                         {item.error}
                       </div>{/if}
@@ -782,6 +856,15 @@
         {/if}
       </CardBody>
     </Card>
+    {#if selectedQueueItem}
+      <div class="mt-3">
+        <TaskDetails
+          item={selectedQueueItem}
+          {now}
+          onclose={() => (selectedQueueId = null)}
+        />
+      </div>
+    {/if}
   {/if}
 {/if}
 
