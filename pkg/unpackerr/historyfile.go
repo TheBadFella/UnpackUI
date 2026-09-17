@@ -36,6 +36,8 @@ type HistoryRecord struct {
 	ID          string        `json:"id"`
 	App         string        `json:"app"`
 	Kind        string        `json:"kind,omitempty"` // Starr dialect or Folder; App is the instance label.
+	Title       string        `json:"title,omitempty"`
+	Reason      string        `json:"reason,omitempty"`
 	URL         string        `json:"url,omitempty"`
 	Path        string        `json:"path"`
 	OutputPath  string        `json:"outputPath,omitempty"`
@@ -53,6 +55,7 @@ type HistoryRecord struct {
 	Progress    string        `json:"progress,omitempty"`
 	DeleteOrig  bool          `json:"deleteOrig,omitempty"`
 	DeleteDelay string        `json:"deleteDelay,omitempty"` // Go duration, e.g. 5m0s
+	DeleteAt    *time.Time    `json:"deleteAt,omitempty"`
 	Syncthing   bool          `json:"syncthing,omitempty"`
 	SplitFlac   bool          `json:"splitFlac,omitempty"`
 	MaxBytes    uint64        `json:"maxBytes,omitempty"`
@@ -64,26 +67,31 @@ type HistoryRecord struct {
 
 // QueueItem is a live in-flight extract for GET /api/queue.
 type QueueItem struct {
-	ID         string        `json:"id"`
-	App        string        `json:"app"`
-	URL        string        `json:"url,omitempty"`
-	Path       string        `json:"path"`
-	OutputPath string        `json:"outputPath,omitempty"`
-	Status     ExtractStatus `json:"status"`
-	Retries    uint          `json:"retries"`
-	Updated    time.Time     `json:"updated"`
-	Progress   string        `json:"progress,omitempty"`
-	Error      string        `json:"error,omitempty"`
-	Percent    float64       `json:"percent,omitempty"`
-	Wrote      uint64        `json:"wrote,omitempty"`
-	Total      uint64        `json:"total,omitempty"`
-	Read       uint64        `json:"read,omitempty"`
-	Compressed uint64        `json:"compressed,omitempty"`
-	Files      int           `json:"files,omitempty"`
-	Count      int           `json:"count,omitempty"`
-	Archives   int           `json:"archives,omitempty"`
-	Extracted  int           `json:"extracted,omitempty"`
-	Archive    string        `json:"archive,omitempty"`
+	ID                  string        `json:"id"`
+	App                 string        `json:"app"`
+	Title               string        `json:"title,omitempty"`
+	Reason              string        `json:"reason,omitempty"`
+	URL                 string        `json:"url,omitempty"`
+	Path                string        `json:"path"`
+	OutputPath          string        `json:"outputPath,omitempty"`
+	Status              ExtractStatus `json:"status"`
+	Retries             uint          `json:"retries"`
+	Updated             time.Time     `json:"updated"`
+	Progress            string        `json:"progress,omitempty"`
+	Error               string        `json:"error,omitempty"`
+	Percent             float64       `json:"percent,omitempty"`
+	Wrote               uint64        `json:"wrote,omitempty"`
+	Total               uint64        `json:"total,omitempty"`
+	Read                uint64        `json:"read,omitempty"`
+	Compressed          uint64        `json:"compressed,omitempty"`
+	Files               int           `json:"files,omitempty"`
+	Count               int           `json:"count,omitempty"`
+	Archives            int           `json:"archives,omitempty"`
+	Extracted           int           `json:"extracted,omitempty"`
+	Archive             string        `json:"archive,omitempty"`
+	SpeedBytesPerSecond uint64        `json:"speedBytesPerSecond,omitempty"`
+	ETASeconds          int64         `json:"etaSeconds,omitempty"`
+	DeleteAt            *time.Time    `json:"deleteAt,omitempty"`
 }
 
 func isDurableHistory(status ExtractStatus) bool {
@@ -267,6 +275,8 @@ func historyFromExtract(itemID string, item *Extract) HistoryRecord {
 		ID:         itemID,
 		App:        item.Label(),
 		Kind:       string(item.App),
+		Title:      extractIDString(item, "title"),
+		Reason:     extractIDString(item, "reason"),
 		URL:        item.URL,
 		Path:       item.Path,
 		OutputPath: item.OutputPath,
@@ -284,6 +294,10 @@ func historyFromExtract(itemID string, item *Extract) HistoryRecord {
 
 	if item.DeleteDelay != 0 {
 		rec.DeleteDelay = item.DeleteDelay.String()
+		if item.Status == IMPORTED {
+			deleteAt := item.Updated.Add(item.DeleteDelay)
+			rec.DeleteAt = &deleteAt
+		}
 	}
 
 	if isDurableHistory(item.Status) {
@@ -293,6 +307,21 @@ func historyFromExtract(itemID string, item *Extract) HistoryRecord {
 	fillHistoryStats(&rec, item)
 
 	return rec
+}
+
+// extractIDString exposes only the small set of human-facing identifiers used
+// by the dashboard, rather than serializing the complete internal IDs map.
+func extractIDString(item *Extract, key string) string {
+	if item == nil || item.IDs == nil {
+		return ""
+	}
+
+	value, ok := item.IDs[key]
+	if !ok {
+		return ""
+	}
+
+	return strings.TrimSpace(fmt.Sprint(value))
 }
 
 func fillHistoryStats(rec *HistoryRecord, item *Extract) {
@@ -446,6 +475,8 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 	queue := QueueItem{
 		ID:         id,
 		App:        item.Label(),
+		Title:      extractIDString(item, "title"),
+		Reason:     extractIDString(item, "reason"),
 		URL:        item.URL,
 		Path:       item.Path,
 		OutputPath: item.OutputPath,
@@ -463,6 +494,7 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 	}
 
 	if item.XProg != nil {
+		now := time.Now()
 		if prog := item.XProg.String(); prog != "no progress yet" {
 			queue.Progress = prog
 		}
@@ -478,6 +510,13 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 			queue.Archives = item.XProg.Archives
 			queue.Extracted = item.XProg.Extracted
 
+			if speed, ok := item.XProg.Speed(now); ok {
+				queue.SpeedBytesPerSecond = speed
+			}
+			if eta, ok := item.XProg.ETA(now); ok {
+				queue.ETASeconds = int64(eta / time.Second)
+			}
+
 			if prog.XFile != nil {
 				rel := strings.TrimPrefix(prog.XFile.FilePath, item.Path)
 				queue.Archive = strings.TrimLeft(filepath.ToSlash(rel), `/\`)
@@ -487,6 +526,11 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 
 	if item.Resp != nil && item.Resp.Error != nil {
 		queue.Error = item.Resp.Error.Error()
+	}
+
+	if item.Status == IMPORTED && item.DeleteDelay > 0 {
+		deleteAt := item.Updated.Add(item.DeleteDelay)
+		queue.DeleteAt = &deleteAt
 	}
 
 	return queue

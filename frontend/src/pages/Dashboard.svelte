@@ -28,6 +28,14 @@
     relTime,
     progressCaption,
   } from '../lib/format'
+  import {
+    formatEta,
+    formatRate,
+    itemPath,
+    itemReason,
+    itemTitle,
+    deleteRemaining,
+  } from '../lib/dashboard'
   import { success, failure } from '../lib/toast'
   import { live, type LiveTopic } from '../lib/socket.svelte'
   import type { BufferStat, QueueItem } from '../lib/types'
@@ -508,6 +516,12 @@
                         </div>
                         <div class="queue-progress-caption text-muted">
                           {progressCaption(item)}
+                          {#if item.speedBytesPerSecond}
+                            · {formatRate(item.speedBytesPerSecond)}
+                          {/if}
+                          {#if item.etaSeconds}
+                            · ETA {formatEta(item.etaSeconds)}
+                          {/if}
                         </div>
                         <div class="text-truncate" title={item.archive || ''}>
                           {item.archive || '\u00a0'}
@@ -523,6 +537,12 @@
                           title={item.progress || ''}
                         >
                           {progressCaption(item) || $_('phrases.Empty')}
+                          {#if item.speedBytesPerSecond}
+                            · {formatRate(item.speedBytesPerSecond)}
+                          {/if}
+                          {#if item.etaSeconds}
+                            · ETA {formatEta(item.etaSeconds)}
+                          {/if}
                         </div>
                       {/if}
                     </div>
@@ -558,7 +578,22 @@
                 </tr>
                 <tr class="stack-item-path">
                   <td colspan="6">
-                    <code class="wrap small">{item.id}</code>
+                    <div class="small"><strong>{itemTitle(item)}</strong></div>
+                    <code class="wrap small">{itemPath(item)}</code>
+                    {#if itemReason(item)}
+                      <div class="text-muted small">{itemReason(item)}</div>
+                    {/if}
+                    {#if item.outputPath || item.deleteAt}
+                      <details class="small mt-1">
+                        <summary>{$_('logs.Details')}</summary>
+                        {#if item.outputPath}
+                          <div>Output: <code>{item.outputPath}</code></div>
+                        {/if}
+                        {#if item.deleteAt}
+                          <div>Deletes in: {deleteRemaining(item.deleteAt, now)}</div>
+                        {/if}
+                      </details>
+                    {/if}
                     {#if item.error}<div class="text-danger small">
                         {item.error}
                       </div>{/if}

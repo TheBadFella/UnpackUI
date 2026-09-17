@@ -30,6 +30,13 @@
     isZeroTime,
     isFinishedHistory,
   } from '../lib/format'
+  import {
+    deleteRemaining,
+    itemPath,
+    itemReason,
+    itemTitle,
+    visibleFiles,
+  } from '../lib/dashboard'
   import { success, failure } from '../lib/toast'
   import type { HistoryRecord } from '../lib/types'
   import { live } from '../lib/socket.svelte'
@@ -178,6 +185,9 @@
                 {isZeroTime(row.finished)
                   ? $_('phrases.Empty')
                   : relTime(row.finished, now)}
+                {#if row.deleteAt}
+                  <div class="text-muted">Deletes in {deleteRemaining(row.deleteAt, now)}</div>
+                {/if}
               </td>
               {#if canWrite}
                 <td class="text-end" headers="hist-actions">
@@ -193,7 +203,27 @@
             </tr>
             <tr class="stack-item-path">
               <td colspan={canWrite ? 7 : 6} headers="hist-app">
-                <code class="wrap small">{row.id}</code>
+                <div class="small"><strong>{itemTitle(row)}</strong></div>
+                <code class="wrap small">{itemPath(row)}</code>
+                {#if itemReason(row)}
+                  <div class="text-muted small">{itemReason(row)}</div>
+                {/if}
+                {#if row.outputPath || visibleFiles(row.newFiles).length}
+                  <details class="small mt-1">
+                    <summary>{$_('logs.Details')}</summary>
+                    {#if row.outputPath}
+                      <div>Output: <code>{row.outputPath}</code></div>
+                    {/if}
+                    {#if visibleFiles(row.newFiles).length}
+                      <div>Files:</div>
+                      <ul class="mb-0">
+                        {#each visibleFiles(row.newFiles) as file}
+                          <li><code>{file}</code></li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </details>
+                {/if}
                 {#if row.error}<div class="text-danger small">
                     {row.error}
                   </div>{/if}

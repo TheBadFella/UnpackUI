@@ -41,6 +41,15 @@ export interface Stats {
   stackDel: BufferStat
   stackTask: BufferStat
   starrQueues?: StarrQueueStat[]
+  /** Additive fields retained for older UnpackUI/Homepage clients. */
+  active?: number
+  completed?: number
+  webhookOK?: number
+  webhookFailed?: number
+  cmdhookOK?: number
+  cmdhookFailed?: number
+  uptime?: string
+  generatedAt?: string
 }
 
 export interface BufferStat {
@@ -94,6 +103,8 @@ export interface SystemInfo {
 export interface QueueItem {
   id: string
   app: string
+  title?: string
+  reason?: string
   url: string
   path: string
   outputPath: string
@@ -112,11 +123,17 @@ export interface QueueItem {
   archives?: number
   extracted?: number
   archive?: string
+  speedBytesPerSecond?: number
+  etaSeconds?: number
+  deleteAt?: string
 }
 
 export interface HistoryRecord {
   id: string
   app: string
+  kind?: string
+  title?: string
+  reason?: string
   url: string
   path: string
   outputPath: string
@@ -132,6 +149,16 @@ export interface HistoryRecord {
   elapsed: string
   error: string
   progress: string
+  deleteOrig?: boolean
+  deleteDelay?: string
+  deleteAt?: string
+  syncthing?: boolean
+  splitFlac?: boolean
+  maxBytes?: number
+  noRetry?: boolean
+  newFiles?: string[]
+  preFiles?: string[]
+  forgotten?: boolean
 }
 
 export interface BrowseDir {
