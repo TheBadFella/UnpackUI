@@ -463,6 +463,11 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 
 /* Keep the fork's original dashboard presentation around the upstream data
  * and action contracts. Utility/settings pages remain Bootstrap themed. */
+.dashboard-wrap {
+  width: 100%;
+  min-height: 100%;
+}
+
 .dashboard-page {
   --dash-bg: #0d0d0d;
   --dash-panel: #141414;
@@ -477,10 +482,10 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
   --dash-border: #2d2d2d;
   --dash-border-strong: #555555;
 
-  max-width: 1480px;
-  min-height: calc(100vh - 4rem);
-  margin: -0.5rem -0.75rem -1rem;
-  padding: 2.625rem 1.75rem 4.5rem;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 1.75rem 2rem 4.5rem;
   color: var(--dash-text);
   font-family: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'SFMono-Regular', monospace;
   background:
