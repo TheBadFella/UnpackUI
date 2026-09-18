@@ -2353,3 +2353,38 @@ func TestConfigPutSonarrOtherSlugWhenEnvURLHasNoKey(t *testing.T) {
 		t.Fatalf("live slug 1 %+v", got)
 	}
 }
+
+func TestConfigPutGeneralRestampsQueueDeadlines(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.ConfigFile = filepath.Join(t.TempDir(), "unpackerr.conf")
+	unpack.StartDelay = cnfg.Duration{Duration: time.Minute}
+	unpack.snapshotFileConfig()
+
+	now := time.Now().Round(time.Second)
+	item := &Extract{
+		App:     FolderString,
+		Path:    "/watch/folder",
+		Status:  WAITING,
+		Updated: now,
+		Note:    "something",
+	}
+	unpack.Map["/watch/folder"] = item
+	unpack.stampQueueDue("/watch/folder", item)
+
+	if !item.Due.Equal(now.Add(time.Minute)) || item.DueKind != dueStart {
+		t.Fatalf("initial due %v kind %q", item.Due, item.DueKind)
+	}
+
+	body := `{"startDelay":"3m"}`
+	put := doAuth(t, unpack, http.MethodPut, "/api/config/general", body, putKey(unpack))
+	if put.Code != http.StatusOK {
+		t.Fatalf("put %d %s", put.Code, put.Body.String())
+	}
+
+	if !item.Due.Equal(now.Add(3*time.Minute)) || item.DueKind != dueStart {
+		t.Fatalf("restamped due %v kind %q want %v", item.Due, item.DueKind, now.Add(3*time.Minute))
+	}
+}
+
