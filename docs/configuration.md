@@ -41,7 +41,6 @@ remnant_action = "rename"
 web_url = "https://unpackui.example.com"
 
 [webserver]
-ui = true
 metrics = false
 listen_addr = "0.0.0.0:5656"
 urlbase = "/"
@@ -64,7 +63,6 @@ environment:
   UN_STATE_FILE: /config/unpackerr.state.json
   UN_REMNANT_ACTION: rename
   UN_WEB_URL: https://unpackui.example.com
-  UN_WEBSERVER_UI: "true"
   UN_WEBSERVER_METRICS: "false"
   UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
   UN_WEBSERVER_URLBASE: /

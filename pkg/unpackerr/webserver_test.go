@@ -172,3 +172,22 @@ func TestWebRoutesDoNotRegisterLegacyStatusEndpoints(t *testing.T) {
 		}
 	}
 }
+
+func TestWebRoutesIgnoreLegacyFeatureFlags(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	unpack.Webserver.API = false
+	unpack.Webserver.UI = false
+	unpack.Webserver.router = http.NewServeMux()
+	unpack.webRoutes()
+
+	for _, route := range []string{"/", "/api/openapi.json"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, route, nil)
+		unpack.Webserver.router.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("legacy flags disabled %s: status %d", route, rec.Code)
+		}
+	}
+}

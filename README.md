@@ -29,7 +29,7 @@ your setup.
 | **Safer folder handling** | Waits for downloads to finish and ignores media-only or archive-free folders. |
 | **Extraction guardrails** | Caps uncompressed bytes, created files, and expansion ratio to protect the disk from rogue archives. |
 | **Dashboard API** | Provides the upstream stats/queue/history/system/WebSocket APIs plus additive Homepage-compatible stats fields. |
-| **Better notifications** | Adds compact Discord embeds, update-in-place messages, and optional links to the UI. |
+| **Better notifications** | Adds compact Discord embeds and optional links to the UI. |
 | **Quieter optional apps** | Silently skips empty Starr app entries while preserving real configuration and connection errors. |
 
 ## 📚 Guides

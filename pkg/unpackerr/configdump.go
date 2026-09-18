@@ -262,14 +262,7 @@ func (u *Unpackerr) logWebserver(printf configLine) {
 		ssl = "s"
 	}
 
-	features := []string{}
-	if u.Webserver.API {
-		features = append(features, "json-api")
-	}
-
-	if u.Webserver.UI {
-		features = append(features, "status-ui")
-	}
+	features := []string{"json-api", "status-ui"}
 
 	if u.Webserver.Metrics {
 		features = append(features, "metrics")

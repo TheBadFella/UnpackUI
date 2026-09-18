@@ -21,7 +21,7 @@ baseline, not a replacement for the repository contracts in
   files, with 750 insertions and 211 deletions relative to `95f728e`.
 - Current fork delta after the merge: `git diff upstream/main..HEAD` is the
   fork's intentional product, recovery, UI, documentation, test, and workflow
-  surface (96 paths; 8,524 insertions and 1,599 deletions at this baseline).
+  surface (96 paths; 8,648 insertions and 1,599 deletions at this baseline).
   Review that delta separately from new upstream commits; it is not a reason to
   re-review old upstream history.
 
@@ -141,6 +141,20 @@ tests/stop-local.ps1
   behavior, and webhook deduplication. Generated config/API examples and the
   frontend schema remain synchronized with the definitions.
 
+### Compatibility surface remaining after the web UI migration
+
+- `webserver.api` and `webserver.ui` are parsed for existing TOML and
+  environment configurations, but do not gate the dashboard or authenticated
+  API. `listen_addr` controls whether the web server runs.
+- Global `UN_FOLDERS_INTERVAL` remains a fallback for older configurations;
+  an explicit per-folder interval takes precedence.
+- Array-shaped Starr, folder, and hook configurations, the singular Starr
+  `path` alias, queue progress aliases, and old hash-route redirects remain for
+  existing files, API clients, and bookmarks.
+- Homepage-compatible stats fields, persisted recovery/history migration,
+  embedded-SPA build fallbacks, platform-specific path handling, and the
+  fork/upstream release workflow split are active contracts, not legacy code.
+
 ### Evidence and limitations
 
 - Targeted folder, recovery, tracking, configuration, and poller tests passed;
@@ -152,7 +166,7 @@ tests/stop-local.ps1
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.4`; existing `v2.0.3` remains untouched.
+- The next safe patch release is `v2.0.5`; existing `v2.0.4` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
