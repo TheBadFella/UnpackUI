@@ -208,6 +208,7 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 	}
 }
 
+//nolint:funlen // restart sequence is the assertion.
 func TestRecoverExtractedFolderKeepsDeleteDeadlineAcrossRestarts(t *testing.T) {
 	t.Parallel()
 
@@ -232,7 +233,8 @@ func TestRecoverExtractedFolderKeepsDeleteDeadlineAcrossRestarts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reading first recovery state: %v", err)
 	}
-	if item := firstState.Folders[archivePath]; item == nil || item.Status != EXTRACTED.String() || !item.Updated.Equal(updated) {
+	item := firstState.Folders[archivePath]
+	if item == nil || item.Status != EXTRACTED.String() || !item.Updated.Equal(updated) {
 		t.Fatalf("saved extracted recovery item = %+v", item)
 	}
 
@@ -269,6 +271,7 @@ func TestRecoverExtractedFolderKeepsDeleteDeadlineAcrossRestarts(t *testing.T) {
 	}
 }
 
+//nolint:funlen // cleanup round-trip is the assertion.
 func TestRecoverExtractedFolderRestoresCleanupPaths(t *testing.T) {
 	t.Parallel()
 
