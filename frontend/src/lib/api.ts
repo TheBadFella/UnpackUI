@@ -3,18 +3,12 @@
 // kept only for Rapidoc "try it"; sending it on every fetch would keep the UI
 // logged in after a restart because that key is persisted in the config file.
 
-export const LoggedOut = new Error('logged out')
+import { readCookie } from './util'
+
 export const TimedOut = new Error('request timed out')
 
 // urlbase lets a reverse-proxied SPA know its prefix. The backend drops a cookie;
 // in dev we default to '/'.
-function readCookie(name: string): string {
-  const match = document.cookie.match(
-    new RegExp('(?:^|; )' + name + '=([^;]*)'),
-  )
-  return match ? decodeURIComponent(match[1]) : ''
-}
-
 let urlbase = readCookie('urlbase') || '/'
 let apiKey = ''
 let onUnauthorized:

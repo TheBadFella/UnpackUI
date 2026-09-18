@@ -157,42 +157,6 @@ code.wrap {
   white-space: normal;
 }
 
-.table-hover > tbody.stack-item:hover > tr > * {
-  --bs-table-bg-state: var(--bs-table-hover-bg);
-  --bs-table-color-state: var(--bs-table-hover-color);
-}
-
-.stack-item > tr > * {
-  padding-top: 0.2rem;
-  padding-bottom: 0.2rem;
-  line-height: 1.15;
-  vertical-align: middle;
-}
-
-.stack-item > tr:first-child > * {
-  border-bottom-width: 0;
-  padding-bottom: 0.05rem;
-}
-
-.stack-item-path > * {
-  border-top-width: 0;
-  padding-top: 0;
-  padding-bottom: 0.2rem;
-  line-height: 1.2;
-}
-
-.stack-item-path code.wrap {
-  display: block;
-  word-break: break-word;
-  line-height: 1.2;
-}
-
-.stack-item .badge {
-  padding: 0.12em 0.4em;
-  font-size: 0.7rem;
-  line-height: 1.15;
-}
-
 .queue-progress {
   min-width: 8rem;
 }
@@ -215,11 +179,6 @@ code.wrap {
 	table-layout: fixed;
 	width: 100%;
 	min-width: 0;
-}
-
-.queue-table .stack-item-path,
-.history-table .stack-item-path {
-	font-size: 0.82rem;
 }
 
 .queue-progress-caption {
@@ -275,77 +234,6 @@ code.wrap {
 	.queue-table thead,
 	.history-table thead {
 		display: none;
-	}
-
-	.queue-table tbody.stack-item,
-	.history-table tbody.stack-item {
-		display: block;
-		margin-bottom: 0.75rem;
-		border: 1px solid var(--bs-border-color);
-		border-radius: 0.35rem;
-		overflow: hidden;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child,
-	.history-table tbody.stack-item > tr:first-child {
-		display: block;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child > td,
-	.history-table tbody.stack-item > tr:first-child > td {
-		display: grid;
-		grid-template-columns: minmax(5.5rem, 35%) minmax(0, 1fr);
-		gap: 0.5rem;
-		align-items: baseline;
-		padding: 0.55rem 0.7rem;
-		border-top: 1px solid var(--bs-border-color);
-		text-align: start !important;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child > td:first-child,
-	.history-table tbody.stack-item > tr:first-child > td:first-child {
-		border-top: 0;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child > td::before,
-	.history-table tbody.stack-item > tr:first-child > td::before {
-		content: attr(data-label);
-		color: var(--bs-secondary-color);
-		font-size: 0.7rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		text-transform: uppercase;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child > td.queue-progress,
-	.history-table tbody.stack-item > tr:first-child > td {
-		min-width: 0;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child > td.queue-progress .queue-progress-inner {
-		width: auto;
-		max-width: none;
-	}
-
-	.queue-table tbody.stack-item > tr:first-child > td.queue-progress .queue-progress-caption {
-		white-space: normal;
-	}
-
-	.queue-table tbody.stack-item > tr.stack-item-path,
-	.history-table tbody.stack-item > tr.stack-item-path {
-		display: block;
-	}
-
-	.queue-table tbody.stack-item > tr.stack-item-path > td,
-	.history-table tbody.stack-item > tr.stack-item-path > td {
-		display: block;
-		padding: 0.55rem 0.7rem 0.7rem;
-		border-top: 1px solid var(--bs-border-color);
-	}
-
-	.queue-table tbody.stack-item > tr.stack-item-path > td::before,
-	.history-table tbody.stack-item > tr.stack-item-path > td::before {
-		content: none;
 	}
 
 	.queue-table .column-resizer,
@@ -844,22 +732,6 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
   vertical-align: top;
 }
 
-.dashboard-page .queue-table .stack-item-path > td,
-.dashboard-page .history-table .stack-item-path > td {
-  padding-top: 0;
-  padding-bottom: 0.75rem;
-  border-top: 0;
-  font-size: 0.8rem;
-}
-
-.dashboard-page .queue-table .stack-item-path code,
-.dashboard-page .history-table .stack-item-path code {
-  display: block;
-  color: var(--dash-text);
-  font-family: inherit;
-  line-height: 1.45;
-}
-
 .dashboard-page .badge {
   display: inline-flex;
   align-items: center;
@@ -1037,23 +909,6 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
   background: #16c784;
   box-shadow: 0 0 6px rgba(22, 199, 132, 0.7);
   margin-right: 0.25rem;
-}
-
-.dashboard-page tbody.stack-item.items-row {
-  cursor: pointer;
-}
-
-.dashboard-page .table-hover > tbody.stack-item.items-row:hover > tr > *,
-.dashboard-page tbody.stack-item.items-row:hover > tr > * {
-  background: rgba(255, 75, 47, 0.06) !important;
-}
-
-.dashboard-page tbody.stack-item.items-row.is-selected > tr > * {
-  background: rgba(255, 75, 47, 0.12) !important;
-}
-
-.dashboard-page tbody.stack-item.items-row.is-selected {
-  border-color: var(--dash-accent) !important;
 }
 
 .action-button {
@@ -1263,52 +1118,6 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 
   .dashboard-page .queue-table thead,
   .dashboard-page .history-table thead { display: none; }
-
-  .dashboard-page .queue-table tbody.stack-item,
-  .dashboard-page .history-table tbody.stack-item {
-    display: block;
-    margin-bottom: 0.75rem;
-    overflow: hidden;
-    border: 1px solid var(--dash-border);
-    border-radius: 0;
-  }
-
-  .dashboard-page .queue-table tbody.stack-item > tr:first-child,
-  .dashboard-page .history-table tbody.stack-item > tr:first-child { display: block; }
-
-  .dashboard-page .queue-table tbody.stack-item > tr:first-child > td,
-  .dashboard-page .history-table tbody.stack-item > tr:first-child > td {
-    display: grid;
-    grid-template-columns: minmax(5.5rem, 35%) minmax(0, 1fr);
-    gap: 0.5rem;
-    align-items: baseline;
-    padding: 0.7rem;
-    border-top: 1px solid var(--dash-border);
-    text-align: start !important;
-  }
-
-  .dashboard-page .queue-table tbody.stack-item > tr:first-child > td:first-child,
-  .dashboard-page .history-table tbody.stack-item > tr:first-child > td:first-child { border-top: 0; }
-
-  .dashboard-page .queue-table tbody.stack-item > tr:first-child > td::before,
-  .dashboard-page .history-table tbody.stack-item > tr:first-child > td::before {
-    content: attr(data-label);
-    color: var(--dash-muted);
-    font-size: 0.67rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-
-  .dashboard-page .queue-table tbody.stack-item > tr.stack-item-path,
-  .dashboard-page .history-table tbody.stack-item > tr.stack-item-path { display: block; }
-
-  .dashboard-page .queue-table tbody.stack-item > tr.stack-item-path > td,
-  .dashboard-page .history-table tbody.stack-item > tr.stack-item-path > td {
-    display: block;
-    padding: 0.7rem;
-    border-top: 1px solid var(--dash-border);
-  }
 
   .dashboard-page .queue-table .progress { width: 100%; }
 }

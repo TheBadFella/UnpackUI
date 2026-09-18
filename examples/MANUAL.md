@@ -38,8 +38,7 @@ OPTIONS
         5 = imported, 6 = deleting, 7 = delete failed, 8 = deleted
         9 = nothing extracted
 
-        Discord webhooks support update_existing=true to edit one message per
-        extract as status changes. Set web_url for an Open UI link in Discord
+        Discord webhooks are supported. Set web_url for an Open UI link in Discord
         embeds. Notifiarr and other templates remain available.
 
     -v, --version

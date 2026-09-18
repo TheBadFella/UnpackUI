@@ -460,7 +460,6 @@ passwords = []
 ################
 # Sends a webhook when an extraction queues, starts, finishes, and/or is deleted.
 # Works with notifiarr.com, or natively with Discord/Telegram/Slack/etc.
-# Discord can edit one message per extract when update_existing = true.
 # Can possibly be used with other services by providing a custom template_path.
 ###### Don't forget to uncomment [webhook.0] and url at a minimum !!!!
 #[webhook.0]
@@ -486,13 +485,6 @@ passwords = []
 # template_path = ''
 ## Override automatic template detection. Values: notifiarr, discord, telegram, gotify, pushover, slack
 # template = ""
-## When true and using the Discord template (URL contains discord.com/discordapp.com,
-## or template = "discord"), Unpackerr creates one Discord message per extract and
-## PATCHes that same message as status changes. Use this instead of Notifiarr when
-## you want native Discord update-in-place notifications with Unpackerr's embed
-## fields. Ignored for Notifiarr and other webhook templates. Message IDs are not
-## persisted across restarts.
-# update_existing = false
 ## Set this to true to ignore the SSL certificate on the server.
 # ignore_ssl = false
 ## You can adjust how long to wait for a server response.

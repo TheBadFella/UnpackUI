@@ -61,10 +61,6 @@ export function resetColumnWidths<K extends string>(
   return { ...defaults }
 }
 
-export function clampColumnWidth(width: number, min = minimumColumnWidth): number {
-  return Math.max(min, Math.round(width))
-}
-
 export function colStyle(val: number | string | undefined, fallback = 'auto'): string {
   if (val === undefined) return fallback
   return typeof val === 'number' ? `${val}px` : val
