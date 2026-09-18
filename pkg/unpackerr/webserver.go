@@ -190,13 +190,6 @@ func (u *Unpackerr) webRoutes() {
 		u.Webserver.handleGet(base+"/{path...}", u.serveUI)
 	}
 
-	if u.Webserver.UI {
-		u.Webserver.handleGet(path.Join(u.Webserver.URLBase, "/api/status"),
-			u.requirePerm(PermReadSystemQueue, u.webStatusAPI))
-		u.Webserver.handlePost(path.Join(u.Webserver.URLBase, "/api/status/clear-completed"),
-			u.requirePerm(PermWriteSystemHistory, u.webClearCompletedAPI))
-	}
-
 	u.registerAuthRoutes()
 	u.registerOpenAPIRoute()
 	u.registerAPIRoutes()
@@ -274,21 +267,15 @@ func (u *Unpackerr) serveUI(resp http.ResponseWriter, req *http.Request) {
 		Secure:   u.cookieSecure(req),
 	})
 
-	if u.Webserver.UI && !frontend.HasBuiltAssets() && (req.URL.Path == "/" || req.URL.Path == "/index.html") {
-		u.webIndex(resp, req)
-		return
-	}
-
 	frontend.IndexHandler(resp, req)
 }
 
-// skipWebAccessLog suppresses noisy UI polling from the access log while still serving the route.
+// skipWebAccessLog suppresses noisy UI stats polling from the access log while still serving the route.
 func (u *Unpackerr) skipWebAccessLog(withAccessLog, withoutAccessLog http.Handler) http.Handler {
-	statusPath := path.Join(u.Webserver.URLBase, "/api/status")
 	statsPath := path.Join(u.Webserver.URLBase, "/api/stats")
 
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method == http.MethodGet && (request.URL.Path == statusPath || request.URL.Path == statsPath) {
+		if request.Method == http.MethodGet && request.URL.Path == statsPath {
 			withoutAccessLog.ServeHTTP(writer, request)
 			return
 		}

@@ -46,7 +46,10 @@
     "Download": "Descargar",
     "Cancel": "Cancelar",
     "Close": "Cerrar",
-    "Test": "Probar"
+    "Test": "Probar",
+    "ResetColumns": "Restablecer columnas",
+    "HideCompleted": "Ocultar completados",
+    "ShowHidden": "Mostrar ocultos"
   },
   "phrases": {
     "EnvironmentVariable": "Variable de entorno: <code>{variableName}</code>",
@@ -86,6 +89,9 @@
     "ReservedUsername": "Los nombres de usuario webauth, noauth y filepath están reservados, y un nombre de usuario no puede contener dos puntos.",
     "FilterPlaceholder": "Filtrar…",
     "Empty": "—",
+    "Output": "Salida",
+    "Details": "Detalles",
+    "DeletesIn": "Se elimina en",
     "URLMustBeginWithHttp": "La URL debe empezar por http:// o https://",
     "URLInvalid": "Esa no es una URL válida.",
     "APIKeyMustBeCountCharactersOrLonger": "La clave API debe tener al menos {count} caracteres.",
@@ -143,9 +149,10 @@
       "DisabledHint": "El inicio con contraseña está desactivado. Entre por el proxy inverso. Si el proxy le trajo aquí, ninguno de los grupos coincidió con admin ni con un rol configurado."
     },
     "dashboard": {
-      "Title": "Resumen",
-      "intro": "Cola en vivo, recuentos de extracción e historial terminado de este Unpackerr.",
-      "ActiveQueue": "Actividad",
+      "Title": "Estado de Unpackerr",
+      "intro": "Progreso de extracción en directo.",
+      "ActiveQueue": "Elementos seguidos",
+      "TrackedHint": "Elementos activos y retenidos en la cola. Los elementos terminados aparecen en Historial.",
       "Live": "En vivo",
       "Starrs": "Apps Starr",
       "StarrsHint": "Instancias de Sonarr, Radarr, Lidarr y Readarr en la configuración.",
@@ -199,6 +206,7 @@
       "Status": "Estado",
       "Item": "Elemento",
       "Progress": "Progreso",
+      "ETA": "ETA",
       "Retries": "Reintentos",
       "Updated": "Actualizado",
       "Actions": "Acciones",

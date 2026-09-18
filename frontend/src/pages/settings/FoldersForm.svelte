@@ -77,7 +77,7 @@
       delete_files: false,
       disable_log: false,
       move_back: false,
-      delete_after: '',
+      delete_after: '0s',
       extract_isos: false,
       disableRecursion: false,
       maxNested: 0,
@@ -145,7 +145,7 @@
       if (row.envOnly || !row.slug) continue
       const item: FolderConfig = {
         ...row.value,
-        delete_after: row.value.delete_after || null,
+        delete_after: row.value.delete_after?.trim() ? row.value.delete_after : '0s',
         exclude_paths: (excludeText[row.id] ?? '')
           .split('\n')
           .map((s) => s.trim())

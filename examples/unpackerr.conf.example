@@ -413,9 +413,9 @@ passwords = []
 
 
 ##-Folders-#######################################################################
-## This application can also watch folders for things to extract. If you copy a ##
-## subfolder into a watched folder (defined below) any extractable items in the ##
-## folder will be decompressed. This has nothing to do with Starr applications. ##
+## This application can also watch folders for things to extract. Archives in ##
+## subfolders are tracked and decompressed individually. This has nothing to do ##
+## with Starr applications.                                                     ##
 ##################################################################################
 #[folder.0]
 # path = '/downloads/auto_extract'

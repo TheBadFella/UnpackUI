@@ -1,18 +1,5 @@
 <script lang="ts">
-  import {
-    Button,
-    Card,
-    CardBody,
-    CardFooter,
-    CardHeader,
-    Col,
-    Container,
-    Form,
-    Input,
-    Label,
-    Row,
-    Spinner,
-  } from '@sveltestrap/sveltestrap'
+  import { Spinner } from '@sveltestrap/sveltestrap'
   import { _ } from '../lib/i18n/Translate.svelte'
   import { login, profile } from '../lib/auth.svelte'
   import icon from '../assets/icon.png'
@@ -35,68 +22,66 @@
   }
 </script>
 
-<Container>
-  <Row
-    class="justify-content-center align-items-center"
-    style="min-height: 100vh"
-  >
-    <Col xs="auto">
-      <Card style="width: 22rem" class="shadow">
-        <CardHeader class="navbar-unpackerr text-white">
-          <Row class="align-items-center g-2">
-            <Col xs="auto"><img src={icon} alt="" class="brand-logo" /></Col>
-            <Col><span class="fw-semibold">Unpackerr</span></Col>
-          </Row>
-        </CardHeader>
-        <CardBody>
-          {#if profile.loginDisabled}
-            <div role="status">
-              <p class="fw-semibold mb-2">{$_('pages.login.Disabled')}</p>
-              <p class="mb-0 text-body-secondary">
-                {$_('pages.login.DisabledHint')}
-              </p>
-            </div>
-          {:else}
-            <Form on:submit={onsubmit}>
-              <Label for="username" class="form-label mb-1"
-                >{$_('pages.login.Username')}</Label
-              >
-              <Input
-                id="username"
-                type="text"
-                bind:value={username}
-                autocomplete="username"
-              />
-              <Label for="password" class="form-label mb-1 mt-3"
-                >{$_('pages.login.Password')}</Label
-              >
-              <Input
-                id="password"
-                type="password"
-                class="mb-3"
-                bind:value={password}
-                autocomplete="current-password"
-              />
-              <Button
-                type="submit"
-                color="primary"
-                class="w-100"
-                disabled={loading}
-              >
-                {#if loading}<Spinner size="sm" />{/if}
-                <span class="ms-1">{$_('buttons.Login')}</span>
-              </Button>
-            </Form>
-          {/if}
-        </CardBody>
-        {#if error}
-          <CardFooter
-            class="text-danger small"
-            role="alert"
-            aria-live="assertive">{error}</CardFooter
-          >
-        {/if}
-      </Card>
-    </Col>
-  </Row>
-</Container>
+<div class="login-wrap">
+  <div class="login-card shadow">
+    <div class="login-card-header">
+      <img src={icon} alt="" class="brand-logo" />
+      <span class="login-card-title">Unpackerr</span>
+    </div>
+    <div class="login-card-subtitle">
+      Sign in to UnpackUI
+    </div>
+
+    {#if profile.loginDisabled}
+      <div role="status">
+        <p class="fw-semibold mb-2" style="color: #ffffff;">{$_('pages.login.Disabled')}</p>
+        <p class="mb-0 text-body-secondary" style="color: #a9a9a9 !important;">
+          {$_('pages.login.DisabledHint')}
+        </p>
+      </div>
+    {:else}
+      <form {onsubmit}>
+        <label for="username" class="login-form-label">
+          {$_('pages.login.Username')}
+        </label>
+        <input
+          id="username"
+          type="text"
+          class="login-form-input"
+          bind:value={username}
+          autocomplete="username"
+        />
+
+        <label for="password" class="login-form-label">
+          {$_('pages.login.Password')}
+        </label>
+        <input
+          id="password"
+          type="password"
+          class="login-form-input"
+          bind:value={password}
+          autocomplete="current-password"
+        />
+
+        <button
+          type="submit"
+          class="login-btn"
+          disabled={loading}
+        >
+          {#if loading}<Spinner size="sm" class="me-2" />{/if}
+          <span>{$_('buttons.Login')}</span>
+        </button>
+      </form>
+    {/if}
+
+    {#if error}
+      <div
+        class="login-error"
+        role="alert"
+        aria-live="assertive"
+      >
+        {error}
+      </div>
+    {/if}
+  </div>
+</div>

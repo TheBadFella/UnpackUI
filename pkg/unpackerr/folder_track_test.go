@@ -117,6 +117,66 @@ func TestMediaOnlyFolderStaysOutOfQueueAndRecovery(t *testing.T) {
 	}
 }
 
+func TestPrepopulatedFolderArchivesEnterQueueAndRecoverySeparately(t *testing.T) {
+	t.Parallel()
+
+	watch := t.TempDir()
+	cfg := &FolderConfig{Path: watch}
+	unpack := New()
+	unpack.Folder.Buffer = 32
+	unpack.StateFile = filepath.Join(t.TempDir(), defaultStateFile)
+	unpack.recovery = newRecoveryState()
+
+	tracker, err := unpack.Folder.NewWatcher([]*FolderConfig{cfg}, unpack.Logger, updateChanBuf, suffix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if tracker.Watcher != nil {
+			tracker.Watcher.Close()
+		}
+		if tracker.FSNotify != nil {
+			_ = tracker.FSNotify.Close()
+		}
+	})
+	unpack.folders = tracker
+
+	incoming := filepath.Join(watch, "incoming")
+	nested := filepath.Join(incoming, "nested")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	archives := []string{
+		filepath.Join(incoming, "one.zip"),
+		filepath.Join(incoming, "two.zip"),
+		filepath.Join(incoming, "three.zip"),
+		filepath.Join(incoming, "four.zip"),
+		filepath.Join(nested, "five.zip"),
+	}
+	for _, archive := range archives {
+		if err := os.WriteFile(archive, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	unpack.scanWatchedFolders(time.Now())
+
+	if unpack.Map[incoming] != nil || unpack.recovery.Folders[incoming] != nil {
+		t.Fatalf("watch container entered queue or recovery: %+v %+v",
+			unpack.Map[incoming], unpack.recovery.Folders[incoming])
+	}
+	for _, archive := range archives {
+		item := unpack.Map[archive]
+		if item == nil || item.Status != WAITING || item.App != FolderString {
+			t.Fatalf("archive queue item %s: %+v", archive, item)
+		}
+		if item := unpack.recovery.Folders[archive]; item == nil || item.Status != WAITING.String() {
+			t.Fatalf("archive recovery item %s: %+v",
+				archive, item)
+		}
+	}
+}
+
 func TestCheckFolderStatsDropsMissingWaiting(t *testing.T) {
 	t.Parallel()
 

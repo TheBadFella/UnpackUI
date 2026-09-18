@@ -26,6 +26,30 @@ func TestIncompleteArchiveName(t *testing.T) {
 	}
 }
 
+func TestMultipartIncompleteSibling(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	primary := filepath.Join(dir, "release.part01.rar")
+	partial := filepath.Join(dir, "release.part02.rar.part")
+	if err := os.WriteFile(primary, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(partial, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := multipartIncompleteSibling(primary); got != partial {
+		t.Fatalf("incomplete companion = %q, want %q", got, partial)
+	}
+	if err := os.Rename(partial, filepath.Join(dir, "release.part02.rar")); err != nil {
+		t.Fatal(err)
+	}
+	if got := multipartIncompleteSibling(primary); got != "" {
+		t.Fatalf("finished companion reported incomplete: %q", got)
+	}
+}
+
 func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	t.Parallel()
 
@@ -59,33 +83,6 @@ func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	}
 	if unpackerr.folders.Folders[itemPath] != folder {
 		t.Fatal("expected archive-free folder to remain tracked briefly to avoid re-queue")
-	}
-}
-
-func TestBuildWebStateOmitsMediaOnlyWatchedFolders(t *testing.T) {
-	t.Parallel()
-
-	watchPath := t.TempDir()
-	itemPath := filepath.Join(watchPath, "episode")
-	if err := os.Mkdir(itemPath, 0o700); err != nil {
-		t.Fatalf("creating media folder: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(itemPath, "episode.mkv"), []byte("video"), 0o600); err != nil {
-		t.Fatalf("creating media file: %v", err)
-	}
-
-	now := time.Now()
-	unpackerr := New()
-	unpackerr.folders = &Folders{
-		Logs: unpackerr.Logger,
-		Folders: map[string]*Folder{
-			itemPath: {Updated: now, Status: WAITING, Config: &FolderConfig{Path: watchPath}},
-		},
-	}
-
-	snapshot := unpackerr.buildWebState(now)
-	if len(snapshot.Items) != 0 {
-		t.Fatalf("expected media-only watched folder to stay out of the UI, got %+v", snapshot.Items)
 	}
 }
 
