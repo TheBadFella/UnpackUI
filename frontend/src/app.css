@@ -1783,10 +1783,19 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 .form-check-input {
   background-color: #111;
   border-color: #383838;
+  cursor: pointer;
 }
 .form-check-input:checked {
   background-color: #ff4b2f;
   border-color: #ff4b2f;
+}
+.form-check-label {
+  text-transform: none;
+  font-size: 0.82rem;
+  letter-spacing: normal;
+  color: var(--dash-muted, #a9a9a9);
+  cursor: pointer;
+  user-select: none;
 }
 .btn {
   border-radius: 0;
