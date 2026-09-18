@@ -118,11 +118,11 @@ jobs:
         with:
           images: ${{ steps.image_name.outputs.image }}
           tags: |
-            type=semver,pattern=v{{version}},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=semver,pattern={{version}},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=semver,pattern={{major}},enable=${{ github.event_name != 'workflow_dispatch' }}
-            type=ref,enable=${{ github.event_name != 'workflow_dispatch' }},event=branch
+            type=semver,pattern=v{{version}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
 
       - name: Collect manual Docker tags
         if: github.event_name == 'workflow_dispatch'
