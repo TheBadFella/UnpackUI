@@ -23,8 +23,6 @@ func SamplePayload() *Payload {
 			"otherId":    "another-id-here-like-imdb",
 		},
 		Time:     time.Now(),
-		Title:    friendlyEventTitle(extract.EXTRACTED),
-		Retries:  1,
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
 		Arch:     runtime.GOARCH,

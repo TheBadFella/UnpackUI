@@ -152,7 +152,7 @@
       "Title": "Unpackerr Status",
       "intro": "Live extraction progress.",
       "ActiveQueue": "Tracked items",
-      "TrackedHint": "Current queue plus completed items that stay visible until you clear them.",
+      "TrackedHint": "Active and retained queue items. Finished items are listed in History.",
       "Live": "Live",
       "Starrs": "Starr apps",
       "StarrsHint": "Sonarr, Radarr, Lidarr, and Readarr instances in the config.",

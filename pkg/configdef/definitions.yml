@@ -993,7 +993,6 @@ sections:
       ################
       # Sends a webhook when an extraction queues, starts, finishes, and/or is deleted.
       # Works with notifiarr.com, or natively with Discord/Telegram/Slack/etc.
-      # Discord can edit one message per extract when update_existing = true.
       # Can possibly be used with other services by providing a custom template_path.
       ###### Don't forget to uncomment [webhook.0] and url at a minimum !!!!
     docs: |
@@ -1005,9 +1004,7 @@ sections:
       - Use a Notifiarr unpackerr URL (or `template = "notifiarr"`) to relay through
         [notifiarr.com](https://notifiarr.com).
       - Use a Discord Incoming Webhook URL (or `template = "discord"`) to post embeds
-        directly. Set `update_existing = true` to create one Discord message per extract
-        and edit that same message as status changes (queued → extracting → deleted),
-        similar to Notifiarr's update-in-place Discord behavior.
+        directly.
 
       The compact Discord embed includes a readable title, raw release name, app,
       retries, Starr reason (when available), archive/file counts, size, elapsed time,
@@ -1021,9 +1018,6 @@ sections:
       - _`Name` is only used in logs, but it's also available as a template value as `{{name}}`._
       - Built-In Templates: `pushover`, `telegram`, `discord`, `notifiarr`, `slack`, `gotify`.
       - Set `template` to `discord` or `notifiarr` to force a destination (or let URL auto-detect).
-      - Discord `update_existing = true` edits one message per extract as status changes.
-        Message IDs are kept in memory only; a restart mid-extract starts a new message.
-      - Discord `update_existing` is ignored for Notifiarr and non-Discord templates.
       - Native Discord embeds use a clean parsed title, compact stats, and a Release field
         for the raw filename (Path/Output are omitted to keep notifications glanceable).
       - Set global `web_url` (for example `http://host:5656`) so Discord embeds make the
@@ -1106,18 +1100,7 @@ sections:
           - value: 'slack'
         short: Instead of auto template selection, force a built-in template.
         desc: 'Override automatic template detection. Values: notifiarr, discord, telegram, gotify, pushover, slack'
-      - name: update_existing
-        envvar: UPDATE_EXISTING
-        default: false
-        recommend: *BOOLEAN
-        short: Discord only — edit one message per extract instead of posting new ones.
-        desc: |
-          When true and using the Discord template (URL contains discord.com/discordapp.com,
-          or template = "discord"), Unpackerr creates one Discord message per extract and
-          PATCHes that same message as status changes. Use this instead of Notifiarr when
-          you want native Discord update-in-place notifications with Unpackerr's embed
-          fields. Ignored for Notifiarr and other webhook templates. Message IDs are not
-          persisted across restarts.
+
       - name: ignore_ssl
         envvar: IGNORE_SSL
         default: false

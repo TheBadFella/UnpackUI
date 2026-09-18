@@ -152,7 +152,7 @@
       "Title": "Unpackerr-status",
       "intro": "Live voortgang van uitpakken.",
       "ActiveQueue": "Bijgehouden items",
-      "TrackedHint": "Huidige wachtrij plus voltooide items die zichtbaar blijven totdat je ze wist.",
+      "TrackedHint": "Actieve en bewaarde items in de wachtrij. Voltooide items staan in Geschiedenis.",
       "Live": "Live",
       "Starrs": "Starr-apps",
       "StarrsHint": "Sonarr-, Radarr-, Lidarr- en Readarr-instanties in de configuratie.",

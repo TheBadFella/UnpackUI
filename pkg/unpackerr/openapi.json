@@ -184,6 +184,8 @@
           "status": {"type": "string"},
           "retries": {"type": "integer"},
           "updated": {"type": "string", "format": "date-time"},
+          "started": {"type": "string", "format": "date-time"},
+          "elapsed": {"type": "string"},
           "progress": {"type": "string"},
           "error": {"type": "string"},
           "percent": {"type": "number", "description": "Extraction percent from xtractr.Progress (wrote/total or read/compressed)"},
@@ -195,7 +197,9 @@
           "count": {"type": "integer"},
           "archives": {"type": "integer"},
           "extracted": {"type": "integer"},
-          "archive": {"type": "string", "description": "Current archive path relative to the item path"}
+          "archive": {"type": "string", "description": "Current archive path relative to the item path"},
+          "archiveFiles": {"type": "array", "items": {"type": "string"}, "description": "Archive paths observed for the in-flight extract"},
+          "newFiles": {"type": "array", "items": {"type": "string"}, "description": "Files created by the in-flight extract"}
         }
       },
       "HistoryRecord": {

@@ -6,10 +6,11 @@ export type DashboardRecord = QueueItem | HistoryRecord
 
 export function itemTitle(item: DashboardRecord): string {
   const title = item.title?.trim()
-  if (title) return title
+  const normalizedTitle = title?.replace(/\\/g, '/').replace(/\/+$/, '')
+  const normalizedPath = item.path.replace(/\\/g, '/').replace(/\/+$/, '')
+  if (title && normalizedTitle !== normalizedPath) return title
 
-  const path = item.path.replace(/\\/g, '/')
-  const label = path.split('/').filter(Boolean).pop()
+  const label = normalizedPath.split('/').filter(Boolean).pop()
   return label || item.id
 }
 

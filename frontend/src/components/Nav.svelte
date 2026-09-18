@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, onDestroy } from 'svelte'
   import {
     Navbar,
     NavbarBrand,
@@ -20,6 +20,8 @@
   import { profile, logout, has } from '../lib/auth.svelte'
   import { configPerm, systemPerm } from '../lib/perms'
   import { STARR_SECTIONS } from '../lib/types'
+  import { live } from '../lib/socket.svelte'
+  import { relTime } from '../lib/format'
   import Icon from './Icon.svelte'
   import Lock from 'phosphor-svelte/lib/Lock'
   import Monitor from 'phosphor-svelte/lib/Monitor'
@@ -28,6 +30,7 @@
   import Moon from 'phosphor-svelte/lib/Moon'
   import SignOut from 'phosphor-svelte/lib/SignOut'
   import icon from '../assets/icon.png'
+  import githubIcon from '../assets/github.svg'
 
   const md = 768
   let wide = $state(typeof window !== 'undefined' && window.innerWidth >= md)
@@ -40,7 +43,33 @@
     open = nowWide
   }
 
-  onMount(() => syncWidth(window.innerWidth))
+  let now = $state(Date.now())
+  let ageTimer: ReturnType<typeof setInterval> | undefined
+
+  function ageLabel(ms: number): string {
+    const sec = Math.max(0, Math.floor(ms / 1000))
+    if (sec < 60) return `${sec}s`
+    const min = Math.floor(sec / 60)
+    if (min < 60) return `${min}m`
+    const hr = Math.floor(min / 60)
+    if (hr < 24) return `${hr}h`
+    return `${Math.floor(hr / 24)}d`
+  }
+
+  const dataAge = $derived(
+    live.fetchedAt === undefined ? '' : ageLabel(now - live.fetchedAt),
+  )
+
+  onMount(() => {
+    syncWidth(window.innerWidth)
+    ageTimer = setInterval(() => {
+      now = Date.now()
+    }, 1000)
+  })
+
+  onDestroy(() => {
+    if (ageTimer) clearInterval(ageTimer)
+  })
 
   function onResize() {
     syncWidth(window.innerWidth)
@@ -144,10 +173,35 @@
 <svelte:window onresize={onResize} />
 
 <Navbar class="navbar-unpackerr" dark expand="md" container="fluid">
-  <NavbarBrand href="#/" on:click={(e) => go(e, '/')}>
-    <img src={icon} alt="" class="brand-logo me-2" />
-    <span class="fw-semibold text-white">Unpackerr</span>
-  </NavbarBrand>
+  <div class="d-flex align-items-center">
+    <NavbarBrand href="#/" on:click={(e) => go(e, '/')}>
+      <img src={icon} alt="" class="brand-logo me-2" />
+      <span class="fw-semibold text-white">Unpackerr</span>
+    </NavbarBrand>
+    <div class="nav-meta d-flex align-items-center ms-2 ms-md-3">
+      <a
+        class="nav-repo-link"
+        href="https://github.com/TheBadFella/UnpackUI"
+        target="_blank"
+        rel="noreferrer"
+        aria-label="UnpackUI on GitHub"
+        title="UnpackUI on GitHub"
+      >
+        <img src={githubIcon} alt="" aria-hidden="true" />
+      </a>
+      <div class="nav-stamp-chip ms-2" aria-live="polite">
+        <span>
+          {#if live.connected}
+            <span class="live-dot"></span> {$_('pages.dashboard.Live')}
+          {:else if dataAge}
+            {$_('pages.dashboard.UpdatedAgo', { values: { age: dataAge } })}
+          {:else}
+            {$_('phrases.LoadingApi')}
+          {/if}
+        </span>
+      </div>
+    </div>
+  </div>
   <NavbarToggler
     on:click={() => (open = !open)}
     aria-label={$_('nav.Toggle')}

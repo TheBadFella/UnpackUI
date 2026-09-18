@@ -1,6 +1,7 @@
 package unpackerr
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,6 +32,12 @@ func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) {
 			StartedAt: now.Add(-10 * time.Second),
 			UpdatedAt: now,
 		},
+		Resp: &xtractr.Response{
+			Started:  now.Add(-10 * time.Second),
+			Elapsed:  10 * time.Second,
+			Archives: xtractr.ArchiveList{"/downloads/Show.S01E01": {"/downloads/Show.S01E01/show.rar"}},
+			NewFiles: []string{"/downloads/Show.S01E01/episode.mkv"},
+		},
 	}
 	item.XProg.Extract = item
 
@@ -44,6 +51,10 @@ func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) {
 	if queue.SpeedBytesPerSecond == 0 || queue.ETASeconds == 0 {
 		t.Fatalf("queue progress timing %+v", queue)
 	}
+	if !queue.Started.Equal(now.Add(-10*time.Second)) || queue.Elapsed != "10s" ||
+		len(queue.ArchiveFiles) != 1 || len(queue.NewFiles) != 1 {
+		t.Fatalf("queue file details %+v", queue)
+	}
 
 	record := historyFromExtract("show-1", item)
 	if record.Title != queue.Title || record.Reason != queue.Reason {
@@ -51,6 +62,23 @@ func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) {
 	}
 	if record.DeleteAt == nil || queue.DeleteAt == nil || !record.DeleteAt.Equal(*queue.DeleteAt) {
 		t.Fatalf("history delete time %+v", record.DeleteAt)
+	}
+
+	waiting := queueFromExtract("waiting-1", &Extract{
+		App:     "Folder",
+		Path:    "/downloads/inbox",
+		Status:  WAITING,
+		Updated: now,
+	})
+	if !waiting.Started.IsZero() {
+		t.Fatalf("waiting queue invented start time: %+v", waiting.Started)
+	}
+	encoded, err := json.Marshal(waiting)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), `"started"`) {
+		t.Fatalf("waiting queue should omit zero start time: %s", encoded)
 	}
 }
 

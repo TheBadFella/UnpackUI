@@ -77,6 +77,8 @@ type QueueItem struct {
 	Status              ExtractStatus `json:"status"`
 	Retries             uint          `json:"retries"`
 	Updated             time.Time     `json:"updated"`
+	Started             time.Time     `json:"started,omitzero"`
+	Elapsed             string        `json:"elapsed,omitempty"`
 	Progress            string        `json:"progress,omitempty"`
 	Error               string        `json:"error,omitempty"`
 	Percent             float64       `json:"percent,omitempty"`
@@ -89,6 +91,8 @@ type QueueItem struct {
 	Archives            int           `json:"archives,omitempty"`
 	Extracted           int           `json:"extracted,omitempty"`
 	Archive             string        `json:"archive,omitempty"`
+	ArchiveFiles        []string      `json:"archiveFiles,omitempty"`
+	NewFiles            []string      `json:"newFiles,omitempty"`
 	SpeedBytesPerSecond uint64        `json:"speedBytesPerSecond,omitempty"`
 	ETASeconds          int64         `json:"etaSeconds,omitempty"`
 	DeleteAt            *time.Time    `json:"deleteAt,omitempty"`
@@ -495,6 +499,17 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 
 	applyExtractProgress(&queue, item)
 
+	if item.Resp != nil {
+		if !item.Resp.Started.IsZero() {
+			queue.Started = item.Resp.Started
+		}
+		if item.Resp.Elapsed > 0 {
+			queue.Elapsed = item.Resp.Elapsed.Round(time.Second).String()
+		}
+		queue.ArchiveFiles = append(queue.ArchiveFiles, item.Resp.Archives.List()...)
+		queue.ArchiveFiles = append(queue.ArchiveFiles, item.Resp.Extras.List()...)
+		queue.NewFiles = append(queue.NewFiles, item.Resp.NewFiles...)
+	}
 	if item.Resp != nil && item.Resp.Error != nil {
 		queue.Error = item.Resp.Error.Error()
 	}
@@ -510,6 +525,9 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 func applyExtractProgress(queue *QueueItem, item *Extract) {
 	if item.XProg == nil {
 		return
+	}
+	if !item.XProg.StartedAt.IsZero() {
+		queue.Started = item.XProg.StartedAt
 	}
 
 	now := time.Now()

@@ -38,7 +38,6 @@
     visibleFiles,
   } from '../lib/dashboard'
   import {
-    clampColumnWidth,
     loadColumnWidths,
     resetColumnWidths,
     saveColumnWidths,
@@ -61,44 +60,54 @@
   const dismissedStorageKey = 'unpackerr.dashboard.dismissed-history.v1'
 
   type HistoryColumn =
-    | 'app'
+    | 'item'
     | 'status'
     | 'files'
     | 'size'
     | 'retries'
     | 'finished'
+    | 'path'
     | 'actions'
   const historyColumnDefaults: Record<HistoryColumn, string> = {
-    app: '13%',
-    status: '13%',
-    files: '8%',
-    size: '11%',
-    retries: '8%',
-    finished: '27%',
-    actions: '20%',
+    item: '25%',
+    status: '12%',
+    files: '7%',
+    size: '10%',
+    retries: '7%',
+    finished: '16%',
+    path: '15%',
+    actions: '8%',
   }
   const historyColumnMins: Record<HistoryColumn, number> = {
-    app: 70,
-    status: 70,
+    item: 180,
+    status: 110,
     files: 50,
     size: 70,
     retries: 50,
-    finished: 110,
+    finished: 130,
+    path: 160,
     actions: 80,
   }
+  const historyColumnKeys: HistoryColumn[] = [
+    'item',
+    'status',
+    'files',
+    'size',
+    'retries',
+    'finished',
+    'path',
+    'actions',
+  ]
   const historyColumnStorageKey = 'unpackerr.dashboard.history-columns.v1'
   let historyColumnWidths = $state<Record<HistoryColumn, number | string>>({ ...historyColumnDefaults })
-  let tableWidth = $state<number | null>(null)
   let historyResize = $state<{
     key: HistoryColumn
     startX: number
     startWidths: Record<HistoryColumn, number>
-    containerWidth: number
     handle: HTMLElement
   } | null>(null)
 
   function resetHistoryColumns() {
-    tableWidth = null
     historyColumnWidths = resetColumnWidths(
       historyColumnStorageKey,
       historyColumnDefaults,
@@ -116,16 +125,11 @@
 
     const thead = heading.parentElement
     const ths = thead ? (Array.from(thead.children) as HTMLElement[]) : []
-    const keys: HistoryColumn[] = ['app', 'status', 'files', 'size', 'retries', 'finished']
-    if (canWrite) keys.push('actions')
-
-    const tableEl = heading.closest('table')
-    const containerWidth = tableEl?.parentElement?.clientWidth ?? tableEl?.getBoundingClientRect().width ?? 0
 
     const startWidths: Record<HistoryColumn, number> = {} as any
-    ths.forEach((th, idx) => {
-      const colKey = keys[idx]
-      if (colKey) {
+    ths.forEach((th) => {
+      const colKey = th.dataset.columnKey as HistoryColumn | undefined
+      if (colKey && historyColumnKeys.includes(colKey)) {
         startWidths[colKey] = Math.round(th.getBoundingClientRect().width)
       }
     })
@@ -134,7 +138,6 @@
       key,
       startX: event.clientX,
       startWidths,
-      containerWidth,
       handle,
     }
     document.body.classList.add('is-resizing-columns')
@@ -143,28 +146,22 @@
   function moveHistoryResize(event: PointerEvent | MouseEvent) {
     if (!historyResize) return
     const delta = event.clientX - historyResize.startX
-    const flexKey: HistoryColumn = historyResize.key === 'finished' ? 'status' : 'finished'
-
-    const minW = historyColumnMins[historyResize.key]
-    const newTargetW = Math.max(minW, Math.round(historyResize.startWidths[historyResize.key] + delta))
-    const actualDelta = newTargetW - historyResize.startWidths[historyResize.key]
-
-    const flexMinW = historyColumnMins[flexKey]
-    const newFlexW = Math.max(flexMinW, Math.round(historyResize.startWidths[flexKey] - actualDelta))
-    const absorbedDelta = historyResize.startWidths[flexKey] - newFlexW
-
-    const unabsorbed = actualDelta - absorbedDelta
+    const flexKey: HistoryColumn = historyResize.key === 'finished' ? 'item' : 'finished'
+    const targetStart = historyResize.startWidths[historyResize.key] ?? historyColumnMins[historyResize.key]
+    const flexStart = historyResize.startWidths[flexKey] ?? historyColumnMins[flexKey]
+    const requestedDelta = Math.round(targetStart + delta) - targetStart
+    const availableDelta = Math.max(0, flexStart - historyColumnMins[flexKey])
+    const actualDelta = Math.max(
+      -targetStart + historyColumnMins[historyResize.key],
+      Math.min(requestedDelta, availableDelta),
+    )
+    const newTargetW = targetStart + actualDelta
+    const newFlexW = flexStart - actualDelta
 
     const updated: Record<HistoryColumn, number | string> = { ...historyResize.startWidths }
     updated[historyResize.key] = newTargetW
     updated[flexKey] = newFlexW
     historyColumnWidths = updated
-
-    if (unabsorbed > 0) {
-      tableWidth = Math.round(historyResize.containerWidth + unabsorbed)
-    } else {
-      tableWidth = null
-    }
   }
 
   function finishHistoryResize(event: PointerEvent | MouseEvent) {
@@ -183,11 +180,23 @@
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const delta = event.key === 'ArrowRight' ? 16 : -16
-    const flexKey: HistoryColumn = key === 'finished' ? 'status' : 'finished'
-    const curVal = typeof historyColumnWidths[key] === 'number' ? (historyColumnWidths[key] as number) : 120
-    const flexVal = typeof historyColumnWidths[flexKey] === 'number' ? (historyColumnWidths[flexKey] as number) : 300
-    const newTarget = Math.max(historyColumnMins[key], curVal + delta)
-    const newFlex = Math.max(historyColumnMins[flexKey], flexVal - (newTarget - curVal))
+    const handle = event.currentTarget as HTMLElement
+    const table = handle.closest('table')
+    const targetHeader = handle.parentElement
+    const flexKey: HistoryColumn = key === 'finished' ? 'item' : 'finished'
+    const flexHeader = table
+      ? Array.from(table.querySelectorAll('thead th')).find(
+          (th) => (th as HTMLElement).dataset.columnKey === flexKey,
+        ) as HTMLElement | undefined
+      : undefined
+    const curVal = targetHeader?.getBoundingClientRect().width ?? historyColumnMins[key]
+    const flexVal = flexHeader?.getBoundingClientRect().width ?? historyColumnMins[flexKey]
+    const actualDelta = Math.max(
+      -curVal + historyColumnMins[key],
+      Math.min(delta, Math.max(0, flexVal - historyColumnMins[flexKey])),
+    )
+    const newTarget = curVal + actualDelta
+    const newFlex = flexVal - actualDelta
     const updated: Record<HistoryColumn, number | string> = { ...historyColumnWidths }
     updated[key] = newTarget
     updated[flexKey] = newFlex
@@ -213,7 +222,7 @@
   const shown = $derived(
     filter.trim()
       ? rows.filter((r) =>
-          (r.id + r.app + r.status)
+          (r.id + r.app + r.status + itemTitle(r) + itemPath(r))
             .toLowerCase()
             .includes(filter.trim().toLowerCase()),
         )
@@ -314,14 +323,14 @@
   <CardBody>
     <Row class="align-items-center mb-2 g-2">
       <Col>
-        <CardTitle class="mb-0">{$_('pages.history.Title')}</CardTitle>
+        <CardTitle class="mb-0">{$_('pages.history.Title')} ({allRows.length})</CardTitle>
+        <div class="subtle small mt-1">{$_('pages.history.intro')}</div>
       </Col>
       <Col xs="auto">
         <Input
           id="history-filter"
           name="history-filter"
           type="text"
-          bsSize="sm"
           aria-label={$_('phrases.FilterPlaceholder')}
           placeholder={$_('phrases.FilterPlaceholder')}
           bind:value={filter}
@@ -368,77 +377,113 @@
     {:else if shown.length === 0}
       <p class="text-muted mb-0">{$_('phrases.NoHistory')}</p>
     {:else}
-      <Table responsive hover size="sm" class="align-middle history-table" style={tableWidth ? `width: ${tableWidth}px` : 'width: 100%'}>
+      <Table responsive hover size="sm" class="align-middle history-table">
         <colgroup>
-          <col style={`width: ${colStyle(historyColumnWidths.app)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.item)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.status)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.files)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.size)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.retries)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.finished)}`} />
+          <col style={`width: ${colStyle(historyColumnWidths.path)}`} />
           {#if canWrite}<col style={`width: ${colStyle(historyColumnWidths.actions)}`} />{/if}
         </colgroup>
         <thead>
           <tr>
-            <th id="hist-app" scope="col">
-              {$_('pages.history.App')}
-              <button type="button" class="column-resizer" aria-label="Resize app column"
-                onpointerdown={(event) => startHistoryResize(event, 'app')}
-                onkeydown={(event) => nudgeHistoryResize(event, 'app')}></button>
+            <th id="hist-item" data-column-key="item" scope="col">
+              {$_('pages.history.Item')}
+              <button type="button" class="column-resizer" aria-label="Resize item column"
+                title="Resize item column"
+                onpointerdown={(event) => startHistoryResize(event, 'item')}
+                onkeydown={(event) => nudgeHistoryResize(event, 'item')}></button>
             </th>
-            <th id="hist-status" scope="col">
+            <th id="hist-status" data-column-key="status" scope="col">
               {$_('pages.history.Status')}
               <button type="button" class="column-resizer" aria-label="Resize status column"
+                title="Resize status column"
                 onpointerdown={(event) => startHistoryResize(event, 'status')}
                 onkeydown={(event) => nudgeHistoryResize(event, 'status')}></button>
             </th>
-            <th id="hist-files" class="text-end" scope="col">
+            <th id="hist-files" data-column-key="files" class="text-end" scope="col">
               {$_('pages.history.Files')}
               <button type="button" class="column-resizer" aria-label="Resize files column"
+                title="Resize files column"
                 onpointerdown={(event) => startHistoryResize(event, 'files')}
                 onkeydown={(event) => nudgeHistoryResize(event, 'files')}></button>
             </th>
-            <th id="hist-size" class="text-end" scope="col">
+            <th id="hist-size" data-column-key="size" class="text-end" scope="col">
               {$_('pages.history.Size')}
               <button type="button" class="column-resizer" aria-label="Resize size column"
+                title="Resize size column"
                 onpointerdown={(event) => startHistoryResize(event, 'size')}
                 onkeydown={(event) => nudgeHistoryResize(event, 'size')}></button>
             </th>
-            <th id="hist-retries" class="text-end" scope="col">
+            <th id="hist-retries" data-column-key="retries" class="text-end" scope="col">
               {$_('pages.history.Retries')}
               <button type="button" class="column-resizer" aria-label="Resize retries column"
+                title="Resize retries column"
                 onpointerdown={(event) => startHistoryResize(event, 'retries')}
                 onkeydown={(event) => nudgeHistoryResize(event, 'retries')}></button>
             </th>
-            <th id="hist-finished" scope="col">
+            <th id="hist-finished" data-column-key="finished" scope="col">
               {$_('pages.history.Finished')}
+              <button type="button" class="column-resizer" aria-label="Resize finished column"
+                title="Resize finished column"
+                onpointerdown={(event) => startHistoryResize(event, 'finished')}
+                onkeydown={(event) => nudgeHistoryResize(event, 'finished')}></button>
+            </th>
+            <th id="hist-path" data-column-key="path" scope="col">
+              {$_('pages.logs.Path')}
               {#if canWrite}
-                <button type="button" class="column-resizer" aria-label="Resize finished column"
-                  onpointerdown={(event) => startHistoryResize(event, 'finished')}
-                  onkeydown={(event) => nudgeHistoryResize(event, 'finished')}></button>
+                <button type="button" class="column-resizer" aria-label="Resize path column"
+                  title="Resize path column"
+                  onpointerdown={(event) => startHistoryResize(event, 'path')}
+                  onkeydown={(event) => nudgeHistoryResize(event, 'path')}></button>
               {/if}
             </th>
             {#if canWrite}
-              <th id="hist-actions" class="text-end" scope="col">
+              <th id="hist-actions" data-column-key="actions" class="text-end" scope="col">
                 {$_('pages.history.Actions')}
               </th>
             {/if}
           </tr>
         </thead>
-        {#each shown as row (row.id)}
-          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-          <tbody
-            class="stack-item items-row"
-            class:is-selected={selectedHistoryId === row.id}
-            onclick={() => toggleHistorySelect(row.id)}
-          >
-            <tr>
-              <td data-label={$_('pages.history.App')} headers="hist-app">{row.app}</td>
-              <td data-label={$_('pages.history.Status')} headers="hist-status"
-                ><Badge color={statusColor(row.status)}
+        <tbody>
+          {#each shown as row (row.id)}
+            <tr
+              class="items-row"
+              class:is-selected={selectedHistoryId === row.id}
+              tabindex="0"
+              role="button"
+              aria-pressed={selectedHistoryId === row.id}
+              aria-label={itemTitle(row)}
+              onclick={() => toggleHistorySelect(row.id)}
+              onkeydown={(event) => {
+                if (event.target !== event.currentTarget) return
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  toggleHistorySelect(row.id)
+                }
+              }}
+            >
+              <td data-label={$_('pages.history.Item')} headers="hist-item" class="items-cell-item">
+                <div class="item-title"><strong>{itemTitle(row)}</strong></div>
+                <div class="item-app text-muted">{row.app}</div>
+                {#if row.retries}
+                  <div class="item-note text-muted">{$_('pages.history.Retries')}: {row.retries}</div>
+                {/if}
+                {#if itemReason(row)}
+                  <div class="item-note text-muted"><strong>Reason</strong> {itemReason(row)}</div>
+                {/if}
+                {#if row.error}
+                  <div class="item-note text-danger"><strong>Error</strong> {row.error}</div>
+                {/if}
+              </td>
+              <td data-label={$_('pages.history.Status')} headers="hist-status">
+                <Badge color={statusColor(row.status)}
                   >{$_(statusPhrase(row.status))}</Badge
-                ></td
-              >
+                >
+              </td>
               <td data-label={$_('pages.history.Files')} class="text-end" headers="hist-files">{row.files || 0}</td>
               <td data-label={$_('pages.history.Size')} class="text-end text-nowrap" headers="hist-size"
                 >{bytes(row.bytes)}</td
@@ -446,7 +491,7 @@
               <td data-label={$_('pages.history.Retries')} class="text-end" headers="hist-retries">{row.retries}</td>
               <td
                 data-label={$_('pages.history.Finished')}
-                class="small text-nowrap"
+                class="text-nowrap"
                 headers="hist-finished"
                 title={dateTime(row.finished)}
               >
@@ -456,6 +501,9 @@
                 {#if row.deleteAt}
                   <div class="text-muted">{$_('phrases.DeletesIn')} {deleteRemaining(row.deleteAt, now)}</div>
                 {/if}
+              </td>
+              <td data-label={$_('pages.logs.Path')} headers="hist-path" class="items-cell-path">
+                <code class="path-cell">{itemPath(row)}</code>
               </td>
               {#if canWrite}
                 <td data-label={$_('pages.history.Actions')} class="text-end" headers="hist-actions">
@@ -472,20 +520,8 @@
                 </td>
               {/if}
             </tr>
-            <tr class="stack-item-path">
-              <td colspan={canWrite ? 7 : 6} headers="hist-app">
-                <div class="small"><strong>{itemTitle(row)}</strong></div>
-                <code class="wrap small">{itemPath(row)}</code>
-                {#if itemReason(row)}
-                  <div class="text-muted small">{itemReason(row)}</div>
-                {/if}
-                {#if row.error}<div class="text-danger small">
-                    {row.error}
-                  </div>{/if}
-              </td>
-            </tr>
-          </tbody>
-        {/each}
+          {/each}
+        </tbody>
       </Table>
     {/if}
   </CardBody>

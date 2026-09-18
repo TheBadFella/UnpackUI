@@ -49,11 +49,9 @@ type Config struct {
 	Nickname       string        `json:"nickname"       toml:"nickname"        xml:"nickname,omitempty"        yaml:"nickname"`
 	Token          string        `json:"token"          toml:"token"           xml:"token,omitempty"           yaml:"token"`
 	Channel        string        `json:"channel"        toml:"channel"         xml:"channel,omitempty"         yaml:"channel"`
-	UpdateExisting bool          `json:"updateExisting" toml:"update_existing" xml:"update_existing,omitempty" yaml:"updateExisting"`
 	client         *http.Client
 	fails          uint
 	posts          uint
-	msgIDs         map[string]string
 	sync.Mutex     `json:"-" toml:"-" xml:"-" yaml:"-"`
 }
 
