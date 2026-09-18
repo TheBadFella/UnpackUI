@@ -307,6 +307,8 @@ func (u *Unpackerr) putGeneral(raw json.RawMessage) (bool, error) {
 		return restart, err
 	}
 
+	u.restampQueueDeadlines()
+
 	// After configMu: restore takes History.mu, and /api/stats does the reverse.
 	if historyWasOff && u.KeepHistory > 0 {
 		u.loadHistory() // histPath is only resolved while history is enabled.
@@ -314,6 +316,17 @@ func (u *Unpackerr) putGeneral(raw json.RawMessage) (bool, error) {
 	}
 
 	return restart, nil
+}
+
+func (u *Unpackerr) restampQueueDeadlines() {
+	u.lockHistory()
+	defer u.unlockHistory()
+
+	for name, item := range u.Map {
+		u.stampQueueDue(name, item)
+	}
+
+	u.notifyQueueLocked()
 }
 
 // generalRestartRequired lists the general fields the main loop cannot re-apply

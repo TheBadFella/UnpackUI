@@ -26,6 +26,7 @@ Two stacked feature series plus a follow-up mux swap. Closed duplicates (`#688`,
 | [#697](https://github.com/Unpackerr/unpackerr/pull/697) | Stdlib mux | Dropped `julienschmidt/httprouter`. Go `http.ServeMux` with `{section}` and `GET …/{$}` for the index. |
 | [#722](https://github.com/Unpackerr/unpackerr/pull/722) | PUT env overlay | Starr / folder / hook PUTs re-apply `UN_*` onto live so omitting an env-only slug cannot wipe it. File snapshot stays file-shaped. |
 | v1.0.0 (September 2026) | Named instance maps | Sonarr, Radarr, Lidarr, Readarr, folders, webhooks, and cmdhooks are `map[string]*Config` keyed by a slug. Dual-read old `[[section]]` arrays as `"0"`, `"1"`, …. PUT writes the request body as the file document. Live is `clone(fileConfig)` + `ParseENV` (cnfg overlays existing map entries). Env-only slugs still appear on live after `{}`. A client that PUTs live overlay values persists them. |
+| [#761](https://github.com/Unpackerr/unpackerr/pull/761) | Queue ETA & delay countdowns | Per-archive speed & ETA sampling, `due`/`dueKind` deadlines (`start`, `retry`, `cleanup`, `history`) stamped on the main loop. In UnpackUI, live general config PUTs immediately restamp in-flight queue deadlines and broadcast updated queue frames. |
 
 The mux PR is routing only. Behavior below is from the API stacks unless noted.
 
@@ -383,6 +384,7 @@ Two admins saving at once is not a design target. Do not add snapshot-merge.
 - **configdef** is the source of example conf, compose env names, and the TOML writer. PUT persist goes through it so comments/defaults stay consistent.
 - **`--reset`:** new UI password, write file, print, exit. Not an HTTP route.
 - **Websockets** were anticipated (`{urlbase}ws` on a mux that skips apache log). No WS API in this stack yet; do not rip that mux split out casually.
+- **Queue deadline restamping:** When `StartDelay` or `RetryDelay` changes via live general config PUT, `restampQueueDeadlines()` recalculates `Due` timestamps on all active in-flight items under `History.mu` and broadcasts `notifyQueueLocked()`, ensuring countdown timers in open browsers immediately reflect the updated delays.
 
 ---
 
