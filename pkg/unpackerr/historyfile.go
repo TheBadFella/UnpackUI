@@ -129,7 +129,8 @@ func (u *Unpackerr) historyFilePath() string {
 		return filepath.Join(filepath.Dir(u.ConfigFile), historyFileName)
 	}
 
-	return expandHomedir(filepath.Join("~", ".unpackerr", historyFileName))
+	// Env-only (stdout logs, no config file): keep history in memory only.
+	return ""
 }
 
 func (u *Unpackerr) loadHistory() {
@@ -142,7 +143,7 @@ func (u *Unpackerr) loadHistory() {
 	}
 
 	if u.histPath == "" {
-		u.Printf("[Unpackerr] History file disabled; keep_history=%d but no log, config, or home path",
+		u.Printf("[Unpackerr] History file disabled; keep_history=%d but no log or config file",
 			u.KeepHistory)
 
 		return
