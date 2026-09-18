@@ -211,6 +211,51 @@ func TestRecoverWaitingFolderDoesNotCleanOutput(t *testing.T) {
 	}
 }
 
+func TestRecoverLegacyDirectoryItemIsDropped(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	legacyDir := filepath.Join(watchPath, "incoming")
+	if err := os.Mkdir(legacyDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC()
+	unpackerr := newRecoveryTestUnpackerr(watchPath, legacyDir, WAITING, now.Add(-time.Minute))
+	unpackerr.StateFile = filepath.Join(t.TempDir(), defaultStateFile)
+	unpackerr.recoverInterruptedFolders(now)
+
+	if unpackerr.folders.Folders[legacyDir] != nil {
+		t.Fatalf("legacy directory was restored as work: %s", legacyDir)
+	}
+	if unpackerr.recovery.Folders[legacyDir] != nil {
+		t.Fatalf("legacy directory remained in recovery: %s", legacyDir)
+	}
+}
+
+func TestRecoverLegacyExtractingDirectoryCleansPartialOutput(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	legacyDir := filepath.Join(watchPath, "incoming")
+	partial := legacyDir + suffix
+	if err := os.Mkdir(legacyDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(partial, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now().UTC()
+	unpackerr := newRecoveryTestUnpackerr(watchPath, legacyDir, EXTRACTING, now.Add(-time.Minute))
+	unpackerr.StateFile = filepath.Join(t.TempDir(), defaultStateFile)
+	unpackerr.recoverInterruptedFolders(now)
+
+	if _, err := os.Stat(partial); !os.IsNotExist(err) {
+		t.Fatalf("legacy partial output was not cleaned: %v", err)
+	}
+}
+
 func newRecoveryTestUnpackerr(watchPath, archivePath string, status ExtractStatus, updated time.Time) *Unpackerr {
 	unpackerr := New()
 	unpackerr.Folders = InstanceMap[FolderConfig]{"0": {Path: watchPath}}

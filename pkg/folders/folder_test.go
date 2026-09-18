@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Unpackerr/unpackerr/pkg/extract"
 )
 
 type noopLogger struct{}
@@ -104,7 +106,7 @@ func TestFolderConfigIsExcludedPath(t *testing.T) {
 	}
 }
 
-func TestFoldersProcessEventCurrentBehavior(t *testing.T) {
+func TestFoldersProcessEventTracksArchiveNotContainer(t *testing.T) {
 	t.Parallel()
 
 	watchPath := t.TempDir()
@@ -155,8 +157,210 @@ func TestFoldersProcessEventCurrentBehavior(t *testing.T) {
 		Op:     "test",
 	}, time.Now())
 
-	if _, ok := tracker.Folders[dir]; !ok {
-		t.Fatalf("expected folder path to be tracked: %s", dir)
+	if _, ok := tracker.Folders[dir]; ok {
+		t.Fatalf("did not expect watch-container directory to be tracked: %s", dir)
+	}
+}
+
+func TestFoldersNestedArchivesTrackIndividually(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	tracker := newTestFolders(t, cfg)
+
+	incoming := filepath.Join(watchPath, "incoming")
+	nested := filepath.Join(incoming, "nested")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatalf("creating incoming tree: %v", err)
+	}
+
+	archives := []string{
+		filepath.Join(incoming, "one.zip"),
+		filepath.Join(incoming, "two.zip"),
+		filepath.Join(incoming, "three.zip"),
+		filepath.Join(incoming, "four.zip"),
+		filepath.Join(nested, "five.zip"),
+	}
+	for _, archive := range archives {
+		if err := os.WriteFile(archive, []byte("x"), 0o600); err != nil {
+			t.Fatalf("creating archive %s: %v", archive, err)
+		}
+	}
+
+	// A moved or quickly copied directory can already contain every archive
+	// when its create event reaches the watcher.
+	tracker.ProcessEvent(&Event{
+		Config: cfg,
+		Name:   filepath.Base(incoming),
+		File:   incoming,
+		Op:     "test",
+	}, time.Now())
+
+	if _, ok := tracker.Folders[incoming]; ok {
+		t.Fatalf("watch container became a tracked item: %s", incoming)
+	}
+	if _, ok := tracker.Folders[nested]; ok {
+		t.Fatalf("nested watch container became a tracked item: %s", nested)
+	}
+	if len(tracker.Folders) != len(archives) {
+		t.Fatalf("tracked %d items, want %d: %v", len(tracker.Folders), len(archives), tracker.Folders)
+	}
+	for _, archive := range archives {
+		if _, ok := tracker.Folders[archive]; !ok {
+			t.Fatalf("expected archive to be tracked separately: %s", archive)
+		}
+	}
+}
+
+func TestFoldersStartupScanFindsExistingArchivesWithoutRefreshingRecovery(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	tracker := newTestFolders(t, cfg)
+	nested := filepath.Join(watchPath, "incoming", "nested")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	existing := filepath.Join(watchPath, "incoming", "one.zip")
+	recovered := filepath.Join(nested, "two.zip")
+	for _, path := range []string{existing, recovered} {
+		if err := os.WriteFile(path, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	recoveredAt := time.Now().Add(-time.Hour)
+	tracker.Folders[recovered] = &Folder{Updated: recoveredAt, Status: extract.WAITING, Config: cfg}
+	paths := tracker.Scan(time.Now())
+
+	if len(paths) != 2 || tracker.Folders[existing] == nil || tracker.Folders[recovered] == nil {
+		t.Fatalf("startup scan paths=%v folders=%v", paths, tracker.Folders)
+	}
+	if !tracker.Folders[recovered].Updated.Equal(recoveredAt) {
+		t.Fatalf("recovered timestamp changed: got %v want %v", tracker.Folders[recovered].Updated, recoveredAt)
+	}
+	if tracker.Folders[filepath.Join(watchPath, "incoming")] != nil || tracker.Folders[nested] != nil {
+		t.Fatal("startup scan tracked a directory container")
+	}
+}
+
+func TestFoldersIgnoreArchiveInsideExtractDestination(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	tracker := newTestFolders(t, cfg)
+	archive := filepath.Join(watchPath, "movie.zip")
+	dest := filepath.Join(watchPath, "movie")
+	nested := filepath.Join(dest, "extras")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(archive, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outputArchive := filepath.Join(nested, "bonus.zip")
+	if err := os.WriteFile(outputArchive, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	tracker.ProcessEvent(&Event{Config: cfg, Name: "bonus.zip", File: outputArchive, Op: "test"}, time.Now())
+	tracker.Scan(time.Now())
+
+	if tracker.Folders[outputArchive] != nil {
+		t.Fatalf("tracked archive inside extraction output: %s", outputArchive)
+	}
+	if tracker.Folders[archive] == nil {
+		t.Fatalf("did not track source archive: %s", archive)
+	}
+}
+
+func TestFoldersTrackOnlyFirstRARPart(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	tracker := newTestFolders(t, cfg)
+	for _, name := range []string{"release.part01.rar", "release.part02.rar", "release.part03.rar"} {
+		if err := os.WriteFile(filepath.Join(watchPath, name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tracker.Scan(time.Now())
+
+	first := filepath.Join(watchPath, "release.part01.rar")
+	if len(tracker.Folders) != 1 || tracker.Folders[first] == nil {
+		t.Fatalf("multipart tasks=%v, want only %s", tracker.Folders, first)
+	}
+}
+
+func TestFoldersHandleFileEventKeepsNestedArchivePath(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	tracker := &Folders{
+		Config: []*FolderConfig{cfg},
+		Events: make(chan *Event, 1),
+		Logs:   noopLogger{},
+	}
+
+	incoming := filepath.Join(watchPath, "incoming")
+	if err := os.Mkdir(incoming, 0o700); err != nil {
+		t.Fatalf("creating incoming directory: %v", err)
+	}
+	archive := filepath.Join(incoming, "movie.zip")
+	if err := os.WriteFile(archive, []byte("x"), 0o600); err != nil {
+		t.Fatalf("creating archive: %v", err)
+	}
+
+	tracker.handleFileEvent(archive, "test")
+
+	select {
+	case event := <-tracker.Events:
+		if event.File != archive || event.Name != filepath.Base(archive) {
+			t.Fatalf("nested archive event = %+v, want exact archive path", event)
+		}
+	default:
+		t.Fatal("expected nested archive event")
+	}
+}
+
+func TestFoldersReaddsRecreatedWatchContainer(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	cfg := &FolderConfig{Path: watchPath}
+	tracker := newTestFolders(t, cfg)
+	incoming := filepath.Join(watchPath, "incoming")
+	if err := os.Mkdir(incoming, 0o700); err != nil {
+		t.Fatalf("creating incoming directory: %v", err)
+	}
+
+	event := &Event{Config: cfg, Name: filepath.Base(incoming), File: incoming, Op: "test"}
+	tracker.ProcessEvent(event, time.Now())
+	if _, ok := tracker.WatchDirs[incoming]; !ok {
+		t.Fatalf("new directory was not registered: %s", incoming)
+	}
+
+	if err := os.Remove(incoming); err != nil {
+		t.Fatalf("removing incoming directory: %v", err)
+	}
+	tracker.ProcessEvent(event, time.Now())
+	if _, ok := tracker.WatchDirs[incoming]; ok {
+		t.Fatalf("removed directory remained registered: %s", incoming)
+	}
+
+	if err := os.Mkdir(incoming, 0o700); err != nil {
+		t.Fatalf("recreating incoming directory: %v", err)
+	}
+	tracker.ProcessEvent(event, time.Now())
+	if _, ok := tracker.WatchDirs[incoming]; !ok {
+		t.Fatalf("recreated directory was not registered: %s", incoming)
 	}
 }
 
@@ -301,8 +505,11 @@ func TestFoldersIgnoreExtractDestSiblingArchive(t *testing.T) {
 		Op:     "test",
 	}, time.Now())
 
-	if _, ok := tracker.Folders[incoming]; !ok {
-		t.Fatalf("expected unrelated folder to be tracked: %s", incoming)
+	if _, ok := tracker.Folders[incoming]; ok {
+		t.Fatalf("did not expect watch container to be tracked: %s", incoming)
+	}
+	if _, ok := tracker.WatchDirs[incoming]; !ok {
+		t.Fatalf("expected unrelated folder to be watched as a container: %s", incoming)
 	}
 }
 
@@ -322,8 +529,8 @@ func TestFoldersUntrackExtractDestAfterSiblingAppears(t *testing.T) {
 	now := time.Now()
 	tracker.ProcessEvent(&Event{Config: cfg, Name: "Win10", File: dest, Op: "test"}, now)
 
-	if _, ok := tracker.Folders[dest]; !ok {
-		t.Fatalf("expected dest to be tracked before sibling archive: %s", dest)
+	if _, ok := tracker.Folders[dest]; ok {
+		t.Fatalf("did not expect watch container to be tracked before sibling archive: %s", dest)
 	}
 
 	iso := filepath.Join(watchPath, "Win10.iso")
@@ -334,7 +541,7 @@ func TestFoldersUntrackExtractDestAfterSiblingAppears(t *testing.T) {
 	tracker.ProcessEvent(&Event{Config: cfg, Name: "Win10", File: dest, Op: "write"}, now.Add(time.Second))
 
 	if _, ok := tracker.Folders[dest]; ok {
-		t.Fatalf("expected dest to be untracked after sibling archive appeared: %s", dest)
+		t.Fatalf("did not expect extract destination to be tracked: %s", dest)
 	}
 }
 

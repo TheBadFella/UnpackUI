@@ -38,6 +38,7 @@
   )
 </script>
 
+<div class="settings-page">
 <h4 class="mb-3">{heading}</h4>
 
 {#if isStarr}
@@ -79,3 +80,4 @@
     <StarrForm section={current as ConfigSection} />
   {/key}
 {/if}
+</div>

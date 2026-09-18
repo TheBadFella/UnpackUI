@@ -825,9 +825,9 @@ sections:
 
 
       ##-Folders-#######################################################################
-      ## This application can also watch folders for things to extract. If you copy a ##
-      ## subfolder into a watched folder (defined below) any extractable items in the ##
-      ## folder will be decompressed. This has nothing to do with Starr applications. ##
+      ## This application can also watch folders for things to extract. Archives in ##
+      ## subfolders are tracked and decompressed individually. This has nothing to do ##
+      ## with Starr applications.                                                     ##
       ##################################################################################
     docs: |
       Folders are a way to watch a folder for things to extract. You can use this to

@@ -55,6 +55,7 @@ type Folders struct {
 	Interval     time.Duration
 	Config       []*FolderConfig
 	Folders      map[string]*Folder
+	WatchDirs    map[string]struct{}
 	Events       chan *Event
 	Updates      chan *xtractr.Response
 	FSNotify     *fsnotify.Watcher

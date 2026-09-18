@@ -40,6 +40,8 @@
     resetColumnWidths,
     saveColumnWidths,
     colStyle,
+    resizedColumnWidths,
+    tableWidth,
   } from '../lib/columns'
   import { success, failure } from '../lib/toast'
   import { live, type LiveTopic } from '../lib/socket.svelte'
@@ -78,7 +80,7 @@
     deletes: 110,
     updated: 130,
     path: 160,
-    actions: 80,
+    actions: 150,
   }
   const queueColumnKeys: QueueColumn[] = [
     'item',
@@ -137,20 +139,12 @@
   function moveQueueResize(event: PointerEvent | MouseEvent) {
     if (!queueResize) return
     const delta = event.clientX - queueResize.startX
-    const flexKey: QueueColumn = queueResize.key === 'progress' ? 'item' : 'progress'
-    const targetStart = queueResize.startWidths[queueResize.key] ?? queueColumnMins[queueResize.key]
-    const flexStart = queueResize.startWidths[flexKey] ?? queueColumnMins[flexKey]
-    const minW = queueColumnMins[queueResize.key]
-    const requestedDelta = Math.round(targetStart + delta) - targetStart
-    const availableDelta = Math.max(0, flexStart - queueColumnMins[flexKey])
-    const actualDelta = Math.max(-targetStart + minW, Math.min(requestedDelta, availableDelta))
-    const newTargetW = targetStart + actualDelta
-    const newFlexW = flexStart - actualDelta
-
-    const updated: Record<QueueColumn, number | string> = { ...queueResize.startWidths }
-    updated[queueResize.key] = newTargetW
-    updated[flexKey] = newFlexW
-    queueColumnWidths = updated
+    queueColumnWidths = resizedColumnWidths(
+      queueResize.startWidths,
+      queueResize.key,
+      delta,
+      queueColumnMins,
+    )
   }
 
   function finishQueueResize(event: PointerEvent | MouseEvent) {
@@ -171,27 +165,13 @@
     const delta = event.key === 'ArrowRight' ? 16 : -16
     const handle = event.currentTarget as HTMLElement
     const table = handle.closest('table')
-    const targetHeader = handle.parentElement
-    const flexKey: QueueColumn = key === 'progress' ? 'item' : 'progress'
-    const flexHeader = table
-      ? Array.from(table.querySelectorAll('thead th')).find(
-          (th) => (th as HTMLElement).dataset.columnKey === flexKey,
-        ) as HTMLElement | undefined
-      : undefined
-    const curVal = targetHeader?.getBoundingClientRect().width ?? queueColumnMins[key]
-    const flexVal = flexHeader?.getBoundingClientRect().width ?? queueColumnMins[flexKey]
-    const requestedDelta = delta
-    const availableDelta = Math.max(0, flexVal - queueColumnMins[flexKey])
-    const actualDelta = Math.max(
-      -curVal + queueColumnMins[key],
-      Math.min(requestedDelta, availableDelta),
-    )
-    const newTarget = curVal + actualDelta
-    const newFlex = flexVal - actualDelta
-    const updated: Record<QueueColumn, number | string> = { ...queueColumnWidths }
-    updated[key] = newTarget
-    updated[flexKey] = newFlex
-    queueColumnWidths = updated
+    if (!table) return
+    const measured: Record<QueueColumn, number> = {} as any
+    table.querySelectorAll('thead th').forEach((th) => {
+      const colKey = (th as HTMLElement).dataset.columnKey as QueueColumn | undefined
+      if (colKey) measured[colKey] = Math.round((th as HTMLElement).getBoundingClientRect().width)
+    })
+    queueColumnWidths = resizedColumnWidths(measured, key, delta, queueColumnMins)
     saveColumnWidths(queueColumnStorageKey, queueColumnWidths)
   }
 
@@ -226,6 +206,10 @@
   const stats = $derived(live.stats)
   const queue = $derived(live.queue)
   const queueShowsDelete = $derived(queue.some((item) => Boolean(item.deleteAt)))
+  const queueVisibleColumns = $derived(
+    queueColumnKeys.filter((key) => key !== 'deletes' || queueShowsDelete),
+  )
+  const queueTableWidth = $derived(tableWidth(queueColumnWidths, queueVisibleColumns))
   const selectedQueueItem = $derived(
     queue.find((item) => item.id === selectedQueueId) ?? null
   )
@@ -654,7 +638,7 @@
         {#if queue.length === 0}
           <p class="text-muted mb-0">{$_('phrases.NothingQueued')}</p>
         {:else}
-          <Table responsive hover size="sm" class="align-middle queue-table">
+          <Table responsive hover size="sm" class="align-middle queue-table" style={`width: ${queueTableWidth}`}>
             <colgroup>
               <col style={`width: ${colStyle(queueColumnWidths.item)}`} />
               <col style={`width: ${colStyle(queueColumnWidths.status)}`} />
@@ -664,9 +648,7 @@
               {/if}
               <col style={`width: ${colStyle(queueColumnWidths.updated)}`} />
               <col style={`width: ${colStyle(queueColumnWidths.path)}`} />
-              {#if canWrite}
-                <col style={`width: ${colStyle(queueColumnWidths.actions)}`} />
-              {/if}
+              <col style={`width: ${colStyle(queueColumnWidths.actions)}`} />
             </colgroup>
             <thead>
               <tr>
@@ -729,22 +711,18 @@
                 </th>
                 <th data-column-key="path">
                   {$_('pages.logs.Path')}
-                  {#if canWrite}
-                    <button
-                      type="button"
-                      class="column-resizer"
-                      aria-label="Resize path column"
-                      title="Resize path column"
-                      onpointerdown={(event) => startQueueResize(event, 'path')}
-                      onkeydown={(event) => nudgeQueueResize(event, 'path')}
-                    ></button>
-                  {/if}
+                  <button
+                    type="button"
+                    class="column-resizer"
+                    aria-label="Resize path column"
+                    title="Resize path column"
+                    onpointerdown={(event) => startQueueResize(event, 'path')}
+                    onkeydown={(event) => nudgeQueueResize(event, 'path')}
+                  ></button>
                 </th>
-                {#if canWrite}
-                  <th data-column-key="actions" class="text-end">
-                    {$_('pages.dashboard.Actions')}
-                  </th>
-                {/if}
+                <th data-column-key="actions" class="text-end">
+                  {$_('pages.dashboard.Actions')}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -836,10 +814,19 @@
                   <td data-label={$_('pages.logs.Path')} class="items-cell-path">
                     <code class="path-cell">{itemPath(item)}</code>
                   </td>
-                  {#if canWrite}
-                    <td data-label={$_('pages.dashboard.Actions')} class="text-end text-nowrap">
-                      {#if item.status === 'extractfailed' || TERMINAL.includes(item.status)}
-                        <ButtonGroup size="sm">
+                  <td data-label={$_('pages.dashboard.Actions')} class="text-end text-nowrap">
+                    <ButtonGroup size="sm">
+                      <Button
+                        type="button"
+                        color="secondary"
+                        outline
+                        onclick={(e) => {
+                          e.stopPropagation()
+                          selectedQueueId = item.id
+                        }}
+                        >{$_('phrases.Details')}</Button
+                      >
+                      {#if canWrite && (item.status === 'extractfailed' || TERMINAL.includes(item.status))}
                           {#if item.status === 'extractfailed'}
                             <Button
                               color="primary"
@@ -865,14 +852,9 @@
                               >{$_('buttons.Forget')}</Button
                             >
                           {/if}
-                        </ButtonGroup>
-                      {:else}
-                        <span class="text-muted action-placeholder" aria-label={$_('phrases.Empty')}
-                          >{$_('phrases.Empty')}</span
-                        >
                       {/if}
-                    </td>
-                  {/if}
+                    </ButtonGroup>
+                  </td>
                 </tr>
               {/each}
             </tbody>
