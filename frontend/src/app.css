@@ -385,7 +385,7 @@ code.wrap {
 }
 
 .page-wrap {
-  max-width: 1400px;
+  max-width: 1680px;
 }
 
 /* Bootstrap's dark-theme body color is a little subdued for dense settings
@@ -530,7 +530,7 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 }
 
 .dashboard-page {
-  max-width: 1480px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: 42px 28px 72px;
   width: 100%;
@@ -1737,7 +1737,7 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
   color: #ffffff;
 }
 .page-wrap {
-  max-width: 1480px;
+  max-width: 1680px;
   font-family: monospace;
   font-family: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'SFMono-Regular', monospace;
 }
