@@ -323,6 +323,9 @@ sections:
         desc: |
           How many completed or failed items to keep in unpackerr.history.jsonl
           (next to the log file, or the config file if logs go to stdout).
+          With neither a log file nor a config file, history stays in memory
+          for this process and is not written to disk, so it does not survive
+          a restart. Set `log_file` or use a config file to persist it.
           In-flight Starr items are also written so a restart can put EXTRACTED
           and IMPORTED work back on the live queue for 72 hours; they do not
           count against this number. In-flight Folder items are recorded for
