@@ -34,25 +34,25 @@ type Logger interface {
 
 // Config defines a webhook or command hook.
 type Config struct {
-	Name           string        `json:"name"           toml:"name"            xml:"name"                      yaml:"name"`
-	URL            string        `json:"url"            toml:"url"             xml:"url,omitempty"             yaml:"url"`
-	Command        string        `json:"command"        toml:"command"         xml:"command,omitempty"         yaml:"command"`
-	CType          string        `json:"contentType"    toml:"content_type"    xml:"content_type,omitempty"    yaml:"contentType"`
-	TmplPath       string        `json:"templatePath"   toml:"template_path"   xml:"template_path,omitempty"   yaml:"templatePath"`
-	TempName       string        `json:"template"       toml:"template"        xml:"template,omitempty"        yaml:"template"`
-	Timeout        cnfg.Duration `json:"timeout"        toml:"timeout"         xml:"timeout"                   yaml:"timeout"`
-	Shell          bool          `json:"shell"          toml:"shell"           xml:"shell"                     yaml:"shell"`
-	IgnoreSSL      bool          `json:"ignoreSsl"      toml:"ignore_ssl"      xml:"ignore_ssl,omitempty"      yaml:"ignoreSsl"`
-	Silent         bool          `json:"silent"         toml:"silent"          xml:"silent"                    yaml:"silent"`
-	Events         Statuses      `json:"events"         toml:"events"          xml:"events"                    yaml:"events"`
-	Exclude        StringSlice   `json:"exclude"        toml:"exclude"         xml:"exclude"                   yaml:"exclude"`
-	Nickname       string        `json:"nickname"       toml:"nickname"        xml:"nickname,omitempty"        yaml:"nickname"`
-	Token          string        `json:"token"          toml:"token"           xml:"token,omitempty"           yaml:"token"`
-	Channel        string        `json:"channel"        toml:"channel"         xml:"channel,omitempty"         yaml:"channel"`
-	client         *http.Client
-	fails          uint
-	posts          uint
-	sync.Mutex     `json:"-" toml:"-" xml:"-" yaml:"-"`
+	Name       string        `json:"name"           toml:"name"            xml:"name"                      yaml:"name"`
+	URL        string        `json:"url"            toml:"url"             xml:"url,omitempty"             yaml:"url"`
+	Command    string        `json:"command"        toml:"command"         xml:"command,omitempty"         yaml:"command"`
+	CType      string        `json:"contentType"    toml:"content_type"    xml:"content_type,omitempty"    yaml:"contentType"`
+	TmplPath   string        `json:"templatePath"   toml:"template_path"   xml:"template_path,omitempty"   yaml:"templatePath"`
+	TempName   string        `json:"template"       toml:"template"        xml:"template,omitempty"        yaml:"template"`
+	Timeout    cnfg.Duration `json:"timeout"        toml:"timeout"         xml:"timeout"                   yaml:"timeout"`
+	Shell      bool          `json:"shell"          toml:"shell"           xml:"shell"                     yaml:"shell"`
+	IgnoreSSL  bool          `json:"ignoreSsl"      toml:"ignore_ssl"      xml:"ignore_ssl,omitempty"      yaml:"ignoreSsl"`
+	Silent     bool          `json:"silent"         toml:"silent"          xml:"silent"                    yaml:"silent"`
+	Events     Statuses      `json:"events"         toml:"events"          xml:"events"                    yaml:"events"`
+	Exclude    StringSlice   `json:"exclude"        toml:"exclude"         xml:"exclude"                   yaml:"exclude"`
+	Nickname   string        `json:"nickname"       toml:"nickname"        xml:"nickname,omitempty"        yaml:"nickname"`
+	Token      string        `json:"token"          toml:"token"           xml:"token,omitempty"           yaml:"token"`
+	Channel    string        `json:"channel"        toml:"channel"         xml:"channel,omitempty"         yaml:"channel"`
+	client     *http.Client
+	fails      uint
+	posts      uint
+	sync.Mutex `json:"-" toml:"-" xml:"-" yaml:"-"`
 }
 
 // Statuses allows us to create a custom environment variable unmarshaller.
