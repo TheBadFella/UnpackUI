@@ -1,5 +1,8 @@
 # Review guidance for Unpackerr
 
+When creating commits, do not add `Co-authored-by` trailers or other Copilot
+attestations unless the user explicitly requests them.
+
 Longer runtime/API context: [`INTERNALS.md`](../INTERNALS.md).
 
 Unpackerr is a single-process daemon. One goroutine in `Run()` (`pkg/unpackerr/start.go`)
