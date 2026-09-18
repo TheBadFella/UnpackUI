@@ -83,7 +83,7 @@
 {:else}
   <div class="app-shell">
     <Nav />
-    <main class="app-main">
+        <main class="app-main global-wrap">
       {#if top === ''}
         <div class="dashboard-wrap">
           <RestartBanner />

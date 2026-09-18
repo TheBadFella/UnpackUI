@@ -152,7 +152,7 @@
       "Title": "Estado de Unpackerr",
       "intro": "Progreso de extracción en directo.",
       "ActiveQueue": "Elementos seguidos",
-      "TrackedHint": "Cola actual y elementos completados que permanecen visibles hasta que los borres.",
+      "TrackedHint": "Elementos activos y retenidos en la cola. Los elementos terminados aparecen en Historial.",
       "Live": "En vivo",
       "Starrs": "Apps Starr",
       "StarrsHint": "Instancias de Sonarr, Radarr, Lidarr y Readarr en la configuración.",

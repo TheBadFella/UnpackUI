@@ -11,13 +11,12 @@ import (
 	"golift.io/version"
 )
 
-// runAllHooks sends webhooks and executes command hooks.
 func (u *Unpackerr) runAllHooks(item *Extract) {
 	if item.Status == IMPORTED && item.App == FolderString {
 		return // This is an internal state change we don't need to fire on.
 	}
 
-	payload := u.hookPayload(item)
+	payload := hookPayload(item)
 
 	for _, hook := range u.hookList() {
 		if hook.HasEvent(item.Status) && !hook.Excluded(item.App, item.Name) {
@@ -32,22 +31,14 @@ func (u *Unpackerr) runAllHooks(item *Extract) {
 	}
 }
 
-func (u *Unpackerr) hookPayload(item *Extract) *hooks.Payload {
-	var webURL string
-	if u != nil && u.Config != nil {
-		webURL = u.WebURL
-	}
-
+func hookPayload(item *Extract) *hooks.Payload {
 	payload := &hooks.Payload{
-		Path:    item.Path,
-		App:     starr.App(item.Label()),
-		IDs:     item.IDs,
-		Time:    item.Updated,
-		Data:    nil,
-		Event:   item.Status,
-		Title:   friendlyEventTitle(item.Status),
-		Retries: item.Retries,
-		WebURL:  webURL,
+		Path:  item.Path,
+		App:   starr.App(item.Label()),
+		IDs:   item.IDs,
+		Time:  item.Updated,
+		Data:  nil,
+		Event: item.Status,
 		// Application Metadata.
 		Go:       runtime.Version(),
 		OS:       runtime.GOOS,
@@ -58,7 +49,7 @@ func (u *Unpackerr) hookPayload(item *Extract) *hooks.Payload {
 		Started:  version.Started,
 	}
 
-	if item.Resp != nil {
+	if item.Status <= EXTRACTED && item.Resp != nil {
 		payload.Data = &hooks.XtractPayload{
 			Files:   hooks.StringSlice(item.Resp.NewFiles),
 			File:    item.Resp.NewFiles,
@@ -85,10 +76,6 @@ func (u *Unpackerr) hookPayload(item *Extract) *hooks.Payload {
 	}
 
 	return payload
-}
-
-func (u *Unpackerr) buildWebhookPayload(item *Extract) *hooks.Payload {
-	return u.hookPayload(item)
 }
 
 func (u *Unpackerr) hookList() []*hooks.Config {

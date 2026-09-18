@@ -36,9 +36,3 @@ const (
 	DELETED          = extract.DELETED
 	EXTRACTEDNOTHING = extract.EXTRACTEDNOTHING
 )
-
-var ErrInvalidStatus = hooks.ErrInvalidStatus
-
-func friendlyEventTitle(status ExtractStatus) string {
-	return hooks.FriendlyEventTitle(status)
-}

@@ -111,6 +111,8 @@ export interface QueueItem {
   status: string
   retries: number
   updated: string
+  started?: string
+  elapsed?: string
   progress: string
   error: string
   percent?: number
@@ -123,6 +125,8 @@ export interface QueueItem {
   archives?: number
   extracted?: number
   archive?: string
+  archiveFiles?: string[]
+  newFiles?: string[]
   speedBytesPerSecond?: number
   etaSeconds?: number
   deleteAt?: string

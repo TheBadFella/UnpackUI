@@ -50,15 +50,12 @@
     return normalizedValue.slice(normalizedRoot.length + 1)
   }
 
-  const title = $derived(item.title?.trim() || itemTitle(item))
-  const isFolder = $derived(item.app?.toLowerCase() === 'folder')
-  const location = $derived(
-    isFolder ? item.path : (pathDir(item.path) || item.path)
-  )
-  const sourceArchive = $derived(isFolder ? '' : pathBase(item.path))
+  const title = $derived(itemTitle(item))
+  const location = $derived(pathDir(item.path) || item.path)
+  const sourceArchive = $derived(pathBase(item.path))
   const outputPath = $derived(item.outputPath || '')
   const currentArchive = $derived(
-    'archive' in item && item.archive ? pathBase(item.archive) : ''
+    'archive' in item && item.archive ? item.archive : ''
   )
   const isCompleted = $derived(
     item.status === 'finished' ||
@@ -128,11 +125,13 @@
   )
 
   const archives = $derived.by(() => {
-    const list: string[] = []
-    if ('archive' in item && item.archive) {
-      list.push(relativePath(item.archive, location))
+    if ('archiveFiles' in item && Array.isArray(item.archiveFiles) && item.archiveFiles.length) {
+      return visibleFiles(item.archiveFiles).map((archive) => relativePath(archive, location))
     }
-    return list
+    if ('archive' in item && item.archive) {
+      return [relativePath(item.archive, location)]
+    }
+    return []
   })
 
   const extractedFiles = $derived.by(() => {
@@ -198,7 +197,7 @@
         <div class="detail-paths">
           {#if location}
             <div class="detail-path-row">
-              <div class="detail-label">{isFolder ? 'Folder' : 'Location'}</div>
+              <div class="detail-label">Location</div>
               <div class="detail-path-value">{location}</div>
             </div>
           {/if}
@@ -218,6 +217,12 @@
             <div class="detail-path-row detail-path-row-wide">
               <div class="detail-label">Output folder</div>
               <div class="detail-path-value">{outputPath}</div>
+            </div>
+          {/if}
+          {#if item.url}
+            <div class="detail-path-row detail-path-row-wide">
+              <div class="detail-label">Source URL</div>
+              <div class="detail-path-value">{item.url}</div>
             </div>
           {/if}
           {#if currentArchive}
@@ -322,4 +327,3 @@
     {/if}
   </div>
 </section>
-
