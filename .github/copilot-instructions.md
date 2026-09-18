@@ -34,9 +34,10 @@ in mind; the items below have been raised and rejected before.
 - The history JSONL is written by this process, capped at `keep_history`, and read
   with `bufio.Reader.ReadBytes`. It is not untrusted input. Do not request line
   caps, bounded readers, atomic rename, rollback copies, or `.bak` handling for it.
-  Starr and Folder rows newer than 72 hours are restored into `History.Map`
-  after `validateApps`. Folder items are attached to the watch tracker after
-  `PollFolders` (which replaces `u.folders`). Do not skip Folder rows.
+  Starr rows newer than 72 hours are restored into `History.Map` after
+  `validateApps`. Folder rows are skipped here; the fork maintains a separate
+  `unpackerr.state.json` recovery file (`recoverInterruptedFolders`) that owns
+  watched-folder resume, partial-output cleanup, and delete_retry timing.
 - A local admin POST does not need context-cancellation checks between enqueue and
   execution on the main loop.
 - `New()` allocates `Config`, `Webserver`, `History`, and `folders`. Nil checks on
