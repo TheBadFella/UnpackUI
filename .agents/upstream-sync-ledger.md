@@ -21,9 +21,110 @@ baseline, not a replacement for the repository contracts in
   files, with 750 insertions and 211 deletions relative to `95f728e`.
 - Current fork delta after the merge: `git diff upstream/main..HEAD` is the
   fork's intentional product, recovery, UI, documentation, test, and workflow
-  surface (92 paths; 8,084 insertions and 1,599 deletions at this baseline).
+  surface (96 paths; 8,524 insertions and 1,599 deletions at this baseline).
   Review that delta separately from new upstream commits; it is not a reason to
   re-review old upstream history.
+
+### Fork-modified file inventory
+
+```text
+.agents/repository-context.md
+.agents/skill-provenance.md
+.agents/skills/change-unpackui/SKILL.md
+.agents/skills/unslop-unpackui/SKILL.md
+.agents/skills/verify-unpackui/SKILL.md
+.agents/upstream-sync-ledger.md
+.commandcode/taste/taste.md
+.gitattributes
+.github/copilot-instructions.md
+.github/dependabot.yml
+.github/workflows/cleanup-images.yml
+.github/workflows/codetests.yml
+.github/workflows/release.yml
+.gitignore
+.golangci.yml
+AGENTS.md
+AUDIT_REPORT.md
+INTERNALS.md
+README.md
+docs/configuration.md
+docs/environment-variables.md
+docs/notifications.md
+docs/setup.md
+docs/ui.md
+examples/MANUAL.md
+examples/docker-compose.yml
+examples/unpackerr.conf.example
+frontend/src/App.svelte
+frontend/src/app.css
+frontend/src/components/Nav.svelte
+frontend/src/components/TaskDetails.svelte
+frontend/src/lib/api.ts
+frontend/src/lib/columns.ts
+frontend/src/lib/dashboard.ts
+frontend/src/lib/format.ts
+frontend/src/lib/i18n/locales/el.json
+frontend/src/lib/i18n/locales/en.json
+frontend/src/lib/i18n/locales/es.json
+frontend/src/lib/i18n/locales/nl.json
+frontend/src/lib/types.ts
+frontend/src/pages/Dashboard.svelte
+frontend/src/pages/History.svelte
+frontend/src/pages/Login.svelte
+frontend/src/pages/Settings.svelte
+frontend/src/pages/System.svelte
+frontend/src/pages/settings/FoldersForm.svelte
+init/docker/Dockerfile.goreleaser
+pkg/configdef/definitions.yml
+pkg/folders/config.go
+pkg/folders/folder_test.go
+pkg/folders/watch.go
+pkg/hooks/config.go
+pkg/hooks/http.go
+pkg/hooks/sample.go
+pkg/hooks/templates.go
+pkg/ui/UnpackUI.png
+pkg/unpackerr/api.go
+pkg/unpackerr/api_test.go
+pkg/unpackerr/apps.go
+pkg/unpackerr/cnfgfile.go
+pkg/unpackerr/cnfgfile_fork_test.go
+pkg/unpackerr/cnfgfile_test.go
+pkg/unpackerr/configapi.go
+pkg/unpackerr/configdump.go
+pkg/unpackerr/configput.go
+pkg/unpackerr/configput_test.go
+pkg/unpackerr/duration.go
+pkg/unpackerr/folder.go
+pkg/unpackerr/folder_recursion_test.go
+pkg/unpackerr/folder_test.go
+pkg/unpackerr/folder_track_test.go
+pkg/unpackerr/historyfile.go
+pkg/unpackerr/historyfile_test.go
+pkg/unpackerr/historyrestore.go
+pkg/unpackerr/historyrestore_test.go
+pkg/unpackerr/historyrestore_windows_test.go
+pkg/unpackerr/logs.go
+pkg/unpackerr/metrics.go
+pkg/unpackerr/openapi.json
+pkg/unpackerr/progress.go
+pkg/unpackerr/queue_actions.go
+pkg/unpackerr/queue_actions_test.go
+pkg/unpackerr/recovery.go
+pkg/unpackerr/recovery_test.go
+pkg/unpackerr/recovery_windows_test.go
+pkg/unpackerr/start.go
+pkg/unpackerr/tray.go
+pkg/unpackerr/webserver.go
+pkg/unpackerr/webserver_test.go
+settings.sh
+tests/README.md
+tests/add-dummy-entry.ps1
+tests/run-codetests.ps1
+tests/run-codetests.sh
+tests/start-local.ps1
+tests/stop-local.ps1
+```
 
 ### Merge decisions and invariants
 
