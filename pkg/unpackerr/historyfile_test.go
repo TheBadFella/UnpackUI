@@ -12,7 +12,7 @@ import (
 	"golift.io/xtractr"
 )
 
-func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) {
+func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) { //nolint:funlen
 	t.Parallel()
 
 	now := time.Now().Round(time.Second)
