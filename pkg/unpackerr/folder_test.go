@@ -26,6 +26,30 @@ func TestIncompleteArchiveName(t *testing.T) {
 	}
 }
 
+func TestMultipartIncompleteSibling(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	primary := filepath.Join(dir, "release.part01.rar")
+	partial := filepath.Join(dir, "release.part02.rar.part")
+	if err := os.WriteFile(primary, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(partial, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := multipartIncompleteSibling(primary); got != partial {
+		t.Fatalf("incomplete companion = %q, want %q", got, partial)
+	}
+	if err := os.Rename(partial, filepath.Join(dir, "release.part02.rar")); err != nil {
+		t.Fatal(err)
+	}
+	if got := multipartIncompleteSibling(primary); got != "" {
+		t.Fatalf("finished companion reported incomplete: %q", got)
+	}
+}
+
 func TestExtractTrackedItemWithoutArchivesSkipsQueue(t *testing.T) {
 	t.Parallel()
 

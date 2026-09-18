@@ -248,7 +248,7 @@
 
   .link-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
     column-gap: 1rem;
     row-gap: 1rem;
   }
@@ -291,11 +291,16 @@
     line-height: 1.2;
   }
 
+  .system-link-card > span {
+    min-width: 0;
+  }
+
   .link-hint {
     display: block;
     font-size: 0.74rem;
     color: var(--dash-muted);
     margin-top: 4px;
+    overflow-wrap: anywhere;
   }
 
   .chip-tag {
@@ -356,4 +361,3 @@
     word-break: break-word;
   }
 </style>
-

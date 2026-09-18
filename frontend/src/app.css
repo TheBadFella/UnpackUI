@@ -362,6 +362,14 @@ code.wrap {
   max-width: 1400px;
 }
 
+/* Bootstrap's dark-theme body color is a little subdued for dense settings
+ * forms. Keep the contrast increase scoped to Configuration. */
+.settings-page {
+  --bs-body-color: #f4f4f4;
+  --bs-secondary-color: #c4c4c4;
+  color: var(--bs-body-color);
+}
+
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -1508,7 +1516,8 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 
 .dashboard-page .table-responsive {
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
 }
 
 @media (min-width: 992px) {
@@ -1842,4 +1851,3 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 .modal-header, .modal-footer {
   border-color: var(--dash-border);
 }
-
