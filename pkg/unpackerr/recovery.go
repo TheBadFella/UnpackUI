@@ -239,8 +239,18 @@ func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, ite
 		return false, true
 	}
 
-	if _, err := os.Stat(item.Path); err != nil {
+	stat, err := os.Stat(item.Path)
+	if err != nil {
 		u.Printf("[Folder] Removing stale recovery item, path no longer exists: %s (%v)", item.Path, err)
+		delete(u.recovery.Folders, item.Path)
+
+		return false, true
+	}
+	if stat.IsDir() {
+		if item.Status == QUEUED.String() || item.Status == EXTRACTING.String() {
+			u.cleanupInterruptedFolderOutput(item.Path, cfg, now)
+		}
+		u.Printf("[Folder] Migrating legacy directory recovery item to per-archive tracking: %s", item.Path)
 		delete(u.recovery.Folders, item.Path)
 
 		return false, true

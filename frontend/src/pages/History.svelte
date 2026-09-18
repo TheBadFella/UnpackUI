@@ -42,6 +42,8 @@
     resetColumnWidths,
     saveColumnWidths,
     colStyle,
+    resizedColumnWidths,
+    tableWidth,
   } from '../lib/columns'
   import { success, failure } from '../lib/toast'
   import type { HistoryRecord } from '../lib/types'
@@ -86,7 +88,7 @@
     retries: 50,
     finished: 130,
     path: 160,
-    actions: 80,
+    actions: 150,
   }
   const historyColumnKeys: HistoryColumn[] = [
     'item',
@@ -146,22 +148,12 @@
   function moveHistoryResize(event: PointerEvent | MouseEvent) {
     if (!historyResize) return
     const delta = event.clientX - historyResize.startX
-    const flexKey: HistoryColumn = historyResize.key === 'finished' ? 'item' : 'finished'
-    const targetStart = historyResize.startWidths[historyResize.key] ?? historyColumnMins[historyResize.key]
-    const flexStart = historyResize.startWidths[flexKey] ?? historyColumnMins[flexKey]
-    const requestedDelta = Math.round(targetStart + delta) - targetStart
-    const availableDelta = Math.max(0, flexStart - historyColumnMins[flexKey])
-    const actualDelta = Math.max(
-      -targetStart + historyColumnMins[historyResize.key],
-      Math.min(requestedDelta, availableDelta),
+    historyColumnWidths = resizedColumnWidths(
+      historyResize.startWidths,
+      historyResize.key,
+      delta,
+      historyColumnMins,
     )
-    const newTargetW = targetStart + actualDelta
-    const newFlexW = flexStart - actualDelta
-
-    const updated: Record<HistoryColumn, number | string> = { ...historyResize.startWidths }
-    updated[historyResize.key] = newTargetW
-    updated[flexKey] = newFlexW
-    historyColumnWidths = updated
   }
 
   function finishHistoryResize(event: PointerEvent | MouseEvent) {
@@ -182,27 +174,17 @@
     const delta = event.key === 'ArrowRight' ? 16 : -16
     const handle = event.currentTarget as HTMLElement
     const table = handle.closest('table')
-    const targetHeader = handle.parentElement
-    const flexKey: HistoryColumn = key === 'finished' ? 'item' : 'finished'
-    const flexHeader = table
-      ? Array.from(table.querySelectorAll('thead th')).find(
-          (th) => (th as HTMLElement).dataset.columnKey === flexKey,
-        ) as HTMLElement | undefined
-      : undefined
-    const curVal = targetHeader?.getBoundingClientRect().width ?? historyColumnMins[key]
-    const flexVal = flexHeader?.getBoundingClientRect().width ?? historyColumnMins[flexKey]
-    const actualDelta = Math.max(
-      -curVal + historyColumnMins[key],
-      Math.min(delta, Math.max(0, flexVal - historyColumnMins[flexKey])),
-    )
-    const newTarget = curVal + actualDelta
-    const newFlex = flexVal - actualDelta
-    const updated: Record<HistoryColumn, number | string> = { ...historyColumnWidths }
-    updated[key] = newTarget
-    updated[flexKey] = newFlex
-    historyColumnWidths = updated
+    if (!table) return
+    const measured: Record<HistoryColumn, number> = {} as any
+    table.querySelectorAll('thead th').forEach((th) => {
+      const colKey = (th as HTMLElement).dataset.columnKey as HistoryColumn | undefined
+      if (colKey) measured[colKey] = Math.round((th as HTMLElement).getBoundingClientRect().width)
+    })
+    historyColumnWidths = resizedColumnWidths(measured, key, delta, historyColumnMins)
     saveColumnWidths(historyColumnStorageKey, historyColumnWidths)
   }
+
+  const historyTableWidth = $derived(tableWidth(historyColumnWidths, historyColumnKeys))
 
   const canWrite = has(systemPerm('history', 'write'))
   const allRows = $derived(live.history.filter(isFinishedHistory))
@@ -377,7 +359,7 @@
     {:else if shown.length === 0}
       <p class="text-muted mb-0">{$_('phrases.NoHistory')}</p>
     {:else}
-      <Table responsive hover size="sm" class="align-middle history-table">
+      <Table responsive hover size="sm" class="align-middle history-table" style={`width: ${historyTableWidth}`}>
         <colgroup>
           <col style={`width: ${colStyle(historyColumnWidths.item)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.status)}`} />
@@ -386,7 +368,7 @@
           <col style={`width: ${colStyle(historyColumnWidths.retries)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.finished)}`} />
           <col style={`width: ${colStyle(historyColumnWidths.path)}`} />
-          {#if canWrite}<col style={`width: ${colStyle(historyColumnWidths.actions)}`} />{/if}
+          <col style={`width: ${colStyle(historyColumnWidths.actions)}`} />
         </colgroup>
         <thead>
           <tr>
@@ -434,18 +416,14 @@
             </th>
             <th id="hist-path" data-column-key="path" scope="col">
               {$_('pages.logs.Path')}
-              {#if canWrite}
-                <button type="button" class="column-resizer" aria-label="Resize path column"
-                  title="Resize path column"
-                  onpointerdown={(event) => startHistoryResize(event, 'path')}
-                  onkeydown={(event) => nudgeHistoryResize(event, 'path')}></button>
-              {/if}
+              <button type="button" class="column-resizer" aria-label="Resize path column"
+                title="Resize path column"
+                onpointerdown={(event) => startHistoryResize(event, 'path')}
+                onkeydown={(event) => nudgeHistoryResize(event, 'path')}></button>
             </th>
-            {#if canWrite}
-              <th id="hist-actions" data-column-key="actions" class="text-end" scope="col">
-                {$_('pages.history.Actions')}
-              </th>
-            {/if}
+            <th id="hist-actions" data-column-key="actions" class="text-end" scope="col">
+              {$_('pages.history.Actions')}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -505,20 +483,31 @@
               <td data-label={$_('pages.logs.Path')} headers="hist-path" class="items-cell-path">
                 <code class="path-cell">{itemPath(row)}</code>
               </td>
-              {#if canWrite}
-                <td data-label={$_('pages.history.Actions')} class="text-end" headers="hist-actions">
+              <td data-label={$_('pages.history.Actions')} class="text-end text-nowrap" headers="hist-actions">
+                <ButtonGroup size="sm">
                   <Button
-                    size="sm"
                     color="secondary"
                     outline
+                    type="button"
+                    onclick={(e) => {
+                      e.stopPropagation()
+                      selectedHistoryId = row.id
+                    }}>{$_('phrases.Details')}</Button
+                  >
+                  {#if canWrite}
+                  <Button
+                    color="danger"
+                    outline
+                    type="button"
                     disabled={busy[row.id]}
                     onclick={(e) => {
                       e.stopPropagation()
                       remove(row)
                     }}>{$_('buttons.Delete')}</Button
                   >
-                </td>
-              {/if}
+                  {/if}
+                </ButtonGroup>
+              </td>
             </tr>
           {/each}
         </tbody>

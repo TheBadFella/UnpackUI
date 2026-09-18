@@ -460,6 +460,7 @@ func (u *Unpackerr) Run() {
 
 	u.PollFolders()                  // This initializes channel(s) used below.
 	u.recoverInterruptedFolders(now) // Re-queue watched folder items that were active before shutdown.
+	u.scanWatchedFolders(now)        // Discover archives copied in while Unpackerr was stopped.
 	u.retrieveAppQueues(now)         // Get in-app queues on startup.
 	u.checkQueueChanges(now)         // Same pairing as the poller tick; restored IMPORTED may still be queued.
 	// This is the "main go routine" in start.go.

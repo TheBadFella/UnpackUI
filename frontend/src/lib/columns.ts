@@ -69,3 +69,29 @@ export function colStyle(val: number | string | undefined, fallback = 'auto'): s
   if (val === undefined) return fallback
   return typeof val === 'number' ? `${val}px` : val
 }
+
+export function resizedColumnWidths<K extends string>(
+  widths: Record<K, number>,
+  key: K,
+  delta: number,
+  minimums: Record<K, number>,
+): Record<K, number> {
+  return {
+    ...widths,
+    [key]: Math.max(minimums[key], Math.round(widths[key] + delta)),
+  }
+}
+
+export function tableWidth<K extends string>(
+  widths: ColumnWidths<K>,
+  visible: K[],
+): string {
+  let total = 0
+  for (const key of visible) {
+    const width = widths[key]
+    if (typeof width !== 'number') return '100%'
+    total += width
+  }
+
+  return `max(100%, ${total}px)`
+}

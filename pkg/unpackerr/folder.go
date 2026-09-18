@@ -182,6 +182,9 @@ func (u *Unpackerr) queueFolderExtract(
 func (u *Unpackerr) deferIncompleteFolderExtract(name string, folder *Folder, now time.Time) bool {
 	partial := folderIncompleteDownload(name)
 	if partial == "" {
+		partial = multipartIncompleteSibling(name)
+	}
+	if partial == "" {
 		return false
 	}
 
@@ -190,6 +193,35 @@ func (u *Unpackerr) deferIncompleteFolderExtract(name string, folder *Folder, no
 	u.Debugf("[Folder] Deferring extraction while download is incomplete: %s (%s)", name, partial)
 
 	return true
+}
+
+func multipartIncompleteSibling(path string) string {
+	base := strings.ToLower(filepath.Base(path))
+	partAt := strings.LastIndex(base, ".part")
+	if partAt < 0 || !strings.HasSuffix(base, ".rar") {
+		return ""
+	}
+
+	prefix := base[:partAt+len(".part")]
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		return ""
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := strings.ToLower(entry.Name())
+		if !strings.HasPrefix(name, prefix) || !isIncompleteArchiveName(name) {
+			continue
+		}
+
+		return filepath.Join(filepath.Dir(path), entry.Name())
+	}
+
+	return ""
 }
 
 // incompleteDownloadSuffixes are temporary names download clients use before a file is finalized.
@@ -474,21 +506,79 @@ func (u *Unpackerr) processEvent(event *eventData, now time.Time) {
 		return
 	}
 
-	dirPath := filepath.Join(event.Config.Path, event.Name)
+	dirPath := filepath.Clean(event.File)
+	if event.File == "" {
+		dirPath = filepath.Join(event.Config.Path, event.Name)
+	}
 	_, trackedBefore := u.folders.Folders[dirPath]
 
-	u.folders.ProcessEvent(event, now)
-	u.syncFolderQueue(dirPath)
-
-	if folder := u.folders.Folders[dirPath]; folder != nil {
-		if folder.Status == WAITING && !folderHasExtractableContent(dirPath, folder.Config) {
-			u.recoveryClearFolder(dirPath)
-		} else {
-			u.recoveryTrackFolder(dirPath, folder.Config, folder.Status, folder.Updated)
-		}
-	} else if trackedBefore {
-		u.recoveryClearFolder(dirPath)
+	affected := u.folders.ProcessEvent(event, now)
+	if len(affected) == 0 {
+		return
 	}
+
+	for _, path := range affected {
+		u.syncFolderQueue(path)
+
+		if folder := u.folders.Folders[path]; folder != nil {
+			if folder.Status == WAITING && !folderHasExtractableContent(path, folder.Config) {
+				u.recoveryClearFolder(path)
+			} else {
+				u.recoveryTrackFolder(path, folder.Config, folder.Status, folder.Updated)
+			}
+		} else if path == dirPath && trackedBefore {
+			u.recoveryClearFolder(path)
+		}
+	}
+
+	if _, err := os.Stat(dirPath); err != nil {
+		u.dropMissingFolderDescendants(dirPath)
+	}
+}
+
+// scanWatchedFolders mirrors startup discoveries into the UI queue and
+// recovery state. Folders.Scan preserves timestamps for recovered tasks.
+func (u *Unpackerr) scanWatchedFolders(now time.Time) {
+	if u == nil || u.folders == nil {
+		return
+	}
+
+	for _, path := range u.folders.Scan(now) {
+		u.syncFolderQueue(path)
+		if folder := u.folders.Folders[path]; folder != nil {
+			u.recoveryTrackFolder(path, folder.Config, folder.Status, folder.Updated)
+		}
+	}
+}
+
+// dropMissingFolderDescendants clears per-archive work when a watched
+// container directory disappears in one event. The child fs events are not
+// guaranteed to arrive after a directory removal.
+func (u *Unpackerr) dropMissingFolderDescendants(dirPath string) {
+	for name, folder := range u.folders.Folders {
+		if name == dirPath || !isDescendantPath(dirPath, name) {
+			continue
+		}
+		// Queued/running work still owns its recovery record until its callback
+		// settles. Removing it here would make a crash lose retry cleanup state.
+		if folder.Status != WAITING {
+			continue
+		}
+
+		delete(u.folders.Folders, name)
+		u.folders.Remove(name)
+		u.syncFolderQueue(name)
+		u.recoveryClearFolder(name)
+	}
+}
+
+func isDescendantPath(root, path string) bool {
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	if err != nil {
+		return false
+	}
+
+	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }
 
 // syncFolderQueue mirrors a watched folder into the overview queue while it is
