@@ -71,16 +71,7 @@ func SendWithLog(log Logger, hook *Config, payload *Payload) {
 	bodyBytes := body.Bytes()
 	bodyStr := string(bodyBytes)
 
-	var (
-		reply []byte
-		err   error
-	)
-
-	if hook.SupportsDiscordUpdate() {
-		reply, err = hook.SendOrUpdate(payload.Path, bodyBytes, isTerminalWebhookEvent(payload.Event))
-	} else {
-		reply, err = hook.Send(bytes.NewReader(bodyBytes))
-	}
+	reply, err := hook.Send(bytes.NewReader(bodyBytes))
 
 	if err != nil {
 		log.Debugf("Webhook Payload: %s", bodyStr)

@@ -1,13 +1,86 @@
 package unpackerr
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"golift.io/xtractr"
 )
+
+func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) { //nolint:funlen
+	t.Parallel()
+
+	now := time.Now().Round(time.Second)
+	item := &Extract{
+		App:         "Sonarr",
+		Path:        "/downloads/Show.S01E01",
+		Status:      IMPORTED,
+		Updated:     now,
+		DeleteDelay: 5 * time.Minute,
+		IDs:         map[string]any{"title": "Show S01E01", "reason": "download complete", "secret": "omit"},
+		XProg: &ExtractProgress{
+			Progress: &xtractr.Progress{
+				Total: 1000,
+				Wrote: 500,
+				XFile: &xtractr.XFile{FilePath: "/downloads/Show.S01E01/show.rar"},
+			},
+			StartedAt: now.Add(-10 * time.Second),
+			UpdatedAt: now,
+		},
+		Resp: &xtractr.Response{
+			Started:  now.Add(-10 * time.Second),
+			Elapsed:  10 * time.Second,
+			Archives: xtractr.ArchiveList{"/downloads/Show.S01E01": {"/downloads/Show.S01E01/show.rar"}},
+			NewFiles: []string{"/downloads/Show.S01E01/episode.mkv"},
+		},
+	}
+	item.XProg.Extract = item
+
+	queue := queueFromExtract("show-1", item)
+	if queue.Title != "Show S01E01" || queue.Reason != "download complete" {
+		t.Fatalf("queue details %+v", queue)
+	}
+	if queue.DeleteAt == nil || !queue.DeleteAt.Equal(now.Add(5*time.Minute)) {
+		t.Fatalf("queue delete time %+v", queue.DeleteAt)
+	}
+	if queue.SpeedBytesPerSecond == 0 || queue.ETASeconds == 0 {
+		t.Fatalf("queue progress timing %+v", queue)
+	}
+	if !queue.Started.Equal(now.Add(-10*time.Second)) || queue.Elapsed != "10s" ||
+		len(queue.ArchiveFiles) != 1 || len(queue.NewFiles) != 1 {
+		t.Fatalf("queue file details %+v", queue)
+	}
+
+	record := historyFromExtract("show-1", item)
+	if record.Title != queue.Title || record.Reason != queue.Reason {
+		t.Fatalf("history details %+v", record)
+	}
+	if record.DeleteAt == nil || queue.DeleteAt == nil || !record.DeleteAt.Equal(*queue.DeleteAt) {
+		t.Fatalf("history delete time %+v", record.DeleteAt)
+	}
+
+	waiting := queueFromExtract("waiting-1", &Extract{
+		App:     "Folder",
+		Path:    "/downloads/inbox",
+		Status:  WAITING,
+		Updated: now,
+	})
+	if !waiting.Started.IsZero() {
+		t.Fatalf("waiting queue invented start time: %+v", waiting.Started)
+	}
+	encoded, err := json.Marshal(waiting)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), `"started"`) {
+		t.Fatalf("waiting queue should omit zero start time: %s", encoded)
+	}
+}
 
 func TestHistoryUpsertAndCap(t *testing.T) {
 	t.Parallel()

@@ -143,7 +143,7 @@ export const api = {
   get: <T = any>(uri: string) => request<T>('api/' + uri, 'GET'),
   post: <T = any>(uri: string, body: unknown = {}, timeout = 10000) =>
     request<T>('api/' + uri, 'POST', body, timeout),
-  put: <T = any>(uri: string, body: unknown) =>
-    request<T>('api/' + uri, 'PUT', body),
+  put: <T = any>(uri: string, body: unknown, timeout = 45000) =>
+    request<T>('api/' + uri, 'PUT', body, timeout),
   del: <T = any>(uri: string) => request<T>('api/' + uri, 'DELETE'),
 }

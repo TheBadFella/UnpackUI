@@ -83,25 +83,30 @@
 {:else}
   <div class="app-shell">
     <Nav />
-    <main class="app-main">
-      <Container xxl class="page-wrap pt-2 pb-3">
-        <RestartBanner />
-        {#if top === ''}
+        <main class="app-main global-wrap">
+      {#if top === ''}
+        <div class="dashboard-wrap">
+          <RestartBanner />
           <Dashboard />
-        {:else if top === 'settings'}
-          <Settings />
-        {:else if top === 'trust'}
-          <Trust />
-        {:else if top === 'system'}
-          <System />
-        {:else if top === 'logs'}
-          <Logs />
-        {:else if top === 'docs'}
-          <ApiDocs />
-        {:else}
-          <p>{$_('phrases.NotFound', { values: { path: router.path } })}</p>
-        {/if}
-      </Container>
+        </div>
+      {:else}
+        <Container xxl class="page-wrap pt-2 pb-3">
+          <RestartBanner />
+          {#if top === 'settings'}
+            <Settings />
+          {:else if top === 'trust'}
+            <Trust />
+          {:else if top === 'system'}
+            <System />
+          {:else if top === 'logs'}
+            <Logs />
+          {:else if top === 'docs'}
+            <ApiDocs />
+          {:else}
+            <p>{$_('phrases.NotFound', { values: { path: router.path } })}</p>
+          {/if}
+        </Container>
+      {/if}
     </main>
   </div>
 {/if}

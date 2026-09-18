@@ -46,7 +46,10 @@
     "Download": "Downloaden",
     "Cancel": "Annuleren",
     "Close": "Sluiten",
-    "Test": "Testen"
+    "Test": "Testen",
+    "ResetColumns": "Kolommen resetten",
+    "HideCompleted": "Voltooide verbergen",
+    "ShowHidden": "Verborgen tonen"
   },
   "phrases": {
     "EnvironmentVariable": "Omgevingsvariabele: <code>{variableName}</code>",
@@ -86,6 +89,9 @@
     "ReservedUsername": "De gebruikersnamen webauth, noauth en filepath zijn gereserveerd, en een gebruikersnaam mag geen dubbele punt bevatten.",
     "FilterPlaceholder": "Filteren…",
     "Empty": "—",
+    "Output": "Uitvoer",
+    "Details": "Details",
+    "DeletesIn": "Verwijdert over",
     "URLMustBeginWithHttp": "URL moet beginnen met http:// of https://",
     "URLInvalid": "Dat is geen geldige URL.",
     "APIKeyMustBeCountCharactersOrLonger": "API-sleutel moet minstens {count} tekens zijn.",
@@ -143,9 +149,10 @@
       "DisabledHint": "Wachtwoordaanmelding staat uit. Meld u aan via de reverse proxy. Als de proxy u hierheen stuurde, kwam geen van de groepen overeen met admin of een ingestelde rol."
     },
     "dashboard": {
-      "Title": "Overzicht",
-      "intro": "Live wachtrij, uitpaktellingen en voltooide geschiedenis voor deze Unpackerr.",
-      "ActiveQueue": "Activiteit",
+      "Title": "Unpackerr-status",
+      "intro": "Live voortgang van uitpakken.",
+      "ActiveQueue": "Bijgehouden items",
+      "TrackedHint": "Actieve en bewaarde items in de wachtrij. Voltooide items staan in Geschiedenis.",
       "Live": "Live",
       "Starrs": "Starr-apps",
       "StarrsHint": "Sonarr-, Radarr-, Lidarr- en Readarr-instanties in de configuratie.",
@@ -199,6 +206,7 @@
       "Status": "Status",
       "Item": "Item",
       "Progress": "Voortgang",
+      "ETA": "ETA",
       "Retries": "Pogingen",
       "Updated": "Bijgewerkt",
       "Actions": "Acties",

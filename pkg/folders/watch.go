@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	"github.com/radovskyb/watcher"
 	"golift.io/xtractr"
 )
+
+var rarPartPattern = regexp.MustCompile(`(?i)\.part0*([0-9]+)\.rar$`)
 
 // NewWatcher returns a new folder watcher.
 // You must call folders.FSNotify.Close() when you're done with it.
@@ -27,6 +31,7 @@ func (c WatchConfig) NewWatcher(
 		Interval:     c.Interval.Duration,
 		Config:       folderConfig,
 		Folders:      make(map[string]*Folder),
+		WatchDirs:    make(map[string]struct{}),
 		Events:       make(chan *Event, c.Buffer),
 		Updates:      make(chan *xtractr.Response, updateBuf),
 		Logs:         logger,
@@ -56,9 +61,32 @@ func (c WatchConfig) NewWatcher(
 		if err := fsn.Add(folder.Path); err != nil {
 			logger.Errorf("Folder '%s' (cannot watch): %v", folder.Path, err)
 		}
+
+		folders.WatchDirs[filepath.Clean(folder.Path)] = struct{}{}
 	}
 
 	return folders, nil
+}
+
+// addWatchDir registers a directory as a source of filesystem events. Watched
+// directories are containers only; extraction work is stored in Folders.
+func (f *Folders) addWatchDir(path string) error {
+	path = filepath.Clean(path)
+	if f.WatchDirs == nil {
+		f.WatchDirs = make(map[string]struct{})
+	}
+
+	if _, ok := f.WatchDirs[path]; ok {
+		return nil
+	}
+
+	if err := f.Add(path); err != nil {
+		return err
+	}
+
+	f.WatchDirs[path] = struct{}{}
+
+	return nil
 }
 
 // Add uses either fsnotify or watcher.
@@ -130,11 +158,11 @@ func (f *Folders) handleFileEvent(name, operation string) {
 
 	for _, cfg := range f.Config {
 		// Do not handle events on the watched folder itself.
-		if name == cfg.Path {
+		if filepath.Clean(name) == filepath.Clean(cfg.Path) {
 			return
 		}
 
-		if !strings.HasPrefix(name, cfg.Path) {
+		if !isWithinPath(cfg.Path, name) {
 			continue // Not the configured folder for the event we just got.
 		}
 
@@ -143,11 +171,9 @@ func (f *Folders) handleFileEvent(name, operation string) {
 			continue
 		}
 
-		if dir := filepath.Dir(name); dir == cfg.Path {
-			f.Events <- &Event{Name: filepath.Base(name), Config: cfg, File: name, Op: operation}
-		} else {
-			f.Events <- &Event{Name: filepath.Base(dir), Config: cfg, File: name, Op: operation}
-		}
+		// Keep the exact changed path. Directories are scan/watch containers;
+		// archive files below them must be tracked as separate work items.
+		f.Events <- &Event{Name: filepath.Base(name), Config: cfg, File: name, Op: operation}
 
 		return
 	}
@@ -155,17 +181,24 @@ func (f *Folders) handleFileEvent(name, operation string) {
 	f.Debugf("Folder: Ignored event from non-configured path: %v", name)
 }
 
-// ProcessEvent processes the event that was received.
-func (f *Folders) ProcessEvent(event *Event, now time.Time) {
-	dirPath := filepath.Join(event.Config.Path, event.Name)
+// ProcessEvent processes the event that was received and returns every task
+// path affected by it. Directory events include their discovered archive files.
+func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
+	dirPath, ok := eventPath(event)
+	if !ok {
+		f.Debugf("Folder: Ignored File Event (%s) '%s' (outside configured path)", event.Op, event.File)
+		return nil
+	}
 
 	if event.Config.IsExcludedPath(event.File) || event.Config.IsExcludedPath(dirPath) {
 		f.Debugf("Folder: Ignored File Event (%s) '%s' (excluded path)", event.Op, event.File)
-		return
+		return []string{dirPath}
 	}
 
 	stat, err := os.Stat(dirPath)
 	if err != nil {
+		f.removeWatchDirs(dirPath)
+
 		// Item is unusable (probably deleted), remove it from history.
 		if _, ok := f.Folders[dirPath]; ok {
 			f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
@@ -175,37 +208,148 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) {
 
 		f.Debugf("Folder: Ignored File Event (%s) '%s' (unreadable): %v", event.Op, event.File, err)
 
-		return
+		return []string{dirPath}
 	}
 
-	if !stat.IsDir() && !xtractr.IsArchiveFile(event.Name) {
+	if !stat.IsDir() && !xtractr.IsArchiveFile(filepath.Base(dirPath)) {
 		f.Debugf("Folder: Ignored File Event (%s) '%s' (not archive or dir): %v", event.Op, event.File, err)
-		return
+		return []string{dirPath}
 	}
 
 	if f.ignoredExtractName(dirPath) || f.ignoredExtractName(event.File) {
 		f.Debugf("Folder: Ignored File Event (%s) '%s' (extract path)", event.Op, event.File)
-		return
+		return []string{dirPath}
 	}
 
 	if stat.IsDir() && f.isExtractDest(dirPath) {
 		f.Debugf("Folder: Ignored File Event (%s) '%s' (extract output)", event.Op, event.File)
 
-		if _, ok := f.Folders[dirPath]; ok {
-			f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
-			delete(f.Folders, dirPath)
-			f.Remove(dirPath)
-		}
+		f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
+		delete(f.Folders, dirPath)
 
-		return
+		return []string{dirPath}
+	}
+
+	if stat.IsDir() {
+		// A directory is only a discovery boundary. Scan it now so a moved or
+		// quickly copied tree cannot outrun watcher registration, then watch its
+		// descendants for later archive writes.
+		delete(f.Folders, dirPath)
+
+		return append([]string{dirPath}, f.scanWatchDir(event, dirPath, now, true)...)
+	}
+
+	if f.insideExtractDest(event.Config.Path, filepath.Dir(dirPath)) || !isPrimaryArchive(dirPath) {
+		f.Debugf("Folder: Ignored File Event (%s) '%s' (extract output or secondary volume)", event.Op, event.File)
+		return []string{dirPath}
 	}
 
 	f.saveEvent(event, dirPath, now)
+
+	return []string{dirPath}
 }
 
-func (f *Folders) saveEvent(event *Event, dirPath string, now time.Time) {
+// Scan discovers archives that already exist when Unpackerr starts. Existing
+// recovered tasks are returned but not refreshed, preserving their timestamps.
+func (f *Folders) Scan(now time.Time) []string {
+	paths := make([]string, 0, len(f.Config))
+	for _, cfg := range f.Config {
+		event := &Event{Config: cfg, Name: filepath.Base(cfg.Path), File: cfg.Path, Op: "startup scan"}
+		paths = append(paths, f.scanWatchDir(event, filepath.Clean(cfg.Path), now, false)...)
+	}
+
+	return paths
+}
+
+func (f *Folders) removeWatchDirs(path string) {
+	for watched := range f.WatchDirs {
+		if !isWithinPath(path, watched) {
+			continue
+		}
+
+		f.Remove(watched)
+		delete(f.WatchDirs, watched)
+	}
+}
+
+func eventPath(event *Event) (string, bool) {
+	if event == nil || event.Config == nil {
+		return "", false
+	}
+
+	path := event.File
+	if path == "" {
+		path = filepath.Join(event.Config.Path, event.Name)
+	}
+	path = filepath.Clean(path)
+
+	return path, isWithinPath(event.Config.Path, path) && filepath.Clean(path) != filepath.Clean(event.Config.Path)
+}
+
+func isWithinPath(root, path string) bool {
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	if err != nil {
+		return false
+	}
+
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+}
+
+func (f *Folders) scanWatchDir(event *Event, dirPath string, now time.Time, refreshExisting bool) []string {
+	paths := []string{}
+	if err := f.addWatchDir(dirPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		f.Errorf("Folder: Watching directory %v (event: %s): %v", dirPath, event.Op, err)
+	}
+
+	err := filepath.WalkDir(dirPath, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+
+		if event.Config.IsExcludedPath(path) || f.ignoredExtractName(path) {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+
+			return nil
+		}
+
+		if entry.IsDir() {
+			if path != dirPath && f.isExtractDest(path) {
+				return filepath.SkipDir
+			}
+
+			if err := f.addWatchDir(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				f.Errorf("Folder: Watching directory %v (event: %s): %v", path, event.Op, err)
+			}
+
+			return nil
+		}
+
+		if !xtractr.IsArchiveFile(entry.Name()) {
+			return nil
+		}
+		if f.insideExtractDest(event.Config.Path, filepath.Dir(path)) || !isPrimaryArchive(path) {
+			return nil
+		}
+
+		f.saveEvent(&Event{Config: event.Config, Name: entry.Name(), File: path, Op: event.Op}, path, now, refreshExisting)
+		paths = append(paths, path)
+
+		return nil
+	})
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		f.Errorf("Folder: Scanning directory %v (event: %s): %v", dirPath, event.Op, err)
+	}
+
+	return paths
+}
+
+func (f *Folders) saveEvent(event *Event, dirPath string, now time.Time, refreshExisting ...bool) {
 	if _, ok := f.Folders[dirPath]; ok {
-		f.Folders[dirPath].Updated = now
+		if len(refreshExisting) == 0 || refreshExisting[0] {
+			f.Folders[dirPath].Updated = now
+		}
 		return
 	}
 
@@ -224,6 +368,31 @@ func (f *Folders) saveEvent(event *Event, dirPath string, now time.Time) {
 		Status:  extract.WAITING,
 		Config:  event.Config,
 	}
+}
+
+// insideExtractDest prevents archive-shaped extraction output from becoming
+// new watch work. The watch root itself is never treated as output.
+func (f *Folders) insideExtractDest(root, dir string) bool {
+	root = filepath.Clean(root)
+	for dir = filepath.Clean(dir); isWithinPath(root, dir) && dir != root; dir = filepath.Dir(dir) {
+		if f.isExtractDest(dir) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isPrimaryArchive keeps one task per multipart set. part01.rar (or part1.rar)
+// is the extractable entry point; later volumes are data for that task.
+func isPrimaryArchive(path string) bool {
+	match := rarPartPattern.FindStringSubmatch(filepath.Base(path))
+	if len(match) != rarPartPattern.NumSubexp()+1 {
+		return true
+	}
+
+	part, err := strconv.Atoi(match[1])
+	return err != nil || part == 1
 }
 
 // ignoredExtractName is true when a path component is the temp extract folder

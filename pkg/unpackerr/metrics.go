@@ -42,7 +42,7 @@ func (c *MetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 //
 //nolint:wsl_v5
 func (c *MetricsCollector) Collect(metrics chan<- prometheus.Metric) {
-	stats := c.snapshotStats()
+	stats := c.stats()
 	newMetric := prometheus.MustNewConstMetric
 
 	metrics <- newMetric(c.gauge, prometheus.GaugeValue, float64(stats.Waiting), "waiting")

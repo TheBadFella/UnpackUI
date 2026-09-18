@@ -24,11 +24,11 @@ your setup.
 
 | Feature | What it adds |
 |---|---|
-| **Live dashboard** | Responsive extraction status, progress, ETA, history, resizable columns, and clear-completed controls. |
+| **Live dashboard** | Responsive extraction status, progress, ETA, history, resizable columns, and explicit history clear/delete controls. |
 | **Restart recovery** | Persists watched-folder work and safely retries interrupted extractions after a restart. |
 | **Safer folder handling** | Waits for downloads to finish and ignores media-only or archive-free folders. |
 | **Extraction guardrails** | Caps uncompressed bytes, created files, and expansion ratio to protect the disk from rogue archives. |
-| **Dashboard API** | Provides aggregate, path-free JSON stats for Homepage and similar tools. |
+| **Dashboard API** | Provides the upstream stats/queue/history/system/WebSocket APIs plus additive Homepage-compatible stats fields. |
 | **Better notifications** | Adds compact Discord embeds, update-in-place messages, and optional links to the UI. |
 | **Quieter optional apps** | Silently skips empty Starr app entries while preserving real configuration and connection errors. |
 
@@ -39,7 +39,7 @@ your setup.
 | [Setup](docs/setup.md) | Docker Compose, GHCR images, and source builds |
 | [Configuration](docs/configuration.md) | Config files, precedence, recovery, and fork settings |
 | [Environment variables](docs/environment-variables.md) | Fork-specific variables and their upstream equivalents |
-| [Status UI and API](docs/ui.md) | Dashboard controls, routes, Homepage, and security |
+| [Dashboard UI and API](docs/ui.md) | Dashboard controls, routes, Homepage, and security |
 | [Notifications](docs/notifications.md) | Discord, Notifiarr, events, and multiple destinations |
 
 ## 🔗 Project
