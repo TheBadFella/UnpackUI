@@ -53,7 +53,7 @@
   const title = $derived(itemTitle(item))
   const location = $derived(normalizePath(item.path))
   const sourceArchive = $derived.by(() => {
-    if ('sourceArchive' in item && item.sourceArchive) {
+    if ('sourceArchive' in item && typeof item.sourceArchive === 'string' && item.sourceArchive) {
       return normalizePath(item.sourceArchive)
     }
     if ('archive' in item && item.archive) {
@@ -65,7 +65,7 @@
     'outputPath' in item && item.outputPath ? normalizePath(item.outputPath) : ''
   )
   const currentArchive = $derived.by(() => {
-    if ('currentArchive' in item && item.currentArchive) {
+    if ('currentArchive' in item && typeof item.currentArchive === 'string' && item.currentArchive) {
       return normalizePath(item.currentArchive)
     }
     if ('archive' in item && item.archive) {
