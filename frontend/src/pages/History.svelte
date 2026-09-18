@@ -56,10 +56,14 @@
   let busy = $state<Record<string, boolean>>({})
   let loaded = $state(false)
   let pendingClear = $state(false)
+  let pendingDeleteRow = $state<HistoryRecord | null>(null)
+  let dontAskAgainRowDelete = $state(false)
   let dismissedIds = $state<string[]>([])
   let selectedHistoryId = $state<string | null>(null)
 
   const dismissedStorageKey = 'unpackerr.dashboard.dismissed-history.v1'
+  const confirmDeleteStorageKey = 'unpackerr.history.confirm-each-delete.v1'
+  let confirmEachDelete = $state(loadConfirmEachDelete())
 
   type HistoryColumn =
     | 'item'
@@ -231,6 +235,48 @@
     } else failure(res.body?.error ?? 'delete failed')
   }
 
+  function loadConfirmEachDelete(): boolean {
+    try {
+      const raw = window.localStorage.getItem(confirmDeleteStorageKey)
+      return raw === null ? true : raw === 'true'
+    } catch {
+      return true
+    }
+  }
+
+  function saveConfirmEachDelete(val: boolean) {
+    confirmEachDelete = val
+    try {
+      window.localStorage.setItem(confirmDeleteStorageKey, String(val))
+    } catch {
+      // Restricted storage should not break the dashboard.
+    }
+  }
+
+  function requestDelete(row: HistoryRecord) {
+    if (!confirmEachDelete) {
+      remove(row)
+      return
+    }
+    pendingDeleteRow = row
+    dontAskAgainRowDelete = false
+  }
+
+  function cancelDeleteRow() {
+    pendingDeleteRow = null
+  }
+
+  async function confirmDeleteRow() {
+    if (dontAskAgainRowDelete) {
+      saveConfirmEachDelete(false)
+    }
+    const row = pendingDeleteRow
+    pendingDeleteRow = null
+    if (row) {
+      await remove(row)
+    }
+  }
+
   function askClearAll() {
     pendingClear = true
   }
@@ -341,6 +387,19 @@
             >
           {/if}
           {#if canWrite}
+            <Button
+              color="secondary"
+              outline
+              type="button"
+              title={confirmEachDelete
+                ? $_('pages.history.ConfirmEachHint')
+                : $_('pages.history.ConfirmAllOnlyHint')}
+              onclick={() => saveConfirmEachDelete(!confirmEachDelete)}
+            >
+              {confirmEachDelete
+                ? $_('buttons.ConfirmEach')
+                : $_('buttons.ConfirmAllOnly')}
+            </Button>
             <Button
               color="danger"
               outline
@@ -502,7 +561,7 @@
                     disabled={busy[row.id]}
                     onclick={(e) => {
                       e.stopPropagation()
-                      remove(row)
+                      requestDelete(row)
                     }}>{$_('buttons.Delete')}</Button
                   >
                   {/if}
@@ -537,6 +596,39 @@
     >
     <Button color="danger" type="button" onclick={confirmClear}
       >{$_('buttons.ClearAll')}</Button
+    >
+  </ModalFooter>
+</Modal>
+
+<Modal isOpen={pendingDeleteRow !== null} toggle={cancelDeleteRow}>
+  <ModalHeader toggle={cancelDeleteRow}
+    >{$_('phrases.DeleteHistoryItemTitle')}</ModalHeader
+  >
+  <ModalBody>
+    <p class="mb-2">{$_('phrases.DeleteHistoryItemConfirm')}</p>
+    {#if pendingDeleteRow}
+      <div class="p-2 mb-3 bg-dark border border-secondary text-truncate">
+        <code>{itemTitle(pendingDeleteRow)}</code>
+      </div>
+    {/if}
+    <div class="form-check mt-3">
+      <input
+        class="form-check-input"
+        type="checkbox"
+        id="dontAskAgainRow"
+        bind:checked={dontAskAgainRowDelete}
+      />
+      <label class="form-check-label text-muted small" for="dontAskAgainRow">
+        {$_('phrases.ConfirmAllOnlyOption')}
+      </label>
+    </div>
+  </ModalBody>
+  <ModalFooter>
+    <Button color="secondary" type="button" onclick={cancelDeleteRow}
+      >{$_('buttons.Cancel')}</Button
+    >
+    <Button color="danger" type="button" onclick={confirmDeleteRow}
+      >{$_('buttons.Delete')}</Button
     >
   </ModalFooter>
 </Modal>
