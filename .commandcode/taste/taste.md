@@ -1,0 +1,3 @@
+- Prefers actionable fixes/remediation over read-only analysis reports. When issues are found through code exploration, expects them to be implemented rather than just documented. Confidence: 0.8
+- Wants ALL identified issues addressed, not just selected/easiest ones — values thoroughness in remediation. Confidence: 0.7
+- Do not add `Co-authored-by` trailers or other bot attestations to commits unless explicitly requested by the user.
