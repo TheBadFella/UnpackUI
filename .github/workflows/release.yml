@@ -147,8 +147,22 @@ jobs:
 
           {
             [[ -n "${ref_tag}" ]] && echo "${IMAGE}:${ref_tag}"
-            [[ -n "${extra_tag}" ]] && echo "${IMAGE}:${extra_tag}"
             echo "${IMAGE}:latest"
+
+            # When a version is supplied via extra_image_tag, emit the full
+            # semver set (v2.0.0, 2.0.0, 2.0, 2) so the fork carries release
+            # tags on workflow_dispatch just like a tag push.
+            if [[ -n "${extra_tag}" && "${extra_tag}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+              ver="${extra_tag#v}"
+              major="${ver%%.*}"
+              rest="${ver#*.}"
+              minor="${rest%%.*}"
+
+              echo "${IMAGE}:v${ver}"
+              echo "${IMAGE}:${ver}"
+              echo "${IMAGE}:${major}.${minor}"
+              echo "${IMAGE}:${major}"
+            fi
           } | sort -u > /tmp/manual-docker-tags.txt
 
           {
