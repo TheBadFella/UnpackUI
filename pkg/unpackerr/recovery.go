@@ -240,6 +240,7 @@ func (u *Unpackerr) recoverInterruptedFolders(now time.Time) {
 	}
 }
 
+//nolint:funlen // recovery owns the persisted state transition branches.
 func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, item *recoveryFolder) (bool, bool) {
 	if item == nil {
 		delete(u.recovery.Folders, path)
@@ -278,26 +279,7 @@ func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, ite
 	}
 
 	if item.Status == EXTRACTED.String() {
-		updated := item.Updated
-		if updated.IsZero() {
-			updated = now
-		}
-		files := recoveryPathsWithin(item.Files, cfg.Path)
-		archives := recoveryPathsWithin(item.Archives, cfg.Path)
-
-		folder := &Folder{
-			Updated: updated,
-			Status:  EXTRACTED,
-			Config:  cfg,
-			Files:   files,
-		}
-		if len(archives) > 0 {
-			folder.Archives = xtractr.ArchiveList{"": archives}
-		}
-		u.folders.Folders[item.Path] = folder
-		item.WatchPath = filepath.Clean(cfg.Path)
-		item.Updated = updated
-
+		u.restoreExtractedFolder(now, cfg, item)
 		return true, false
 	}
 
@@ -324,6 +306,23 @@ func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, ite
 	u.Printf("[Folder] Recovered interrupted extraction: %s", item.Path)
 
 	return true, false
+}
+
+func (u *Unpackerr) restoreExtractedFolder(now time.Time, cfg *FolderConfig, item *recoveryFolder) {
+	updated := item.Updated
+	if updated.IsZero() {
+		updated = now
+	}
+	files := recoveryPathsWithin(item.Files, cfg.Path)
+	archives := recoveryPathsWithin(item.Archives, cfg.Path)
+
+	folder := &Folder{Updated: updated, Status: EXTRACTED, Config: cfg, Files: files}
+	if len(archives) > 0 {
+		folder.Archives = xtractr.ArchiveList{"": archives}
+	}
+	u.folders.Folders[item.Path] = folder
+	item.WatchPath = filepath.Clean(cfg.Path)
+	item.Updated = updated
 }
 
 func (u *Unpackerr) recoverNormalizeFolder(path string, item *recoveryFolder) {
