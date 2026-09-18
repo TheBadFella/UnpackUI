@@ -72,8 +72,8 @@
     progress: '17%',
     deletes: '9%',
     updated: '11%',
-    path: '12%',
-    actions: '13%',
+    path: '15%',
+    actions: '10%',
   }
   const queueColumnMins: Record<QueueColumn, number> = {
     item: 180,
@@ -82,7 +82,7 @@
     deletes: 110,
     updated: 130,
     path: 160,
-    actions: 150,
+    actions: 90,
   }
   const queueColumnKeys: QueueColumn[] = [
     'item',
@@ -906,7 +906,7 @@
                     <code class="path-cell">{itemPath(item)}</code>
                   </td>
                   <td data-label={$_('pages.dashboard.Actions')} class="text-end text-nowrap">
-                    <ButtonGroup size="sm">
+                    <ButtonGroup vertical size="sm">
                       <Button
                         type="button"
                         color="secondary"
