@@ -162,7 +162,8 @@ func TestPrepopulatedFolderArchivesEnterQueueAndRecoverySeparately(t *testing.T)
 	unpack.scanWatchedFolders(time.Now())
 
 	if unpack.Map[incoming] != nil || unpack.recovery.Folders[incoming] != nil {
-		t.Fatalf("watch container entered queue or recovery: %+v %+v", unpack.Map[incoming], unpack.recovery.Folders[incoming])
+		t.Fatalf("watch container entered queue or recovery: %+v %+v",
+			unpack.Map[incoming], unpack.recovery.Folders[incoming])
 	}
 	for _, archive := range archives {
 		item := unpack.Map[archive]
@@ -170,7 +171,8 @@ func TestPrepopulatedFolderArchivesEnterQueueAndRecoverySeparately(t *testing.T)
 			t.Fatalf("archive queue item %s: %+v", archive, item)
 		}
 		if item := unpack.recovery.Folders[archive]; item == nil || item.Status != WAITING.String() {
-			t.Fatalf("archive recovery item %s: %+v", archive, item)
+			t.Fatalf("archive recovery item %s: %+v",
+				archive, item)
 		}
 	}
 }

@@ -224,10 +224,8 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
 	if stat.IsDir() && f.isExtractDest(dirPath) {
 		f.Debugf("Folder: Ignored File Event (%s) '%s' (extract output)", event.Op, event.File)
 
-		if _, ok := f.Folders[dirPath]; ok {
-			f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
-			delete(f.Folders, dirPath)
-		}
+		f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
+		delete(f.Folders, dirPath)
 
 		return []string{dirPath}
 	}
@@ -236,9 +234,7 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
 		// A directory is only a discovery boundary. Scan it now so a moved or
 		// quickly copied tree cannot outrun watcher registration, then watch its
 		// descendants for later archive writes.
-		if _, ok := f.Folders[dirPath]; ok {
-			delete(f.Folders, dirPath)
-		}
+		delete(f.Folders, dirPath)
 
 		return append([]string{dirPath}, f.scanWatchDir(event, dirPath, now, true)...)
 	}
@@ -256,7 +252,7 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
 // Scan discovers archives that already exist when Unpackerr starts. Existing
 // recovered tasks are returned but not refreshed, preserving their timestamps.
 func (f *Folders) Scan(now time.Time) []string {
-	paths := []string{}
+	paths := make([]string, 0, len(f.Config))
 	for _, cfg := range f.Config {
 		event := &Event{Config: cfg, Name: filepath.Base(cfg.Path), File: cfg.Path, Op: "startup scan"}
 		paths = append(paths, f.scanWatchDir(event, filepath.Clean(cfg.Path), now, false)...)
@@ -391,7 +387,7 @@ func (f *Folders) insideExtractDest(root, dir string) bool {
 // is the extractable entry point; later volumes are data for that task.
 func isPrimaryArchive(path string) bool {
 	match := rarPartPattern.FindStringSubmatch(filepath.Base(path))
-	if len(match) != 2 {
+	if len(match) != rarPartPattern.NumSubexp()+1 {
 		return true
 	}
 

@@ -168,7 +168,6 @@ const WebhookTemplateDiscord = `{
 }
 `
 
-
 const WebhookTemplatePushover = `token={{token}}&user={{channel}}&html=1&title={{formencode .Title}}&` +
 	`{{if nickname}}device={{nickname}}&{{end}}message=<pre><b>App</b>: {{formencode (htmlencode .App)}}
 <b>Name</b>: {{formencode (index .IDs "title")}}
@@ -263,17 +262,17 @@ const WebhookTemplateSlack = `
 //nolint:wrapcheck
 func (w *Config) Template() (*template.Template, error) {
 	template := template.New("webhook").Funcs(template.FuncMap{
-		"encode":       func(v any) string { b, _ := json.Marshal(v); return string(b) },
-		"rawencode":    func(v any) string { b, _ := json.Marshal(v); return strings.Trim(string(b), `"`) }, // yuck
-		"formencode":   url.QueryEscape,
-		"htmlencode":   func(v any) string { return html.EscapeString(fmt.Sprint(v)) },
-		"separator":    separator,
-		"humanbytes":   humanbytes,
-		"nickname":     func() string { return w.Nickname },
-		"channel":      func() string { return w.Channel },
-		"token":        func() string { return w.Token },
-		"timestamp":    func(t time.Time) string { return t.Format(time.RFC3339) },
-		"name":         func() string { return w.Name },
+		"encode":     func(v any) string { b, _ := json.Marshal(v); return string(b) },
+		"rawencode":  func(v any) string { b, _ := json.Marshal(v); return strings.Trim(string(b), `"`) }, // yuck
+		"formencode": url.QueryEscape,
+		"htmlencode": func(v any) string { return html.EscapeString(fmt.Sprint(v)) },
+		"separator":  separator,
+		"humanbytes": humanbytes,
+		"nickname":   func() string { return w.Nickname },
+		"channel":    func() string { return w.Channel },
+		"token":      func() string { return w.Token },
+		"timestamp":  func(t time.Time) string { return t.Format(time.RFC3339) },
+		"name":       func() string { return w.Name },
 	})
 
 	// Providing a template name that exists overrides template_path.
@@ -350,4 +349,3 @@ func humanbytes(size uint64) string {
 
 	return fmt.Sprintf("%.1f%ciB", float64(size)/float64(div), "KMGTPE"[exp])
 }
-
