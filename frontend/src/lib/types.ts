@@ -127,6 +127,11 @@ export interface QueueItem {
   archive?: string
   archiveFiles?: string[]
   newFiles?: string[]
+  speedBps?: number
+  avgSpeedBps?: number
+  eta?: string
+  due?: string
+  dueKind?: 'start' | 'retry' | 'cleanup' | 'history'
   speedBytesPerSecond?: number
   etaSeconds?: number
   deleteAt?: string
