@@ -51,7 +51,7 @@ baseline, not a replacement for the repository contracts in
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.3`; existing `v2.0.2` remains untouched.
+- The next safe patch release is `v2.0.4`; existing `v2.0.3` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
