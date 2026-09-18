@@ -71,14 +71,14 @@
     | 'path'
     | 'actions'
   const historyColumnDefaults: Record<HistoryColumn, string> = {
-    item: '25%',
-    status: '12%',
-    files: '7%',
-    size: '10%',
-    retries: '7%',
-    finished: '16%',
+    item: '24%',
+    status: '11%',
+    files: '6%',
+    size: '9%',
+    retries: '6%',
+    finished: '15%',
     path: '15%',
-    actions: '8%',
+    actions: '14%',
   }
   const historyColumnMins: Record<HistoryColumn, number> = {
     item: 180,

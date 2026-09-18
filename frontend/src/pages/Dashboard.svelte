@@ -67,13 +67,13 @@
     | 'path'
     | 'actions'
   const queueColumnDefaults: Record<QueueColumn, string> = {
-    item: '29%',
-    status: '12%',
+    item: '27%',
+    status: '11%',
     progress: '17%',
     deletes: '9%',
-    updated: '12%',
-    path: '13%',
-    actions: '8%',
+    updated: '11%',
+    path: '12%',
+    actions: '13%',
   }
   const queueColumnMins: Record<QueueColumn, number> = {
     item: 180,
