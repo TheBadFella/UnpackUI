@@ -4,6 +4,10 @@ Maintain extraction, watched folders, recovery and web controls.
 
 Read [.agents/repository-context.md](.agents/repository-context.md) for source locations, invariants and verification commands.
 
+For upstream syncs, read the dated [upstream sync ledger](.agents/upstream-sync-ledger.md)
+before comparing or merging `upstream/main`; it records the last reviewed
+upstream commit and the fork-specific reconciliation decisions.
+
 - Preserve archive/path confinement, recursive folder semantics, incomplete extraction recovery and webhook deduplication.
 - Use temporary archives and output folders; never point tests or local executable at production media/config.
 - Keep the upstream Go module identity unless migration is requested. Linux generation/lint and Windows checks are distinct.
