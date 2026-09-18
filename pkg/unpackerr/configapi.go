@@ -32,9 +32,10 @@ type generalConfig struct {
 	Passwords     StringSlice   `json:"passwords"`
 }
 
-// foldersConfigAPI is global folder poller settings plus the watch list.
+// foldersConfigAPI is the event buffer plus the watch list. Interval is an
+// omitted-by-default legacy input accepted for old API clients.
 type foldersConfigAPI struct {
-	Interval cnfg.Duration             `json:"interval"`
+	Interval *cnfg.Duration            `json:"interval,omitempty"`
 	Buffer   uint                      `json:"buffer"`
 	Folder   InstanceMap[FolderConfig] `json:"folder"`
 }
@@ -202,11 +203,17 @@ func publicWebserver(web *WebServer) *WebServer {
 }
 
 func foldersConfigFrom(cfg *Config) foldersConfigAPI {
-	return foldersConfigAPI{
-		Interval: cfg.Folder.Interval,
-		Buffer:   cfg.Folder.Buffer,
-		Folder:   emptyIfNilMap(cfg.Folders),
+	section := foldersConfigAPI{
+		Buffer: cfg.Folder.Buffer,
+		Folder: emptyIfNilMap(cfg.Folders),
 	}
+
+	if cfg.Folder.Interval.Duration != 0 {
+		interval := cfg.Folder.Interval
+		section.Interval = &interval
+	}
+
+	return section
 }
 
 func emptyIfNil[T any](list []T) []T {
