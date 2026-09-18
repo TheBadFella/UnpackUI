@@ -71,14 +71,14 @@
     | 'path'
     | 'actions'
   const historyColumnDefaults: Record<HistoryColumn, string> = {
-    item: '24%',
+    item: '25%',
     status: '11%',
     files: '6%',
     size: '9%',
     retries: '6%',
     finished: '15%',
-    path: '15%',
-    actions: '14%',
+    path: '18%',
+    actions: '10%',
   }
   const historyColumnMins: Record<HistoryColumn, number> = {
     item: 180,
@@ -88,7 +88,7 @@
     retries: 50,
     finished: 130,
     path: 160,
-    actions: 150,
+    actions: 90,
   }
   const historyColumnKeys: HistoryColumn[] = [
     'item',
@@ -484,7 +484,7 @@
                 <code class="path-cell">{itemPath(row)}</code>
               </td>
               <td data-label={$_('pages.history.Actions')} class="text-end text-nowrap" headers="hist-actions">
-                <ButtonGroup size="sm">
+                <ButtonGroup vertical size="sm">
                   <Button
                     color="secondary"
                     outline
