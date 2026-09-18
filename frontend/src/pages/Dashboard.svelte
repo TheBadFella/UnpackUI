@@ -46,7 +46,6 @@
   import { success, failure } from '../lib/toast'
   import { live, type LiveTopic } from '../lib/socket.svelte'
   import type { BufferStat, QueueItem } from '../lib/types'
-  import githubIcon from '../assets/github.svg'
   import History from './History.svelte'
   import TaskDetails from '../components/TaskDetails.svelte'
 
@@ -174,20 +173,6 @@
     queueColumnWidths = resizedColumnWidths(measured, key, delta, queueColumnMins)
     saveColumnWidths(queueColumnStorageKey, queueColumnWidths)
   }
-
-  function ageLabel(ms: number): string {
-    const sec = Math.max(0, Math.floor(ms / 1000))
-    if (sec < 60) return `${sec}s`
-    const min = Math.floor(sec / 60)
-    if (min < 60) return `${min}m`
-    const hr = Math.floor(min / 60)
-    if (hr < 24) return `${hr}h`
-    return `${Math.floor(hr / 24)}d`
-  }
-
-  const dataAge = $derived(
-    live.fetchedAt === undefined ? '' : ageLabel(now - live.fetchedAt),
-  )
 
   const canQueue = has(systemPerm('queue', 'read'))
   const canWrite = has(systemPerm('queue', 'write'))

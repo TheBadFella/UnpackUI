@@ -50,7 +50,6 @@ urlbase = "/"
 name = "Discord"
 url = "https://discord.com/api/webhooks/replace/me"
 template = "discord"
-update_existing = true
 events = [0]
 ```
 
@@ -72,7 +71,6 @@ environment:
   UN_WEBHOOK_0_NAME: Discord
   UN_WEBHOOK_0_URL: https://discord.com/api/webhooks/replace/me
   UN_WEBHOOK_0_TEMPLATE: discord
-  UN_WEBHOOK_0_UPDATE_EXISTING: "true"
   UN_WEBHOOK_0_EVENTS_0: "0"
 ```
 

@@ -13,7 +13,7 @@ below.
 | `UN_WEB_URL` | empty | Sets the externally reachable status UI URL used by native Discord links. It does not enable the web server by itself. |
 | `UN_WEBSERVER_API` | `false` | Legacy compatibility setting. The authenticated API is available whenever `UN_WEBSERVER_LISTEN_ADDR` is set. |
 | `UN_WEBSERVER_UI` | `false` | Enables the Svelte dashboard. It reads the upstream stats, queue, history, system, and WebSocket APIs. |
-| `UN_WEBHOOK_<n>_UPDATE_EXISTING` | `false` | For native Discord hooks, creates one message per extraction and edits it as status changes. Replace `<n>` with the zero-based webhook index. |
+| `UN_WEBHOOK_<n>_UPDATE_EXISTING` | `false` | (Deprecated) Previously controlled Discord message editing; no longer used. Discord webhooks now POST a new message per event. |
 
 These are UnpackUI additions. Settings such as `UN_REMNANT_ACTION` are inherited
 from upstream.
@@ -48,7 +48,6 @@ environment:
   # First webhook, all events.
   UN_WEBHOOK_0_URL: https://discord.com/api/webhooks/replace/me
   UN_WEBHOOK_0_TEMPLATE: discord
-  UN_WEBHOOK_0_UPDATE_EXISTING: "true"
   UN_WEBHOOK_0_EVENTS_0: "0"
 
   # Second webhook.
