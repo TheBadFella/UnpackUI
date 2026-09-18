@@ -784,6 +784,15 @@ func (u *Unpackerr) updateQueueStatus(data *newStatus, now time.Time, sendHook b
 	u.Map[data.Name].Status = data.Status
 	u.Map[data.Name].Updated = now
 
+	if folder, ok := u.folders.Folders[data.Name]; ok && u.Map[data.Name].App == FolderString {
+		u.copyFolderRetriesLocked(data.Name, folder)
+
+		u.Map[data.Name].NoRetry = folder.NoRetry
+		if folder.PreFiles != nil {
+			u.Map[data.Name].PreFiles = folder.PreFiles
+		}
+	}
+
 	if sendHook {
 		u.runAllHooks(u.Map[data.Name])
 	}
