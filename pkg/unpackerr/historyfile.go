@@ -648,6 +648,7 @@ func (u *Unpackerr) folderDeleteAfter(itemID string, item *Extract) time.Duratio
 
 	return item.DeleteDelay
 }
+
 func (u *Unpackerr) deleteHistoryID(itemID string) error {
 	u.histMu.Lock()
 	defer u.histMu.Unlock()
