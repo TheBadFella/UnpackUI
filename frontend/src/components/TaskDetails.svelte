@@ -1,6 +1,6 @@
 <script lang="ts">
   import { _ } from '../lib/i18n/Translate.svelte'
-  import { statusPhrase, bytes, relTime, isZeroTime } from '../lib/format'
+  import { statusPhrase, bytes, relTime, isZeroTime, remainCompact } from '../lib/format'
   import {
     itemTitle,
     deleteRemaining,
@@ -51,12 +51,28 @@
   }
 
   const title = $derived(itemTitle(item))
-  const location = $derived(pathDir(item.path) || item.path)
-  const sourceArchive = $derived(pathBase(item.path))
-  const outputPath = $derived(item.outputPath || '')
-  const currentArchive = $derived(
-    'archive' in item && item.archive ? item.archive : ''
+  const location = $derived(normalizePath(item.path))
+  const sourceArchive = $derived.by(() => {
+    if ('sourceArchive' in item && item.sourceArchive) {
+      return normalizePath(item.sourceArchive)
+    }
+    if ('archive' in item && item.archive) {
+      return normalizePath(item.archive)
+    }
+    return ''
+  })
+  const outputPath = $derived(
+    'outputPath' in item && item.outputPath ? normalizePath(item.outputPath) : ''
   )
+  const currentArchive = $derived.by(() => {
+    if ('currentArchive' in item && item.currentArchive) {
+      return normalizePath(item.currentArchive)
+    }
+    if ('archive' in item && item.archive) {
+      return normalizePath(item.archive)
+    }
+    return ''
+  })
   const isCompleted = $derived(
     item.status === 'finished' ||
       item.status === 'extracted' ||
@@ -67,10 +83,12 @@
   )
 
   const updatedAtFormatted = $derived(
-    item.updated ? new Date(item.updated).toLocaleString() : ''
+    item.updated && !isZeroTime(item.updated)
+      ? new Date(item.updated).toLocaleString()
+      : ''
   )
   const startedAtFormatted = $derived(
-    'started' in item && item.started && !isZeroTime(item.started)
+    item.started && !isZeroTime(item.started)
       ? new Date(item.started).toLocaleString()
       : ''
   )
@@ -82,7 +100,12 @@
   const deleteAtFormatted = $derived(
     item.deleteAt ? new Date(item.deleteAt).toLocaleString() : ''
   )
-  const deletesIn = $derived(deleteRemaining(item.deleteAt, now))
+  const deletesIn = $derived.by(() => {
+    if ('dueKind' in item && item.dueKind === 'cleanup' && item.due && !isZeroTime(item.due)) {
+      return remainCompact(item.due, now) || deleteRemaining(item.deleteAt, now)
+    }
+    return deleteRemaining(item.deleteAt, now)
+  })
 
   const progressSummary = $derived.by(() => {
     if (
@@ -108,14 +131,31 @@
     return ''
   })
 
-  const speed = $derived(
-    'speedBytesPerSecond' in item && item.speedBytesPerSecond
-      ? formatRate(item.speedBytesPerSecond)
-      : ''
-  )
-  const eta = $derived(
-    'etaSeconds' in item && item.etaSeconds ? formatEta(item.etaSeconds) : ''
-  )
+  const speed = $derived.by(() => {
+    if ('avgSpeedBps' in item && item.avgSpeedBps) {
+      const avg = formatRate(item.avgSpeedBps)
+      if ('speedBps' in item && item.speedBps && item.speedBps !== item.avgSpeedBps) {
+        return `${avg} (current: ${formatRate(item.speedBps)})`
+      }
+      return avg
+    }
+    if ('speedBps' in item && item.speedBps) {
+      return formatRate(item.speedBps)
+    }
+    if ('speedBytesPerSecond' in item && item.speedBytesPerSecond) {
+      return formatRate(item.speedBytesPerSecond)
+    }
+    return ''
+  })
+  const eta = $derived.by(() => {
+    if ('eta' in item && item.eta && !isZeroTime(item.eta)) {
+      return remainCompact(item.eta, now)
+    }
+    if ('etaSeconds' in item && item.etaSeconds) {
+      return formatEta(item.etaSeconds)
+    }
+    return ''
+  })
   const elapsed = $derived(
     'elapsed' in item && item.elapsed
       ? item.elapsed

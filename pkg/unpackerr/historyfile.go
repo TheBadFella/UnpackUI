@@ -94,6 +94,11 @@ type QueueItem struct {
 	Archive             string        `json:"archive,omitempty"`
 	ArchiveFiles        []string      `json:"archiveFiles,omitempty"`
 	NewFiles            []string      `json:"newFiles,omitempty"`
+	SpeedBps            uint64        `json:"speedBps,omitempty"`    // last sample interval
+	AvgSpeedBps         uint64        `json:"avgSpeedBps,omitempty"` // bytes so far / extract duration
+	ETA                 time.Time     `json:"eta,omitzero"`
+	Due                 time.Time     `json:"due,omitzero"`
+	DueKind             string        `json:"dueKind,omitempty"` // start, retry, cleanup, history
 	SpeedBytesPerSecond uint64        `json:"speedBytesPerSecond,omitempty"`
 	ETASeconds          int64         `json:"etaSeconds,omitempty"`
 	DeleteAt            *time.Time    `json:"deleteAt,omitempty"`
@@ -478,9 +483,9 @@ func (u *Unpackerr) queueSnapshot() []QueueItem {
 	return u.queueSnapshotLocked()
 }
 
-func queueFromExtract(id string, item *Extract) QueueItem {
+func (u *Unpackerr) queueFromExtract(itemID string, item *Extract) QueueItem {
 	queue := QueueItem{
-		ID:         id,
+		ID:         itemID,
 		App:        item.Label(),
 		Title:      extractIDString(item, "title"),
 		Reason:     extractIDString(item, "reason"),
@@ -490,6 +495,8 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 		Status:     item.Status,
 		Retries:    item.Retries,
 		Updated:    item.Updated,
+		Due:        item.Due,
+		DueKind:    item.DueKind,
 	}
 
 	if item.Status == WAITING && item.App == FolderString {
@@ -500,7 +507,7 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 		queue.Progress = item.Note
 	}
 
-	applyExtractProgress(&queue, item)
+	fillQueueProgress(&queue, item)
 
 	if item.Resp != nil {
 		if !item.Resp.Started.IsZero() {
@@ -513,11 +520,14 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 		queue.ArchiveFiles = append(queue.ArchiveFiles, item.Resp.Extras.List()...)
 		queue.NewFiles = append(queue.NewFiles, item.Resp.NewFiles...)
 	}
+
 	if item.Resp != nil && item.Resp.Error != nil {
 		queue.Error = item.Resp.Error.Error()
 	}
 
-	if item.Status == IMPORTED && item.DeleteDelay > 0 {
+	if item.DueKind == dueCleanup && !item.Due.IsZero() {
+		queue.DeleteAt = &item.Due
+	} else if item.Status == IMPORTED && item.DeleteDelay > 0 {
 		deleteAt := item.Updated.Add(item.DeleteDelay)
 		queue.DeleteAt = &deleteAt
 	}
@@ -525,15 +535,11 @@ func queueFromExtract(id string, item *Extract) QueueItem {
 	return queue
 }
 
-func applyExtractProgress(queue *QueueItem, item *Extract) {
+func fillQueueProgress(queue *QueueItem, item *Extract) {
 	if item.XProg == nil {
 		return
 	}
-	if !item.XProg.StartedAt.IsZero() {
-		queue.Started = item.XProg.StartedAt
-	}
 
-	now := time.Now()
 	if prog := item.XProg.String(); prog != "no progress yet" {
 		queue.Progress = prog
 	}
@@ -552,13 +558,14 @@ func applyExtractProgress(queue *QueueItem, item *Extract) {
 	queue.Count = prog.Count
 	queue.Archives = item.XProg.Archives
 	queue.Extracted = item.XProg.Extracted
+	queue.SpeedBps = item.XProg.SpeedBps
+	queue.AvgSpeedBps = item.XProg.AvgSpeedBps
+	queue.ETA = item.XProg.ETA
 
-	if speed, ok := item.XProg.Speed(now); ok {
-		queue.SpeedBytesPerSecond = speed
-	}
-
-	if eta, ok := item.XProg.ETA(now); ok {
-		queue.ETASeconds = int64(eta / time.Second)
+	// Backward-compatibility aliases for fork consumers:
+	queue.SpeedBytesPerSecond = item.XProg.SpeedBps
+	if !item.XProg.ETA.IsZero() && item.XProg.ETA.After(time.Now()) {
+		queue.ETASeconds = int64(time.Until(item.XProg.ETA) / time.Second)
 	}
 
 	if prog.XFile != nil {
@@ -567,6 +574,80 @@ func applyExtractProgress(queue *QueueItem, item *Extract) {
 	}
 }
 
+const (
+	dueStart   = "start"
+	dueRetry   = "retry"
+	dueCleanup = "cleanup"
+	dueHistory = "history"
+)
+
+// stampQueueDue writes the next timer onto the extract. Call from the main
+// loop after Status or Updated changes; HTTP readers only copy the fields.
+func (u *Unpackerr) stampQueueDue(itemID string, item *Extract) {
+	if item == nil {
+		return
+	}
+
+	item.Due, item.DueKind = u.queueDue(itemID, item)
+}
+
+func (u *Unpackerr) queueDue(itemID string, item *Extract) (time.Time, string) {
+	switch item.Status {
+	case WAITING:
+		if u.StartDelay.Duration <= 0 {
+			return time.Time{}, ""
+		}
+
+		if item.App != FolderString && item.Note != "" {
+			return time.Time{}, ""
+		}
+
+		return item.Updated.Add(u.StartDelay.Duration), dueStart
+	case EXTRACTFAILED:
+		if item.NoRetry || item.Retries >= u.maxRetries() {
+			return time.Time{}, ""
+		}
+
+		return item.Updated.Add(u.RetryDelay.Duration), dueRetry
+	case EXTRACTED:
+		delay := u.folderDeleteAfter(itemID, item)
+		if delay <= 0 {
+			return time.Time{}, ""
+		}
+
+		return item.Updated.Add(delay), dueCleanup
+	case IMPORTED:
+		if item.DeleteDelay < 0 {
+			return time.Time{}, ""
+		}
+
+		return item.Updated.Add(item.DeleteDelay), dueCleanup
+	case DELETED:
+		return item.Updated.Add(item.DeleteDelay), dueHistory
+	case EXTRACTEDNOTHING:
+		if item.App != FolderString || u.StartDelay.Duration <= 0 {
+			return time.Time{}, ""
+		}
+
+		return item.Updated.Add(u.StartDelay.Duration), dueHistory
+	default:
+		return time.Time{}, ""
+	}
+}
+
+func (u *Unpackerr) folderDeleteAfter(itemID string, item *Extract) time.Duration {
+	if item.App != FolderString {
+		return 0
+	}
+
+	if u.folders != nil {
+		if folder := u.folders.Folders[itemID]; folder != nil && folder.Config != nil && folder.Config.DeleteAfter != nil {
+			return folder.Config.DeleteAfter.Duration
+		}
+	}
+
+	return item.DeleteDelay
+}
 func (u *Unpackerr) deleteHistoryID(itemID string) error {
 	u.histMu.Lock()
 	defer u.histMu.Unlock()

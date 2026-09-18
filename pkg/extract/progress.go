@@ -10,6 +10,11 @@ import (
 	"golift.io/xtractr"
 )
 
+const (
+	speedSampleInterval = 200 * time.Millisecond
+	maxETA              = 24 * time.Hour
+)
+
 // Progress holds the progress for an entire Extract.
 // An Extract is "a new item in a watch folder" or "a download in a starr app".
 // Either may produce multiple xtractr.XFile structs (extractable archives).
@@ -21,10 +26,16 @@ type Progress struct {
 	Archives int
 	// Number of archives extracted from this Extract.
 	Extracted int
-	// StartedAt is when the current archive began extracting.
-	StartedAt time.Time
-	// UpdatedAt is when the current progress counters were last refreshed.
-	UpdatedAt time.Time
+	// SpeedBps is the current archive rate over the last sample interval.
+	SpeedBps uint64
+	// AvgSpeedBps is (completed archive bytes + current have) / extract duration.
+	AvgSpeedBps uint64
+	// ETA is when the current archive should finish, based on AvgSpeedBps.
+	ETA         time.Time
+	startedAt   time.Time
+	sampleAt    time.Time
+	sampleBytes uint64
+	doneBytes   uint64
 }
 
 func (p *Progress) String() string {
@@ -32,84 +43,126 @@ func (p *Progress) String() string {
 		return "no progress yet"
 	}
 
-	wrote, total := p.Bytes()
+	var wrote, total uint64
+
+	if p.Total > 0 {
+		wrote, total = p.Wrote, p.Total
+	} else if p.Compressed > 0 {
+		wrote, total = p.Read, p.Compressed
+	}
 
 	return fmt.Sprintf("on archive: %d/%d @ %sB/%sB (%.0f%%): %s",
 		p.Extracted+1, p.Archives, bytefmt.ByteSize(wrote), bytefmt.ByteSize(total),
 		p.Percent(), strings.TrimLeft(strings.TrimPrefix(p.XFile.FilePath, p.Path), string(filepath.Separator)))
 }
 
-func (p *Progress) Bytes() (uint64, uint64) {
-	if p == nil || p.Progress == nil {
+func progressBytes(prog *xtractr.Progress) (uint64, uint64) {
+	if prog == nil {
 		return 0, 0
 	}
 
-	if p.Total > 0 {
-		return p.Wrote, p.Total
+	if prog.Total > 0 {
+		return prog.Wrote, prog.Total
 	}
 
-	if p.Compressed > 0 {
-		return p.Read, p.Compressed
+	if prog.Compressed > 0 {
+		return prog.Read, prog.Compressed
 	}
 
 	return 0, 0
 }
 
-func (p *Progress) Speed(now time.Time) (uint64, bool) {
-	if p == nil || p.Progress == nil || p.StartedAt.IsZero() {
-		return 0, false
+func bytesPerSec(delta uint64, elapsed time.Duration) uint64 {
+	if elapsed <= 0 {
+		return 0
 	}
 
-	elapsed := p.UpdatedAt.Sub(p.StartedAt)
-	if elapsed <= 0 && now.After(p.StartedAt) {
-		elapsed = now.Sub(p.StartedAt)
-	}
-
-	if elapsed < time.Second {
-		return 0, false
-	}
-
-	wrote, _ := p.Bytes()
-	if wrote == 0 {
-		return 0, false
-	}
-
-	speed := uint64(float64(wrote) / elapsed.Seconds())
-
-	return speed, speed > 0
+	return uint64(float64(delta) / elapsed.Seconds())
 }
 
-func (p *Progress) ETA(now time.Time) (time.Duration, bool) {
-	speed, ok := p.Speed(now)
-	if !ok {
-		return 0, false
+// ResetSpeed clears speed samples for a new extract.
+func (p *Progress) ResetSpeed() {
+	if p == nil {
+		return
 	}
 
-	wrote, total := p.Bytes()
-	if total == 0 || wrote >= total {
-		return 0, false
-	}
-
-	remaining := total - wrote
-
-	eta := time.Duration(float64(remaining) / float64(speed) * float64(time.Second)).Round(time.Second)
-	if eta > 0 && eta < time.Second {
-		eta = time.Second
-	}
-
-	return eta, eta > 0
+	p.SpeedBps = 0
+	p.AvgSpeedBps = 0
+	p.ETA = time.Time{}
+	p.startedAt = time.Time{}
+	p.sampleAt = time.Time{}
+	p.sampleBytes = 0
+	p.doneBytes = 0
 }
 
-func (p *Progress) ProgressStartedAt(now time.Time) time.Time {
-	if p != nil && p.Extract != nil && p.Resp != nil && !p.Resp.Started.IsZero() &&
-		!p.Resp.Started.After(now) {
-		return p.Resp.Started
+// NoteArchiveDone folds the finished archive into the extract total and
+// clears the current-speed sample so the next archive starts a new interval.
+func (p *Progress) NoteArchiveDone() {
+	if p == nil {
+		return
 	}
 
-	if p != nil && p.Extract != nil && p.Status == EXTRACTING && !p.Updated.IsZero() &&
-		!p.Updated.After(now) {
-		return p.Updated
+	have, _ := progressBytes(p.Progress)
+	p.doneBytes += have
+	p.SpeedBps = 0
+	p.sampleAt = time.Time{}
+	p.sampleBytes = 0
+}
+
+// NoteSpeed updates current/average speeds and ETA from byte counts.
+func (p *Progress) NoteSpeed(now time.Time) {
+	if p == nil || p.Progress == nil {
+		return
 	}
 
-	return now
+	have, want := progressBytes(p.Progress)
+	p.updateSpeeds(now, have)
+	p.updateETA(now, have, want)
+}
+
+func (p *Progress) updateSpeeds(now time.Time, have uint64) {
+	if have < p.sampleBytes {
+		p.SpeedBps = 0
+		p.sampleAt = now
+		p.sampleBytes = have
+	}
+
+	if p.startedAt.IsZero() {
+		p.startedAt = now
+	}
+
+	if p.sampleAt.IsZero() {
+		p.sampleAt = now
+		p.sampleBytes = have
+	}
+
+	if elapsed := now.Sub(p.startedAt); elapsed >= speedSampleInterval {
+		p.AvgSpeedBps = bytesPerSec(p.doneBytes+have, elapsed)
+	}
+
+	if dt := now.Sub(p.sampleAt); dt >= speedSampleInterval {
+		if have > p.sampleBytes {
+			p.SpeedBps = bytesPerSec(have-p.sampleBytes, dt)
+		} else {
+			p.SpeedBps = 0
+		}
+
+		p.sampleAt = now
+		p.sampleBytes = have
+	}
+}
+
+func (p *Progress) updateETA(now time.Time, have, want uint64) {
+	if p.AvgSpeedBps == 0 || want == 0 || have >= want {
+		p.ETA = time.Time{}
+		return
+	}
+
+	left := time.Duration(float64(want-have) / float64(p.AvgSpeedBps) * float64(time.Second))
+	if left > maxETA {
+		p.ETA = time.Time{}
+		return
+	}
+
+	p.ETA = now.Add(left.Round(time.Second))
 }

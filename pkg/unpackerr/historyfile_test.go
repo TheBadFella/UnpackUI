@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"golift.io/cnfg"
 	"golift.io/xtractr"
 )
 
@@ -29,8 +30,9 @@ func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) { //nolint:funlen
 				Wrote: 500,
 				XFile: &xtractr.XFile{FilePath: "/downloads/Show.S01E01/show.rar"},
 			},
-			StartedAt: now.Add(-10 * time.Second),
-			UpdatedAt: now,
+			SpeedBps:    50,
+			AvgSpeedBps: 50,
+			ETA:         now.Add(10 * time.Second),
 		},
 		Resp: &xtractr.Response{
 			Started:  now.Add(-10 * time.Second),
@@ -41,7 +43,8 @@ func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) { //nolint:funlen
 	}
 	item.XProg.Extract = item
 
-	queue := queueFromExtract("show-1", item)
+	unpack := New()
+	queue := unpack.queueFromExtract("show-1", item)
 	if queue.Title != "Show S01E01" || queue.Reason != "download complete" {
 		t.Fatalf("queue details %+v", queue)
 	}
@@ -64,7 +67,7 @@ func TestQueueAndHistoryExposeDashboardDetails(t *testing.T) { //nolint:funlen
 		t.Fatalf("history delete time %+v", record.DeleteAt)
 	}
 
-	waiting := queueFromExtract("waiting-1", &Extract{
+	waiting := unpack.queueFromExtract("waiting-1", &Extract{
 		App:     "Folder",
 		Path:    "/downloads/inbox",
 		Status:  WAITING,
@@ -323,5 +326,67 @@ func TestCapHistoryIgnoresInFlightCount(t *testing.T) {
 	got := unpack.historySnapshot()
 	if len(got) != 2 || got[0].ID != "newer" || got[1].ID != "new" {
 		t.Fatalf("history %+v", got)
+	}
+}
+
+type queueDueCase struct {
+	name   string
+	itemID string
+	item   *Extract
+	kind   string
+	due    time.Time
+}
+
+func dueCase(name, itemID, kind string, item *Extract, due time.Time) queueDueCase {
+	return queueDueCase{name: name, itemID: itemID, item: item, kind: kind, due: due}
+}
+
+func TestQueueFromExtractFillsDue(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1_700_000_000, 0)
+	unpack := New()
+	unpack.StartDelay.Duration = time.Minute
+	unpack.RetryDelay.Duration = 5 * time.Minute
+	unpack.folders.Folders["/w"] = &Folder{
+		Config: &FolderConfig{DeleteAfter: &cnfg.Duration{Duration: 10 * time.Minute}},
+	}
+
+	unstamped := unpack.queueFromExtract("a", &Extract{App: "Sonarr", Status: WAITING, Updated: now})
+	if unstamped.DueKind != "" || !unstamped.Due.IsZero() {
+		t.Fatalf("snapshot must copy stamped due only: %+v", unstamped)
+	}
+
+	tests := []queueDueCase{
+		dueCase("start", "a", dueStart, &Extract{App: "Sonarr", Status: WAITING, Updated: now}, now.Add(time.Minute)),
+		dueCase("noted", "a", "", &Extract{App: "Sonarr", Status: WAITING, Updated: now, Note: "x"}, time.Time{}),
+		dueCase("folder start", "/w", dueStart,
+			&Extract{App: FolderString, Status: WAITING, Updated: now, Note: "x"}, now.Add(time.Minute)),
+		dueCase("retry", "a", dueRetry, &Extract{Status: EXTRACTFAILED, Updated: now}, now.Add(5*time.Minute)),
+		dueCase("noretry", "a", "", &Extract{Status: EXTRACTFAILED, NoRetry: true, Updated: now}, time.Time{}),
+		dueCase("cleanup", "/w", dueCleanup,
+			&Extract{App: FolderString, Status: EXTRACTED, Updated: now}, now.Add(10*time.Minute)),
+		dueCase("starr extracted", "a", "", &Extract{App: "Sonarr", Status: EXTRACTED, Updated: now}, time.Time{}),
+		dueCase("imported", "a", dueCleanup,
+			&Extract{Status: IMPORTED, Updated: now, DeleteDelay: 2 * time.Minute}, now.Add(2*time.Minute)),
+		dueCase("skip del", "a", "", &Extract{Status: IMPORTED, Updated: now, DeleteDelay: -time.Second}, time.Time{}),
+		dueCase("history", "a", dueHistory,
+			&Extract{Status: DELETED, Updated: now, DeleteDelay: time.Minute}, now.Add(time.Minute)),
+		dueCase("nothing", "/w", dueHistory,
+			&Extract{App: FolderString, Status: EXTRACTEDNOTHING, Updated: now}, now.Add(time.Minute)),
+		dueCase("starr nothing", "a", "", &Extract{App: "Sonarr", Status: EXTRACTEDNOTHING, Updated: now}, time.Time{}),
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			unpack.stampQueueDue(test.itemID, test.item)
+
+			got := unpack.queueFromExtract(test.itemID, test.item)
+			if got.DueKind != test.kind || !got.Due.Equal(test.due) {
+				t.Fatalf("got kind %q due %v want %q %v", got.DueKind, got.Due, test.kind, test.due)
+			}
+		})
 	}
 }
