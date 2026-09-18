@@ -52,6 +52,25 @@ func TestWriteConfigFileRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLegacyGlobalFolderIntervalLoads(t *testing.T) {
+	t.Parallel()
+
+	conf := filepath.Join(t.TempDir(), "unpackerr.conf")
+	body := "[folders]\ninterval = \"2s\"\n\n[folder.0]\npath = \"/watch\"\n"
+	if err := os.WriteFile(conf, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded := New()
+	if err := cnfgfile.Unmarshal(loaded.Config, conf); err != nil {
+		t.Fatalf("decode legacy folder interval: %v", err)
+	}
+
+	if got := loaded.Folder.Interval.Duration; got != 2*time.Second {
+		t.Fatalf("legacy folder interval = %v, want 2s", got)
+	}
+}
+
 func TestWriteConfigFilePreservesLiveValues(t *testing.T) {
 	t.Parallel()
 
@@ -612,10 +631,10 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 	unpack.Lidarr = instanceMap([]*LidarrConfig{{StarrConfig: starrConf("http://lidarr:8686"), SplitFlac: true}})
 	unpack.Readarr = instanceMap([]*ReadarrConfig{{StarrConfig: starrConf("http://readarr:8787")}})
 	unpack.Readarr["0"].APIKey = starrKey
-	unpack.Folder.Interval = cnfg.Duration{Duration: 4 * time.Second}
 	unpack.Folder.Buffer = 5000
 	unpack.Folders = instanceMap([]*FolderConfig{{
 		Path: "/watch", ExtractPath: "/extracted", DeleteOrig: true, MoveBack: true, ExtractISOs: true,
+		Interval:    cnfg.Duration{Duration: 4 * time.Second},
 		DeleteAfter: &cnfg.Duration{Duration: 11 * time.Minute}, MaxNested: 2, MaxFiles: 99, MaxRatio: 3.5,
 		ExcludePaths: []string{"/watch/skip"},
 	}})

@@ -5,7 +5,31 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"golift.io/cnfg"
 )
+
+func TestApplyLegacyFolderIntervalKeepsPerFolderOverrides(t *testing.T) {
+	t.Parallel()
+
+	watched := []*FolderConfig{
+		{Path: "/unset"},
+		{Path: "/explicit", Interval: cnfg.Duration{Duration: 2 * time.Second}},
+		{Path: "/disabled", Interval: cnfg.Duration{Duration: time.Millisecond}},
+	}
+
+	applyLegacyFolderInterval(watched, time.Second)
+
+	if got := watched[0].Interval.Duration; got != time.Second {
+		t.Fatalf("unset interval = %v, want 1s", got)
+	}
+	if got := watched[1].Interval.Duration; got != 2*time.Second {
+		t.Fatalf("explicit interval = %v, want 2s", got)
+	}
+	if got := watched[2].Interval.Duration; got != time.Millisecond {
+		t.Fatalf("disabled interval = %v, want 1ms", got)
+	}
+}
 
 func TestFolderWaitingShowsInQueue(t *testing.T) {
 	t.Parallel()
@@ -21,15 +45,7 @@ func TestFolderWaitingShowsInQueue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
-		if tracker.Watcher != nil {
-			tracker.Watcher.Close()
-		}
-
-		if tracker.FSNotify != nil {
-			_ = tracker.FSNotify.Close()
-		}
-	})
+	t.Cleanup(tracker.Close)
 
 	unpack.folders = tracker
 
@@ -83,15 +99,7 @@ func TestMediaOnlyFolderStaysOutOfQueueAndRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
-		if tracker.Watcher != nil {
-			tracker.Watcher.Close()
-		}
-
-		if tracker.FSNotify != nil {
-			_ = tracker.FSNotify.Close()
-		}
-	})
+	t.Cleanup(tracker.Close)
 
 	unpack.folders = tracker
 	itemPath := filepath.Join(watch, "episode")
@@ -131,14 +139,7 @@ func TestPrepopulatedFolderArchivesEnterQueueAndRecoverySeparately(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		if tracker.Watcher != nil {
-			tracker.Watcher.Close()
-		}
-		if tracker.FSNotify != nil {
-			_ = tracker.FSNotify.Close()
-		}
-	})
+	t.Cleanup(tracker.Close)
 	unpack.folders = tracker
 
 	incoming := filepath.Join(watch, "incoming")
@@ -190,15 +191,7 @@ func TestCheckFolderStatsDropsMissingWaiting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
-		if tracker.Watcher != nil {
-			tracker.Watcher.Close()
-		}
-
-		if tracker.FSNotify != nil {
-			_ = tracker.FSNotify.Close()
-		}
-	})
+	t.Cleanup(tracker.Close)
 
 	unpack.folders = tracker
 

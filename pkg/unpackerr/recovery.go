@@ -407,37 +407,43 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 	path = filepath.Clean(path)
 	watchPath = filepath.Clean(watchPath)
 
-	for _, cfg := range u.Folders {
-		if cfg == nil || cfg.Path == "" {
-			continue
-		}
-
-		cfgPath := filepath.Clean(cfg.Path)
-		if watchPath != "." && cfgPath != watchPath {
-			continue
-		}
-
-		if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
-			return cfg
-		}
-	}
-
 	if watchPath != "." {
+		for _, cfg := range u.Folders {
+			if cfg == nil || cfg.Path == "" {
+				continue
+			}
+
+			cfgPath := filepath.Clean(cfg.Path)
+			if cfgPath != watchPath {
+				continue
+			}
+
+			if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
+				return cfg
+			}
+		}
+
 		return nil
 	}
 
+	var (
+		best    *FolderConfig
+		bestLen = -1
+	)
+
 	for _, cfg := range u.Folders {
 		if cfg == nil || cfg.Path == "" {
 			continue
 		}
 
 		cfgPath := filepath.Clean(cfg.Path)
-		if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
-			return cfg
+		if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) && len(cfgPath) > bestLen {
+			best = cfg
+			bestLen = len(cfgPath)
 		}
 	}
 
-	return nil
+	return best
 }
 
 func pathWithin(path, root string) bool {

@@ -461,7 +461,7 @@ func TestConfigPutFoldersValidationDoesNotApply(t *testing.T) {
 	unpack.snapshotFileConfig()
 	key := putKey(unpack)
 
-	body := `{"interval":"1s","buffer":1000,"folder":[{"path":"/rejected/path","maxBytes":"bogus"}]}`
+	body := `{"buffer":1000,"folder":[{"path":"/rejected/path","maxBytes":"bogus"}]}`
 	if rec := doAuth(t, unpack, http.MethodPut, "/api/config/folders", body, key); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bogus folder %d %s", rec.Code, rec.Body.String())
 	}
@@ -474,9 +474,31 @@ func TestConfigPutFoldersValidationDoesNotApply(t *testing.T) {
 		t.Fatalf("rejected folder staged: %+v", unpack.fileConfig.Folders)
 	}
 
-	emptyPath := `{"interval":"1s","buffer":1000,"folder":{"foo2":{"delete_original":true}}}`
+	emptyPath := `{"buffer":1000,"folder":{"foo2":{"delete_original":true}}}`
 	if rec := doAuth(t, unpack, http.MethodPut, "/api/config/folders", emptyPath, key); rec.Code != http.StatusBadRequest {
 		t.Fatalf("empty folder path %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestConfigPutFoldersAcceptsLegacyGlobalInterval(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.ConfigFile = filepath.Join(t.TempDir(), "unpackerr.conf")
+	unpack.snapshotFileConfig()
+	watch := t.TempDir()
+	body := fmt.Sprintf(`{"interval":"2s","buffer":1000,"folder":[{"path":%q}]}`, watch)
+
+	rec := doAuth(t, unpack, http.MethodPut, "/api/config/folders", body, putKey(unpack))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("legacy interval PUT %d %s", rec.Code, rec.Body.String())
+	}
+
+	if got := unpack.Folder.Interval.Duration; got != 2*time.Second {
+		t.Fatalf("live legacy interval = %v, want 2s", got)
+	}
+	if got := unpack.fileConfig.Folder.Interval.Duration; got != 2*time.Second {
+		t.Fatalf("file legacy interval = %v, want 2s", got)
 	}
 }
 
@@ -1367,7 +1389,7 @@ func TestConfigPutSetsPendingRestart(t *testing.T) {
 	}
 
 	folders, err := json.Marshal(map[string]any{
-		"interval": "1s", "buffer": 1000, "folder": []map[string]string{{"path": t.TempDir()}},
+		"buffer": 1000, "folder": []map[string]string{{"path": t.TempDir()}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1624,7 +1646,7 @@ func TestConfigPutWriteFailureDoesNotArmRestart(t *testing.T) {
 	unpack.ConfigFile = blockedPath(t, "unpackerr.conf")
 
 	folders, err := json.Marshal(map[string]any{
-		"interval": "1s", "buffer": 1000, "folder": []map[string]string{{"path": t.TempDir()}},
+		"buffer": 1000, "folder": []map[string]string{{"path": t.TempDir()}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -2042,8 +2064,7 @@ func TestConfigPutFoldersKeepsEnvExtractPath(t *testing.T) {
 	}
 
 	body, err := json.Marshal(map[string]any{
-		"interval": "2s",
-		"buffer":   1000,
+		"buffer": 1000,
 		"folder": map[string]any{
 			"watch": map[string]any{
 				"path":         setup.watch,
@@ -2116,8 +2137,7 @@ func TestConfigPutFoldersKeepsSiblingExcludePaths(t *testing.T) {
 	setup := envFolderExcludeUnpackerr(t)
 
 	body, err := json.Marshal(map[string]any{
-		"interval": "2s",
-		"buffer":   1000,
+		"buffer": 1000,
 		"folder": map[string]any{
 			"watch": map[string]any{
 				"path":          setup.watch,
@@ -2163,8 +2183,7 @@ func TestConfigPutFoldersOtherSlugWhenEnvHasNoPath(t *testing.T) {
 	watch := t.TempDir()
 
 	body, err := json.Marshal(map[string]any{
-		"interval": "1s",
-		"buffer":   1000,
+		"buffer": 1000,
 		"folder": map[string]any{
 			"tv": map[string]any{"path": watch},
 		},

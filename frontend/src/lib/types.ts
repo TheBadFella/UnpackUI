@@ -279,6 +279,7 @@ export interface StarrConfig {
 
 export interface FolderConfig {
   path: string
+  interval: string
   extract_path: string
   delete_original: boolean
   delete_files: boolean
@@ -297,7 +298,8 @@ export interface FolderConfig {
 }
 
 export interface FoldersSection {
-  interval: string
+  /** Deprecated legacy global fallback; per-folder interval is preferred. */
+  interval?: string
   buffer: number
   folder: Record<string, FolderConfig> | null
 }

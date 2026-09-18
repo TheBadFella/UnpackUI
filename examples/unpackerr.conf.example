@@ -203,10 +203,6 @@ passwords = []
 
 ## Global Folder configuration that affects all watched folders.
 [folders]
-## How often poller checks for new folders.
-## The default of `0s` will disable the poller on all systems except Docker.
-## Set this value to `1ms` to disable it in Docker.
- interval = "0s"
 ## How many new folder events can be immediately queued. Don't change this.
  buffer = 20000
 
@@ -424,6 +420,12 @@ passwords = []
 ##################################################################################
 #[folder.0]
 # path = '/downloads/auto_extract'
+## How often this folder is scanned for new archives.
+## Off (`0s`) uses filesystem events (inotify and friends).
+## Enable a poll interval if files never show up in the queue, which is
+## common on Docker and CIFS. Polling increases disk reads and is not
+## recommended when fsnotify works.
+# interval = "0s"
 ## Paths to ignore while watching this folder. Excluded paths and their
 ## children are not tracked or extracted.
 ## Paths may be absolute, or relative to this folder's `path`.

@@ -96,6 +96,25 @@ func TestRecoverInterruptedFolders(t *testing.T) {
 	}
 }
 
+func TestRecoveryFolderConfigPrefersNestedWatchPath(t *testing.T) {
+	t.Parallel()
+
+	parent := t.TempDir()
+	child := filepath.Join(parent, "tv")
+	archive := filepath.Join(child, "episode.zip")
+
+	unpackerr := New()
+	unpackerr.Folders = InstanceMap[FolderConfig]{
+		"parent": {Path: parent},
+		"child":  {Path: child},
+	}
+
+	got := unpackerr.recoveryFolderConfig(archive, ".")
+	if got == nil || filepath.Clean(got.Path) != filepath.Clean(child) {
+		t.Fatalf("recovery config = %+v, want nested watch %q", got, child)
+	}
+}
+
 func TestRecoverInterruptedFolderCleansPartialOutput(t *testing.T) {
 	t.Parallel()
 
