@@ -491,10 +491,10 @@ sections:
         envvar: UI
         default: false
         recommend: *BOOLEAN
-        short: Enable the lightweight status page.
+        short: Legacy compatibility switch; the dashboard follows `listen_addr`.
         desc: |
-          Enable the built-in status UI at the web server root path.
-          This shows queue state, extraction progress, and recent extraction results.
+          Kept for UnpackUI configuration compatibility. The dashboard and browser sign-in
+          page are available whenever listen_addr is set.
       - name: metrics
         envvar: METRICS
         default: false

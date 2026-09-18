@@ -131,8 +131,8 @@ passwords = []
 ## available whenever listen_addr is set. `/api/stats` retains the additional flat
 ## summary fields used by dashboard clients such as Homepage.
  api = false
-## Enable the built-in status UI at the web server root path.
-## This shows queue state, extraction progress, and recent extraction results.
+## Kept for UnpackUI configuration compatibility. The dashboard and browser sign-in
+## page are available whenever listen_addr is set.
  ui = false
 ## Expose Prometheus metrics at /metrics. The HTTP server starts whenever listen_addr is set;
 ## this only controls the /metrics route. Scrapes must send an API key with

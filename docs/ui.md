@@ -3,7 +3,7 @@
 UnpackUI adds a built-in dashboard to Unpackerr's web server. It does not need a
 separate frontend service or database.
 
-## Enable the UI
+## Start the UI
 
 With environment variables:
 
@@ -11,7 +11,6 @@ With environment variables:
 ports:
   - "5656:5656"
 environment:
-  UN_WEBSERVER_UI: "true"
   UN_WEBSERVER_LISTEN_ADDR: 0.0.0.0:5656
 ```
 
@@ -19,12 +18,15 @@ With TOML:
 
 ```toml
 [webserver]
-ui = true
 listen_addr = "0.0.0.0:5656"
 ```
 
 Open `http://localhost:5656`. If `urlbase` is set to `/unpackui`, open
 `http://localhost:5656/unpackui/` instead.
+
+The legacy `api` and `ui` settings are still accepted so existing
+configurations continue to load, but they no longer gate routes. Setting
+`listen_addr` starts both the dashboard and authenticated API.
 
 The first startup generates a UI password and an administrator API key when
 they are not configured. Read the startup log, sign in as `admin`, and store
@@ -55,7 +57,7 @@ responsive; desktop column widths are saved per browser and can be reset. The
 
 | Endpoint | Requires | Purpose |
 |---|---|---|
-| `/` | `ui = true` | Dashboard and browser sign-in page. |
+| `/` | Web server enabled | Dashboard and browser sign-in page. |
 | `/api/stats` | `read:system:stats` | Upstream counters, buffer capacities, Starr queue summaries, and additive compatibility aliases. |
 | `/api/queue` | `read:system:queue` | Current extraction queue. |
 | `/api/queue/retry` | `write:system:queue` | Retry a failed queue item. |

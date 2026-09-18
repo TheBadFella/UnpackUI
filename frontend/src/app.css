@@ -969,8 +969,7 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 
 .dashboard-page .text-danger { color: var(--dash-bad) !important; }
 
-/* The old status page used a charcoal header with orange focus states. Keep
- * the navigation in that same visual family without changing its behavior. */
+/* Keep the navigation in the charcoal and orange Unpackerr visual family. */
 .navbar-unpackerr {
   background: #141414;
   border-bottom: 1px solid #2d2d2d;
