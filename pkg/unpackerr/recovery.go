@@ -6,8 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strings"
 	"time"
+
+	"golift.io/xtractr"
 )
 
 const (
@@ -26,6 +30,8 @@ type recoveryFolder struct {
 	WatchPath string    `json:"watchPath"`
 	Status    string    `json:"status"`
 	Updated   time.Time `json:"updated"`
+	Files     []string  `json:"files,omitempty"`
+	Archives  []string  `json:"archives,omitempty"`
 }
 
 func newRecoveryState() *recoveryState {
@@ -165,13 +171,22 @@ func (u *Unpackerr) recoveryTrackFolder(path string, cfg *FolderConfig, status E
 		return
 	}
 
-	if status > EXTRACTING {
+	if status > EXTRACTING && status != EXTRACTED {
 		u.recoveryClearFolder(path)
 		return
 	}
 
 	path = filepath.Clean(path)
 	watchPath := filepath.Clean(cfg.Path)
+	var files, archives []string
+	if status == EXTRACTED && u.folders != nil {
+		if folder := u.folders.Folders[path]; folder != nil {
+			files = append([]string(nil), folder.Files...)
+			archives = append([]string(nil), folder.Archives.List()...)
+			slices.Sort(files)
+			slices.Sort(archives)
+		}
+	}
 
 	statusText := status.String()
 	if existing := u.recovery.Folders[path]; existing != nil &&
@@ -186,6 +201,8 @@ func (u *Unpackerr) recoveryTrackFolder(path string, cfg *FolderConfig, status E
 		WatchPath: watchPath,
 		Status:    statusText,
 		Updated:   updated,
+		Files:     files,
+		Archives:  archives,
 	}
 
 	u.saveRecoveryState()
@@ -258,6 +275,30 @@ func (u *Unpackerr) recoverInterruptedFolderItem(now time.Time, path string, ite
 
 	if _, ok := u.folders.Folders[item.Path]; ok {
 		return false, false
+	}
+
+	if item.Status == EXTRACTED.String() {
+		updated := item.Updated
+		if updated.IsZero() {
+			updated = now
+		}
+		files := recoveryPathsWithin(item.Files, cfg.Path)
+		archives := recoveryPathsWithin(item.Archives, cfg.Path)
+
+		folder := &Folder{
+			Updated: updated,
+			Status:  EXTRACTED,
+			Config:  cfg,
+			Files:   files,
+		}
+		if len(archives) > 0 {
+			folder.Archives = xtractr.ArchiveList{"": archives}
+		}
+		u.folders.Folders[item.Path] = folder
+		item.WatchPath = filepath.Clean(cfg.Path)
+		item.Updated = updated
+
+		return true, false
 	}
 
 	interrupted := item.Status == QUEUED.String() || item.Status == EXTRACTING.String()
@@ -414,7 +455,7 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 			}
 
 			cfgPath := filepath.Clean(cfg.Path)
-			if cfgPath != watchPath {
+			if !recoveryPathsEqual(cfgPath, watchPath) {
 				continue
 			}
 
@@ -453,4 +494,37 @@ func pathWithin(path, root string) bool {
 	}
 
 	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+}
+
+func recoveryPathsWithin(paths []string, root string) []string {
+	if len(paths) == 0 || root == "" {
+		return nil
+	}
+
+	root = filepath.Clean(root)
+	seen := make(map[string]struct{}, len(paths))
+	safe := make([]string, 0, len(paths))
+
+	for _, path := range paths {
+		path = filepath.Clean(path)
+		if !pathWithin(path, root) {
+			continue
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+
+		seen[path] = struct{}{}
+		safe = append(safe, path)
+	}
+
+	return safe
+}
+
+func recoveryPathsEqual(left, right string) bool {
+	if runtime.GOOS == windows {
+		return strings.EqualFold(left, right)
+	}
+
+	return left == right
 }

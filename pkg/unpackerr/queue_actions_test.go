@@ -141,6 +141,50 @@ func TestQueueRetryFolder(t *testing.T) {
 	}
 }
 
+func TestQueueRetryFolderPersistsWaitingRecovery(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	itemID := filepath.Join(watchPath, "fail.zip")
+	stateFile := filepath.Join(t.TempDir(), defaultStateFile)
+	cfg := &FolderConfig{Path: watchPath}
+
+	unpack := New()
+	unpack.StateFile = stateFile
+	unpack.recovery = newRecoveryState()
+	unpack.folders = &Folders{Folders: map[string]*Folder{
+		itemID: {Status: EXTRACTFAILED, NoRetry: true, Retries: 3, Config: cfg},
+	}}
+	unpack.Map[itemID] = &Extract{
+		App:     FolderString,
+		Path:    itemID,
+		Status:  EXTRACTFAILED,
+		NoRetry: true,
+		Retries: 3,
+	}
+
+	if err := unpack.retryQueueID(itemID); err != nil {
+		t.Fatalf("retry folder: %v", err)
+	}
+
+	item := unpack.Map[itemID]
+	if item == nil || item.Status != WAITING || item.NoRetry || item.Retries != 0 {
+		t.Fatalf("in-memory retry state = %+v", item)
+	}
+
+	state, err := readRecoveryState(stateFile)
+	if err != nil {
+		t.Fatalf("reading recovery state: %v", err)
+	}
+	recovered := state.Folders[itemID]
+	if recovered == nil || recovered.Status != WAITING.String() {
+		t.Fatalf("persisted retry state = %+v", recovered)
+	}
+	if !recovered.Updated.Equal(item.Updated) {
+		t.Fatalf("persisted updated = %s, in-memory = %s", recovered.Updated, item.Updated)
+	}
+}
+
 func TestQueueForgetFolder(t *testing.T) {
 	t.Parallel()
 
