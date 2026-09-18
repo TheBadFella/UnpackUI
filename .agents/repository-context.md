@@ -4,6 +4,12 @@ Maintain extraction, watched folders, recovery and web controls.
 
 Stack observed on 2026-09-06: Go Unpackerr fork + web UI + platform packaging. Recheck manifests and scoped instructions when the implementation changes.
 
+## Upstream sync baseline
+
+Before an upstream review, read [the upstream sync ledger](upstream-sync-ledger.md).
+It records the last reviewed `upstream/main` commit and the exact procedure for
+comparing only newer upstream changes while rechecking the fork invariants.
+
 ## Read for the affected area
 
 - `go.mod`
