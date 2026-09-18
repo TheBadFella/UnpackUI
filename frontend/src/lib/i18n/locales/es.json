@@ -29,6 +29,8 @@
     "Refresh": "Actualizar",
     "Delete": "Eliminar",
     "ClearAll": "Borrar todo",
+    "ConfirmEach": "Confirmar: Cada uno",
+    "ConfirmAllOnly": "Confirmar: Solo borrar todo",
     "Generate": "Generar",
     "Logout": "Cerrar sesión",
     "AddKey": "Añadir clave",
@@ -73,7 +75,10 @@
     "NoCmdhooks": "No hay ganchos de comando configurados.",
     "NoApiKeys": "No hay claves API.",
     "ClearHistoryTitle": "¿Borrar historial?",
-    "ClearHistoryConfirm": "Esto quita las filas terminadas del historial. Los elementos que aún se extraen o esperan importación se quedan en la cola. Esto no se puede deshacer.",
+    "ClearHistoryConfirm": "Esto elimina las filas finalizadas de la lista del historial. Los elementos que aún se están extrayendo o esperando a ser importados permanecen en la cola. Esto no se puede deshacer.",
+    "DeleteHistoryItemTitle": "¿Eliminar del historial?",
+    "DeleteHistoryItemConfirm": "¿Está seguro de que desea eliminar este elemento del historial? Esta acción no se puede deshacer.",
+    "ConfirmAllOnlyOption": "No volver a preguntar para eliminaciones individuales (confirmar solo Borrar todo)",
     "ForgetImportedTitle": "¿Omitir la limpieza de archivos?",
     "ForgetImportedConfirm": "Este elemento aún espera la limpieza de archivos. Si lo olvidas, los archivos extraídos se quedan en el disco.",
     "YouDoNotHavePermission": "No tienes permiso para ver esta sección.",
@@ -237,7 +242,9 @@
       "Finished": "Terminado",
       "Actions": "Acciones",
       "DeletedRow": "Fila de historial eliminada",
-      "Cleared": "Historial borrado"
+      "Cleared": "Historial borrado",
+      "ConfirmEachHint": "Se requiere confirmación para cada eliminación. Haga clic para cambiar.",
+      "ConfirmAllOnlyHint": "La confirmación solo es necesaria para Borrar todo. Haga clic para cambiar."
     },
     "settings": {
       "Title": "Configuración",

@@ -29,6 +29,8 @@
     "Refresh": "Vernieuwen",
     "Delete": "Verwijderen",
     "ClearAll": "Alles wissen",
+    "ConfirmEach": "Bevestigen: Elk",
+    "ConfirmAllOnly": "Bevestigen: Alleen alles wissen",
     "Generate": "Genereren",
     "Logout": "Uitloggen",
     "AddKey": "Sleutel toevoegen",
@@ -74,6 +76,9 @@
     "NoApiKeys": "Geen API-sleutels.",
     "ClearHistoryTitle": "Geschiedenis wissen?",
     "ClearHistoryConfirm": "Dit verwijdert voltooide rijen uit de geschiedenis. Items die nog uitpakken of op import wachten blijven in de wachtrij. Dit kan niet ongedaan worden gemaakt.",
+    "DeleteHistoryItemTitle": "Verwijderen uit geschiedenis?",
+    "DeleteHistoryItemConfirm": "Weet u zeker dat u dit item uit de geschiedenis wilt verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "ConfirmAllOnlyOption": "Niet opnieuw vragen voor individuele verwijderingen (alleen Alles wissen bevestigen)",
     "ForgetImportedTitle": "Opruimen overslaan?",
     "ForgetImportedConfirm": "Dit item wacht nog op opruimen. Vergeten laat de uitgepakte bestanden op schijf staan.",
     "YouDoNotHavePermission": "Je hebt geen toestemming om dit onderdeel te bekijken.",
@@ -237,7 +242,9 @@
       "Finished": "Klaar",
       "Actions": "Acties",
       "DeletedRow": "Geschiedenisrij verwijderd",
-      "Cleared": "Geschiedenis gewist"
+      "Cleared": "Geschiedenis gewist",
+      "ConfirmEachHint": "Bevestiging is vereist voor elke verwijdering. Klik om te schakelen.",
+      "ConfirmAllOnlyHint": "Bevestiging is alleen vereist voor Alles wissen. Klik om te schakelen."
     },
     "settings": {
       "Title": "Configuratie",

@@ -29,6 +29,8 @@
     "Refresh": "Refresh",
     "Delete": "Delete",
     "ClearAll": "Clear all",
+    "ConfirmEach": "Confirm: Each",
+    "ConfirmAllOnly": "Confirm: Clear All only",
     "Generate": "Generate",
     "Logout": "Log out",
     "AddKey": "Add key",
@@ -74,6 +76,9 @@
     "NoApiKeys": "No API keys.",
     "ClearHistoryTitle": "Clear history?",
     "ClearHistoryConfirm": "This removes finished rows from the history list. Items still extracting or waiting for import stay in the queue. This cannot be undone.",
+    "DeleteHistoryItemTitle": "Delete from history?",
+    "DeleteHistoryItemConfirm": "Are you sure you want to remove this item from history? This cannot be undone.",
+    "ConfirmAllOnlyOption": "Don't ask again for individual deletes (confirm Clear All only)",
     "ForgetImportedTitle": "Skip file cleanup?",
     "ForgetImportedConfirm": "This item is still waiting for file cleanup. Forgetting it leaves the extracted files on disk.",
     "YouDoNotHavePermission": "You do not have permission to view this section.",
@@ -237,7 +242,9 @@
       "Finished": "Finished",
       "Actions": "Actions",
       "DeletedRow": "Deleted history row",
-      "Cleared": "History cleared"
+      "Cleared": "History cleared",
+      "ConfirmEachHint": "Confirmation is required for each delete. Click to toggle.",
+      "ConfirmAllOnlyHint": "Confirmation is only required for Clear All. Click to toggle."
     },
     "settings": {
       "Title": "Configuration",
