@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"golift.io/cnfg"
+	"golift.io/xtractr"
 )
 
 func TestRecoveryTracksAndClearsFolder(t *testing.T) {
@@ -202,6 +205,183 @@ func TestRecoverWaitingFolderKeepsOriginalUpdatedTime(t *testing.T) {
 
 	if !folder.Updated.Equal(updated) {
 		t.Fatalf("expected original updated time %s, got %s", updated, folder.Updated)
+	}
+}
+
+func TestRecoverExtractedFolderKeepsDeleteDeadlineAcrossRestarts(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	archivePath := filepath.Join(watchPath, "movie.zip")
+	if err := os.WriteFile(archivePath, []byte("placeholder"), 0o600); err != nil {
+		t.Fatalf("creating archive placeholder: %v", err)
+	}
+
+	stateFile := filepath.Join(t.TempDir(), defaultStateFile)
+	updated := time.Now().UTC().Add(-time.Minute)
+	deleteAfter := time.Hour
+	cfg := &FolderConfig{Path: watchPath, DeleteAfter: &cnfg.Duration{Duration: deleteAfter}}
+
+	unpackerr := New()
+	unpackerr.Folders = InstanceMap[FolderConfig]{"0": cfg}
+	unpackerr.StateFile = stateFile
+	unpackerr.recovery = newRecoveryState()
+	unpackerr.recoveryTrackFolder(archivePath, cfg, EXTRACTED, updated)
+
+	firstState, err := readRecoveryState(stateFile)
+	if err != nil {
+		t.Fatalf("reading first recovery state: %v", err)
+	}
+	if item := firstState.Folders[archivePath]; item == nil || item.Status != EXTRACTED.String() || !item.Updated.Equal(updated) {
+		t.Fatalf("saved extracted recovery item = %+v", item)
+	}
+
+	unpackerr.folders = &Folders{Folders: make(map[string]*Folder)}
+	firstRestart := updated.Add(2 * time.Minute)
+	unpackerr.recoverInterruptedFolders(firstRestart)
+
+	folder := unpackerr.folders.Folders[archivePath]
+	if folder == nil || folder.Status != EXTRACTED {
+		t.Fatalf("first restart folder = %+v", folder)
+	}
+	if !folder.Updated.Equal(updated) {
+		t.Fatalf("first restart updated = %s, want %s", folder.Updated, updated)
+	}
+	if got, want := folder.Updated.Add(folder.Config.DeleteAfter.Duration), updated.Add(deleteAfter); !got.Equal(want) {
+		t.Fatalf("first restart delete deadline = %s, want %s", got, want)
+	}
+
+	secondState, err := readRecoveryState(stateFile)
+	if err != nil {
+		t.Fatalf("reading second recovery state: %v", err)
+	}
+	second := New()
+	second.Folders = InstanceMap[FolderConfig]{"0": cfg}
+	second.StateFile = stateFile
+	second.recovery = secondState
+	second.folders = &Folders{Folders: make(map[string]*Folder)}
+	secondRestart := firstRestart.Add(2 * time.Minute)
+	second.recoverInterruptedFolders(secondRestart)
+
+	folder = second.folders.Folders[archivePath]
+	if folder == nil || folder.Status != EXTRACTED || !folder.Updated.Equal(updated) {
+		t.Fatalf("second restart folder = %+v, want extracted at %s", folder, updated)
+	}
+}
+
+func TestRecoverExtractedFolderRestoresCleanupPaths(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	archivePath := filepath.Join(watchPath, "movie.zip")
+	extractedPath := filepath.Join(watchPath, "movie", "episode.mkv")
+	if err := os.MkdirAll(filepath.Dir(extractedPath), 0o700); err != nil {
+		t.Fatalf("creating extracted directory: %v", err)
+	}
+	if err := os.WriteFile(archivePath, []byte("archive"), 0o600); err != nil {
+		t.Fatalf("creating archive: %v", err)
+	}
+	if err := os.WriteFile(extractedPath, []byte("episode"), 0o600); err != nil {
+		t.Fatalf("creating extracted file: %v", err)
+	}
+
+	stateFile := filepath.Join(t.TempDir(), defaultStateFile)
+	updated := time.Now().UTC().Add(-2 * time.Minute)
+	cfg := &FolderConfig{
+		Path:        watchPath,
+		MoveBack:    true,
+		DeleteFiles: true,
+		DeleteOrig:  true,
+		DeleteAfter: &cnfg.Duration{Duration: time.Minute},
+	}
+
+	unpackerr := New()
+	unpackerr.Folders = InstanceMap[FolderConfig]{"0": cfg}
+	unpackerr.StateFile = stateFile
+	unpackerr.folders = &Folders{Folders: map[string]*Folder{
+		archivePath: {
+			Updated:  updated,
+			Status:   EXTRACTED,
+			Config:   cfg,
+			Files:    []string{extractedPath},
+			Archives: xtractr.ArchiveList{watchPath: {archivePath}},
+		},
+	}}
+	unpackerr.recovery = newRecoveryState()
+	unpackerr.recoveryTrackFolder(archivePath, cfg, EXTRACTED, updated)
+
+	state, err := readRecoveryState(stateFile)
+	if err != nil {
+		t.Fatalf("reading recovery state: %v", err)
+	}
+	if item := state.Folders[archivePath]; item == nil || len(item.Files) != 1 || len(item.Archives) != 1 {
+		t.Fatalf("saved cleanup paths = %+v", item)
+	}
+
+	restarted := New()
+	restarted.Folders = InstanceMap[FolderConfig]{"0": cfg}
+	restarted.StateFile = stateFile
+	restarted.recovery = state
+	restarted.folders = &Folders{Folders: make(map[string]*Folder)}
+	now := updated.Add(2 * time.Minute)
+	restarted.recoverInterruptedFolders(now)
+
+	folder := restarted.folders.Folders[archivePath]
+	if folder == nil || len(folder.Files) != 1 || folder.Files[0] != extractedPath ||
+		len(folder.Archives.List()) != 1 || folder.Archives.List()[0] != archivePath {
+		t.Fatalf("restored cleanup paths = %+v", folder)
+	}
+
+	restarted.checkFolderStats(now)
+	deleteFiles := <-restarted.delChan
+	deleteOrig := <-restarted.delChan
+	if len(deleteFiles.Paths) != 1 || deleteFiles.Paths[0] != extractedPath {
+		t.Fatalf("delete-files request = %+v", deleteFiles)
+	}
+	if len(deleteOrig.Paths) != 1 || deleteOrig.Paths[0] != archivePath {
+		t.Fatalf("delete-original request = %+v", deleteOrig)
+	}
+}
+
+func TestRecoverExtractedFolderDropsOutOfRootCleanupPaths(t *testing.T) {
+	t.Parallel()
+
+	watchPath := t.TempDir()
+	archivePath := filepath.Join(watchPath, "movie.zip")
+	if err := os.WriteFile(archivePath, []byte("archive"), 0o600); err != nil {
+		t.Fatalf("creating archive: %v", err)
+	}
+
+	outsideRoot := filepath.Join(filepath.Dir(watchPath), filepath.Base(watchPath)+"-other")
+	safeFile := filepath.Join(watchPath, "movie", "episode.mkv")
+	unsafeFile := filepath.Join(outsideRoot, "episode.mkv")
+	unsafeArchive := filepath.Join(outsideRoot, "movie.zip")
+	cfg := &FolderConfig{Path: watchPath, DeleteAfter: &cnfg.Duration{Duration: time.Minute}}
+	unpackerr := New()
+	unpackerr.Folders = InstanceMap[FolderConfig]{"0": cfg}
+	unpackerr.folders = &Folders{Folders: make(map[string]*Folder)}
+	unpackerr.recovery = &recoveryState{
+		Version: recoveryStateVersion,
+		Folders: map[string]*recoveryFolder{
+			archivePath: {
+				Path:      archivePath,
+				WatchPath: watchPath,
+				Status:    EXTRACTED.String(),
+				Updated:   time.Now().UTC(),
+				Files:     []string{safeFile, unsafeFile},
+				Archives:  []string{archivePath, unsafeArchive},
+			},
+		},
+	}
+
+	unpackerr.recoverInterruptedFolders(time.Now().UTC())
+
+	folder := unpackerr.folders.Folders[archivePath]
+	if folder == nil || len(folder.Files) != 1 || folder.Files[0] != safeFile {
+		t.Fatalf("filtered files = %+v", folder)
+	}
+	if got := folder.Archives.List(); len(got) != 1 || got[0] != archivePath {
+		t.Fatalf("filtered archives = %v", got)
 	}
 }
 
