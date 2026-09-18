@@ -86,6 +86,9 @@ jobs:
         with:
           fetch-depth: '0'
 
+      - name: Fetch tags for semver metadata
+        run: git fetch --force --tags
+
       - name: Set up QEMU
         if: contains(github.event.inputs.platforms || '', 'arm')
         uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
