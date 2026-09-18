@@ -3,7 +3,7 @@ MAINT="David Newhall II <captain at golift dot io>"
 DESC="Extracts downloads so Radarr, Sonarr, Lidarr or Readarr may import them."
 LICENSE="MIT"
 # Used for source links in package metadata and docker labels.
-SOURCE_URL="https://github.com/Unpackerr/unpackerr"
+SOURCE_URL="https://github.com/TheBadFella/UnpackUI"
 VENDOR="Go Lift <code@golift.io>"
 export MAINT DESC LICENSE SOURCE_URL VENDOR
 
