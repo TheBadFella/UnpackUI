@@ -184,6 +184,7 @@ func TestQueueRetryFolderPersistsWaitingRecovery(t *testing.T) {
 		t.Fatalf("persisted updated = %s, in-memory = %s", recovered.Updated, item.Updated)
 	}
 }
+
 func TestQueueRetryFolderCheckpointsHistory(t *testing.T) {
 	t.Parallel()
 
@@ -232,6 +233,7 @@ func TestQueueRetryFolderCheckpointsHistory(t *testing.T) {
 		t.Fatalf("tracker after folder retry %+v", folder)
 	}
 }
+
 func TestQueueForgetFolder(t *testing.T) {
 	t.Parallel()
 

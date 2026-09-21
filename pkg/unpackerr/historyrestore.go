@@ -361,6 +361,7 @@ func (u *Unpackerr) seedFolderItemLocked(itemID string, item *Extract, requireCo
 
 	return true
 }
+
 func folderFromExtract(item *Extract, cfg *FolderConfig) *Folder {
 	folder := &Folder{
 		Updated:  item.Updated,
@@ -411,6 +412,7 @@ func folderConfigForPath(configs []*FolderConfig, itemPath string) *FolderConfig
 func folderPathContains(watch, item string) bool {
 	return folders.PathContains(watch, item)
 }
+
 func (u *Unpackerr) kindFromURL(url string) starr.App {
 	if url == "" {
 		return ""
