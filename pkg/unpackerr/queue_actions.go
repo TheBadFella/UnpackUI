@@ -168,6 +168,7 @@ func (u *Unpackerr) retryFolderLocked(itemID string, item *Extract, now time.Tim
 	item.Updated = now
 	u.recoveryTrackFolder(itemID, folder.Config, folder.Status, folder.Updated)
 
+	u.maybeRecordHistory(itemID, item)
 	u.notifyQueueLocked()
 
 	return nil

@@ -18,7 +18,7 @@ type starrApp[T any] interface {
 	takeQueue(old *T) // keep the last polled queue from a matching old entry.
 	stripRuntime()    // nil the queue and client on a file-shaped clone.
 	// pollQueue fetches without publishing. The returned bind assigns Queue and
-	// must run under History.mu with lastQueued/lastRetrieved/lastPollErr.
+	// must run under History.mu with lastQueued/lastRetrieved/lastPolled/lastPollErr.
 	pollQueue() (bind func(), total, retrieved int, err error)
 	queueViews() []queueView
 	hasQueueTitle(name string) bool
@@ -69,6 +69,7 @@ func cloneConfig(src *Config) *Config {
 	dst.Folders = cloneFolderMap(src.Folders)
 	dst.Webhook = cloneHookMap(src.Webhook)
 	dst.Cmdhook = cloneHookMap(src.Cmdhook)
+	dst.Hooks = cloneHooks(src.Hooks)
 
 	return &dst
 }
@@ -141,7 +142,8 @@ func cloneStarrMap[T any, P starrApp[T]](src InstanceMap[T]) InstanceMap[T] {
 
 		cloned := *app
 		item := asStarr[T, P](&cloned)
-		item.conf().Paths = append(StringSlice(nil), asStarr[T, P](app).conf().Paths...)
+		srcConf := asStarr[T, P](app).conf()
+		item.conf().Paths = append(StringSlice(nil), srcConf.Paths...)
 		item.stripRuntime()
 
 		out[key] = &cloned

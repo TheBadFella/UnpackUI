@@ -17,24 +17,38 @@ import (
 
 // Payload defines the data sent to notifarr.com (and other) webhooks.
 type Payload struct {
-	Path    string         `json:"path"`                // Path for the extracted item.
-	App     starr.App      `json:"app"`                 // Application Triggering Event
-	IDs     map[string]any `json:"ids,omitempty"`       // Arbitrary IDs from each app.
-	Event   extract.Status `json:"unpackerr_eventtype"` // The type of the event.
-	Title   string         `json:"event_title"`         // Friendly event title for human-facing notifications.
-	Retries uint           `json:"retries,omitempty"`   // Extraction retry count.
-	Time    time.Time      `json:"time"`                // Time of this event.
-	Data    *XtractPayload `json:"data,omitempty"`      // Payload from extraction process.
-	Config  *Config        `json:"-"`                   // Payload from extraction process.
-	WebURL  string         `json:"webUrl,omitempty"`    // URL to the UI.
+	Path      string            `json:"path"`                                // Path for the extracted item.
+	App       starr.App         `json:"app"`                                 // Application Triggering Event
+	IDs       map[string]any    `json:"ids,omitempty"`                       // Arbitrary IDs from each app.
+	CustomIDs map[string]string `json:"customIDs,omitempty" xml:"custom_id"` // User IDs from [hooks].custom_ids.
+	Event     extract.Status    `json:"unpackerr_eventtype"`                 // The type of the event.
+	Time      time.Time         `json:"time"`                                // Time of this event.
+	Data      *XtractPayload    `json:"data,omitempty"`                      // Payload from extraction process.
+	Config    *Config           `json:"-"`                                   // Payload from extraction process.
+	WebURL    string            `json:"webUrl,omitempty"`                    // URL to the UI.
 	// Application Metadata.
-	Go       string    `json:"go"`       // Version of go compiled with
-	OS       string    `json:"os"`       // Operating system: linux, windows, darwin
-	Arch     string    `json:"arch"`     // Architecture: amd64, armhf
-	Version  string    `json:"version"`  // Application Version
-	Revision string    `json:"revision"` // Application Revision
-	Branch   string    `json:"branch"`   // Branch built from.
-	Started  time.Time `json:"started"`  // App start time.
+	Retries    uint      `json:"retries"`              // Extract retry count for this item.
+	EventTitle string    `json:"eventTitle,omitempty"` // English (or customized) event title.
+	Go         string    `json:"go"`                   // Version of go compiled with
+	OS         string    `json:"os"`                   // Operating system: linux, windows, darwin
+	Arch       string    `json:"arch"`                 // Architecture: amd64, armhf
+	Version    string    `json:"version"`              // Application Version
+	Revision   string    `json:"revision"`             // Application Revision
+	Branch     string    `json:"branch"`               // Branch built from.
+	Started    time.Time `json:"started"`              // App start time.
+}
+
+// Title is EventTitle, or Event.Desc() when that override is empty.
+func (p *Payload) Title() string {
+	if p == nil {
+		return ""
+	}
+
+	if title := strings.TrimSpace(p.EventTitle); title != "" {
+		return title
+	}
+
+	return p.Event.Desc()
 }
 
 // XtractPayload is a rewrite of xtractr.Response.
@@ -59,8 +73,11 @@ const WebhookTemplateNotifiarr = `{
   "ids": {
     {{$s := separator ",\n"}}{{range $key, $value := .IDs}}{{call $s}}"{{$key}}": {{encode $value}}{{end}}
   },
-  "unpackerr_eventtype": "{{.Event}}",
-  "event_title": {{encode .Title}},
+{{ if .CustomIDs }}  "customIDs": {
+    {{$s := separator ",\n"}}{{range $key, $value := .CustomIDs}}{{call $s}}"{{$key}}": {{encode $value}}{{end}}
+  },
+{{ end }}  "unpackerr_eventtype": "{{.Event}}",
+  "eventTitle": {{encode .Title}},
 {{ if .Retries }}  "retries": {{.Retries}},
 {{ end }}{{ if .WebURL }}  "web_url": "{{.WebURL}}",
 {{ end }}  "time": "{{.Time}}",
@@ -87,7 +104,8 @@ const WebhookTemplateTelegram = `{
   "chat_id": "{{nickname}}",
   "parse_mode": "HTML",
   "disable_web_page_preview": true,
-  "text": "<b><a href=\"https://github.com/Unpackerr/unpackerr/releases\">Unpackerr</a></b>: {{.Title -}}
+  "text": "<b><a href=\"https://github.com/Unpackerr/unpackerr/releases\">Unpackerr</a></b>: ` +
+	`{{rawencode (htmlencode .Title) -}}
     \n<b>Title</b>: {{rawencode (index .IDs "title") -}}
     \n<b>App</b>: {{htmlencode .App -}}
     \n\n<b>Path</b>: <code>{{rawencode .Path}}</code>
@@ -105,8 +123,9 @@ const WebhookTemplateTelegram = `{
 // The extra spaces before the newlines here are required to make this look good on web and on android.
 
 const WebhookTemplateGotify = `{
-  "title": "{{if nickname}}{{nickname}}{{else}}Unpackerr{{end}}: {{.Title}}",
-  "message": "**App**: {{.App}}  \n**Name**: {{rawencode (index .IDs "title")}}  \n**Path**: {{rawencode .Path -}}
+  "title": {{encode (print (or (nickname) "Unpackerr") ": " .Title)}},
+  "message": "**App**: {{rawencode .App}}  \n` +
+	`**Name**: {{rawencode (index .IDs "title")}}  \n**Path**: {{rawencode .Path -}}
     {{ if .Data.Elapsed.Duration }}  \n**Elapsed**: {{.Data.Elapsed}}{{end -}}
     {{ if .Data.Archives }}  \n**RARs**: {{len .Data.Archives}}{{end -}}
     {{ if .Data.Files }}  \n**Files**: {{len .Data.Files}}{{end -}}
@@ -134,7 +153,7 @@ const WebhookTemplateDiscord = `{
     "title": {{encode (index .IDs "title")}},
     "timestamp": "{{timestamp .Time}}",
     "author": {
-     "name": "Unpackerr: {{.Event.Desc}}",
+     "name": {{encode (print "Unpackerr: " .Title)}},
      "icon_url": "https://unpackerr.zip/img/icon.png",
      "url": "https://github.com/Unpackerr/unpackerr/releases"
     },
@@ -189,13 +208,13 @@ const WebhookTemplateSlack = `
   {{if channel}}"channel": "{{channel}}",{{end}}
   "icon_url": "https://unpackerr.zip/img/icon.png",
   "blocks": [
-	    {
-	      "type": "header",
-	      "text": {
-	        "type": "plain_text",
-	        "text": "Unpackerr: {{.Title}}"
-	      }
-	    },
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": {{encode (print "Unpackerr: " .Title)}}
+      }
+    },
     {
       "type": "section",
       "text": {
@@ -276,35 +295,30 @@ func (w *Config) Template() (*template.Template, error) {
 	})
 
 	// Providing a template name that exists overrides template_path.
-	// Do not add a 'default' case here.
-	switch strings.ToLower(w.TempName) {
-	case "notifiarr", "default":
-		return template.Parse(WebhookTemplateNotifiarr)
-	case "discord":
-		return template.Parse(WebhookTemplateDiscord)
-	case "telegram":
-		return template.Parse(WebhookTemplateTelegram)
-	case "slack":
-		return template.Parse(WebhookTemplateSlack)
-	case "pushover":
-		return template.Parse(WebhookTemplatePushover)
-	case "gotify":
-		return template.Parse(WebhookTemplateGotify)
+	// Unknown names fall through to template_path, then URL detection.
+	name := strings.ToLower(w.TempName)
+	if name == "default" {
+		name = "notifiarr"
 	}
 
-	// Figure out which template to use based on URL or template_path.
-	switch url := strings.ToLower(w.URL); {
-	default:
-		fallthrough
-	case strings.Contains(url, "discordnotifier.com"), strings.Contains(url, "notifiarr.com"):
-		return template.Parse(WebhookTemplateNotifiarr)
-	case w.TmplPath != "":
+	if body, ok := BuiltinWebhookTemplate(name); ok {
+		return template.Parse(body)
+	}
+
+	if w.TmplPath != "" {
 		s, err := os.ReadFile(w.TmplPath)
 		if err != nil {
 			return nil, fmt.Errorf("template file: %w", err)
 		}
 
 		return template.Parse(string(s))
+	}
+
+	switch url := strings.ToLower(w.URL); {
+	default:
+		fallthrough
+	case strings.Contains(url, "discordnotifier.com"), strings.Contains(url, "notifiarr.com"):
+		return template.Parse(WebhookTemplateNotifiarr)
 	case strings.Contains(url, "discord.com"), strings.Contains(url, "discordapp.com"):
 		return template.Parse(WebhookTemplateDiscord)
 	case strings.Contains(url, "api.telegram.org"):
@@ -316,6 +330,37 @@ func (w *Config) Template() (*template.Template, error) {
 	case strings.Contains(url, "gotify"):
 		return template.Parse(WebhookTemplateGotify)
 	}
+}
+
+const (
+	webhookTemplateFilePrefix = "unpackerr-webhook-"
+	webhookTemplateFileExt    = ".tmpl"
+)
+
+// BuiltinWebhookTemplate returns a built-in webhook template body.
+// Name is one of notifiarr, discord, telegram, slack, pushover, gotify.
+func BuiltinWebhookTemplate(name string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "notifiarr":
+		return WebhookTemplateNotifiarr, true
+	case "discord":
+		return WebhookTemplateDiscord, true
+	case "telegram":
+		return WebhookTemplateTelegram, true
+	case "slack":
+		return WebhookTemplateSlack, true
+	case "pushover":
+		return WebhookTemplatePushover, true
+	case "gotify":
+		return WebhookTemplateGotify, true
+	default:
+		return "", false
+	}
+}
+
+// WebhookTemplateFileName is the locked basename for a built-in template dump.
+func WebhookTemplateFileName(name string) string {
+	return webhookTemplateFilePrefix + strings.ToLower(strings.TrimSpace(name)) + webhookTemplateFileExt
 }
 
 func separator(separator string) func() string {
@@ -335,7 +380,7 @@ func humanbytes(size uint64) string {
 	const byteUnit = 1024
 
 	// This is from https://yourbasic.org/golang/formatting-byte-size-to-human-readable-format/
-	// This func converts an int to a human readable byte string.
+	// This func converts a size to a human readable byte string.
 	if size < byteUnit {
 		return fmt.Sprintf("%dB", size)
 	}

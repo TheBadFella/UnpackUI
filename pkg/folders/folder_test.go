@@ -684,6 +684,26 @@ func TestUsesPoller(t *testing.T) {
 	}
 }
 
+func TestEventKind(t *testing.T) {
+	t.Parallel()
+
+	if got := (&Event{Op: "f CREATE"}).Kind(); got != "fsnotify" {
+		t.Fatal(got)
+	}
+
+	if got := (&Event{Op: "w WRITE"}).Kind(); got != "polling" {
+		t.Fatal(got)
+	}
+
+	if got := (&Event{Op: "write"}).Kind(); got != "polling" {
+		t.Fatal(got)
+	}
+
+	if got := (&Event{Op: "CREATE"}).Kind(); got != "" {
+		t.Fatal(got)
+	}
+}
+
 func TestPollerWatchesRootNotExistingTree(t *testing.T) {
 	t.Parallel()
 
@@ -804,6 +824,25 @@ func TestPathContainsRoot(t *testing.T) {
 
 	if PathContains(filepath.Join(root, "data"), filepath.Join(root, "data-old", "a.rar")) {
 		t.Fatal("sibling prefix must not match")
+	}
+}
+
+func TestPathContainsWindowsFold(t *testing.T) {
+	t.Parallel()
+
+	watch := filepath.Join("Watch", "TV")
+	item := filepath.Join("watch", "tv", "Show")
+
+	if pathContains(watch, item, false) {
+		t.Fatal("case-sensitive match must fail")
+	}
+
+	if !pathContains(watch, item, true) {
+		t.Fatal("windows fold should match watch path casing")
+	}
+
+	if pathContains("data", filepath.Join("Data-old", "a.rar"), true) {
+		t.Fatal("folded sibling prefix must not match")
 	}
 }
 

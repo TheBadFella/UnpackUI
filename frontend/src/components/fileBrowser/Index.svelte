@@ -17,6 +17,7 @@
   import { FileBrowser } from './browser.svelte'
   import ActionBar from './ActionBar.svelte'
   import { slide } from 'svelte/transition'
+  import { theme } from '../../lib/theme.svelte'
 
   type Props = {
     value: string
@@ -27,6 +28,8 @@
     disableMkdir?: boolean
     browseFile?: string
     height?: string
+    closeOnSelect?: boolean
+    lockName?: boolean
     children?: Snippet
     footer?: Snippet
   }
@@ -40,6 +43,8 @@
     disableMkdir = false,
     browseFile = '',
     height = '100%',
+    closeOnSelect = true,
+    lockName = false,
     children,
     footer,
   }: Props = $props()
@@ -48,8 +53,12 @@
   let filter = $state('')
   const fb = new FileBrowser(
     untrack(() => value),
-    (v) => ((value = v), close()),
+    (v) => {
+      value = v
+      if (closeOnSelect) close()
+    },
     untrack(() => browseFile),
+    untrack(() => lockName),
   )
   const filt = $derived(filter.toLowerCase())
   const dirs = $derived(
@@ -60,10 +69,17 @@
   )
   const dirsCount = $derived(fb.wd.dirs?.length ?? 0)
   const fileCount = $derived(fb.wd.files?.length ?? 0)
+
+  $effect(() => {
+    if (!lockName || !browseFile) return
+    fb.lockFile(browseFile)
+    const next = fb.preview(fb.wd.path)
+    if (next && next !== value) value = next
+  })
 </script>
 
 <div class="file-browser">
-  <Card style="height: {height};min-height: 400px;">
+  <Card style="height: {height}; min-height: 0;">
     <CardHeader>
       <form onsubmit={(e) => fb.cd(e, fb.input, true)}>
         <InputGroup>
@@ -92,19 +108,21 @@
               </svg>
             {/if}
           </Button>
-          <Tooltip target="{uid}-up"><T id="FileBrowser.tooltip.Up" /></Tooltip>
+          <Tooltip target="{uid}-up" theme={theme.tooltip}>
+            <T id="FileBrowser.tooltip.Up" />
+          </Tooltip>
           <InputGroupText><T id="FileBrowser.Path" /></InputGroupText>
           <Input bind:value={fb.input} />
           {#if fb.input !== fb.wd.path}
             <Button id="{uid}-go" type="submit" color="primary" outline>
               <T id="buttons.Go" />
             </Button>
-            <Tooltip target="{uid}-go">
+            <Tooltip target="{uid}-go" theme={theme.tooltip}>
               <T id="FileBrowser.tooltip.Go" path={fb.input} />
             </Tooltip>
           {/if}
 
-          {#if !file || fb.input !== fb.wd.path}
+          {#if closeOnSelect && (!file || fb.input !== fb.wd.path)}
             <Button
               id="{uid}-select"
               class="btn-icon"
@@ -126,7 +144,7 @@
                 ></path>
               </svg>
             </Button>
-            <Tooltip target="{uid}-select">
+            <Tooltip target="{uid}-select" theme={theme.tooltip}>
               <T
                 id="FileBrowser.tooltip.SelectPath"
                 path={fb.preview(fb.input)}
@@ -181,6 +199,25 @@
 </div>
 
 <style>
+  .file-browser {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .file-browser :global(.card) {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .file-browser :global(.card-body) {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   .file-browser :global(.input-group > .btn-icon) {
     display: inline-flex;
     align-items: center;

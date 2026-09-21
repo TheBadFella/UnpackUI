@@ -132,6 +132,8 @@ func configSectionFrom(cfg *Config, section ConfigSection) any {
 		return emptyIfNilMap(cfg.Readarr)
 	case SectionFolders:
 		return foldersConfigFrom(cfg)
+	case SectionHooks:
+		return hooksConfigFrom(cfg)
 	case SectionWebhooks:
 		return emptyIfNilMap(cfg.Webhook)
 	case SectionCmdhooks:
@@ -214,6 +216,13 @@ func foldersConfigFrom(cfg *Config) foldersConfigAPI {
 	}
 
 	return section
+}
+
+func hooksConfigFrom(cfg *Config) HooksConfig {
+	return HooksConfig{
+		CustomIDs: emptyIfNilMap(cfg.Hooks.CustomIDs),
+		Titles:    cfg.Hooks.Titles,
+	}
 }
 
 func emptyIfNil[T any](list []T) []T {

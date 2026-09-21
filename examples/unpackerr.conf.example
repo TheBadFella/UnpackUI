@@ -461,6 +461,37 @@ passwords = []
 # move_back = false
 ## Set this to true if you want this app to extract ISO files with .iso extension.
 # extract_isos = false
+## Incomplete-download suffixes such as `.part` or `.crdownload`. Extraction
+## stays in waiting as long as any matching file is in the watched item's
+## top folder. Subfolders are not scanned. The UI and config always store
+## a leading period. Waiting items are rechecked every 5s even without the
+## poller. Enabling folder poller will double-poll the folder and increase
+## disk reads. Useful when fsnotify is not available, and not recommended
+## when it is.
+# wait_extensions = []
+## After start delay, skip watched folders that have no extractable archives.
+## They leave waiting without history or webhooks.
+# skip_empty = false
+
+####################
+### Hook Payload ###
+####################
+# Extra IDs and custom event titles shared by every webhook and command hook.
+[hooks]
+## Nested [hooks.custom_ids] table, not an inline map.
+## Webhooks get `customIDs` in JSON (`{{index .CustomIDs "url"}}` in templates).
+## Command hooks get `UN_CUSTOM_ID_<key>` environment variables.
+## Env: UN_HOOKS_CUSTOM_IDS_url=https://…
+## [hooks.custom_ids]
+## url = "https://unpackerr.example"
+## Nested [hooks.titles] table with one field per extract event:
+## waiting, queued, extracting, extractfailed, extracted, imported,
+## deleting, deletefailed, deleted, extractednothing.
+## Empty values keep the built-in English title. Built-in Discord, Slack,
+## Telegram, Gotify, and Pushover templates use this string.
+## Env: UN_HOOKS_TITLES_EXTRACTING=Archive Found
+## [hooks.titles]
+## extracting = "Archive Found"
 
 ################
 ### Webhooks ###
@@ -488,9 +519,9 @@ passwords = []
 # token = ""
 ## Dialect tokens skip every instance of that API. Any other value matches an instance name. None by default. This is an example:
 # exclude = ["readarr", "lidarr"]
-## Override internal webhook template for discord.com or other hooks.
+## Used when template is empty (automatic). A named template ignores this file.
 # template_path = ''
-## Override automatic template detection. Values: notifiarr, discord, telegram, gotify, pushover, slack
+## Override automatic template detection. Values: notifiarr, discord, telegram, gotify, pushover, slack. Empty uses the URL or template_path.
 # template = ""
 ## Set this to true to ignore the SSL certificate on the server.
 # ignore_ssl = false
@@ -523,4 +554,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 18 SEP 2026 03:54 UTC
+## => Content Auto Generated, 20 SEP 2026 18:03 UTC
