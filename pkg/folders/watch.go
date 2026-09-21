@@ -364,18 +364,7 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
 
 	stat, err := os.Stat(dirPath)
 	if err != nil {
-		f.removeWatchDirs(dirPath)
-
-		// Item is unusable (probably deleted), remove it from history.
-		if _, ok := f.Folders[dirPath]; ok {
-			f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
-			delete(f.Folders, dirPath)
-			f.Remove(dirPath)
-		}
-
-		f.Debugf("Folder: Ignored File Event (%s) '%s' (unreadable): %v", event.Op, event.File, err)
-
-		return []string{dirPath}
+		return f.handleUnreadableEvent(event, dirPath, err)
 	}
 
 	if !stat.IsDir() && !xtractr.IsArchiveFile(filepath.Base(dirPath)) {
@@ -423,6 +412,23 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
 	}
 
 	f.saveEvent(event, dirPath, now)
+
+	return []string{dirPath}
+}
+
+// handleUnreadableEvent drops a tracked item whose path can no longer be stat'd
+// (probably deleted) and reports the ignored event.
+func (f *Folders) handleUnreadableEvent(event *Event, dirPath string, err error) []string {
+	f.removeWatchDirs(dirPath)
+
+	// Item is unusable (probably deleted), remove it from history.
+	if _, ok := f.Folders[dirPath]; ok {
+		f.Debugf("Folder: Removing Tracked Item: %v", dirPath)
+		delete(f.Folders, dirPath)
+		f.Remove(dirPath)
+	}
+
+	f.Debugf("Folder: Ignored File Event (%s) '%s' (unreadable): %v", event.Op, event.File, err)
 
 	return []string{dirPath}
 }

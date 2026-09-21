@@ -2407,6 +2407,7 @@ func TestConfigPutGeneralRestampsQueueDeadlines(t *testing.T) {
 		t.Fatalf("restamped due %v kind %q want %v", item.Due, item.DueKind, now.Add(3*time.Minute))
 	}
 }
+
 func TestConfigPutHooksPayload(t *testing.T) {
 	t.Parallel()
 
