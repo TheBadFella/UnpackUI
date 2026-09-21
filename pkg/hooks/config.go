@@ -23,6 +23,7 @@ var (
 	ErrWebhookNoURL  = errors.New("webhook without a URL configured; fix it")
 	ErrCmdhookNoCmd  = errors.New("cmdhook without a command configured; fix it")
 	ErrNilConfig     = errors.New("nil config entry")
+	ErrMessageGone   = errors.New("previous message is gone")
 )
 
 // Logger is the logging surface hooks need from the daemon.
@@ -34,21 +35,22 @@ type Logger interface {
 
 // Config defines a webhook or command hook.
 type Config struct {
-	Name       string        `json:"name"           toml:"name"            xml:"name"                      yaml:"name"`
-	URL        string        `json:"url"            toml:"url"             xml:"url,omitempty"             yaml:"url"`
-	Command    string        `json:"command"        toml:"command"         xml:"command,omitempty"         yaml:"command"`
-	CType      string        `json:"contentType"    toml:"content_type"    xml:"content_type,omitempty"    yaml:"contentType"`
-	TmplPath   string        `json:"templatePath"   toml:"template_path"   xml:"template_path,omitempty"   yaml:"templatePath"`
-	TempName   string        `json:"template"       toml:"template"        xml:"template,omitempty"        yaml:"template"`
-	Timeout    cnfg.Duration `json:"timeout"        toml:"timeout"         xml:"timeout"                   yaml:"timeout"`
-	Shell      bool          `json:"shell"          toml:"shell"           xml:"shell"                     yaml:"shell"`
-	IgnoreSSL  bool          `json:"ignoreSsl"      toml:"ignore_ssl"      xml:"ignore_ssl,omitempty"      yaml:"ignoreSsl"`
-	Silent     bool          `json:"silent"         toml:"silent"          xml:"silent"                    yaml:"silent"`
-	Events     Statuses      `json:"events"         toml:"events"          xml:"events"                    yaml:"events"`
-	Exclude    StringSlice   `json:"exclude"        toml:"exclude"         xml:"exclude"                   yaml:"exclude"`
-	Nickname   string        `json:"nickname"       toml:"nickname"        xml:"nickname,omitempty"        yaml:"nickname"`
-	Token      string        `json:"token"          toml:"token"           xml:"token,omitempty"           yaml:"token"`
-	Channel    string        `json:"channel"        toml:"channel"         xml:"channel,omitempty"         yaml:"channel"`
+	Name       string        `json:"name"         toml:"name"          xml:"name"                    yaml:"name"`
+	URL        string        `json:"url"          toml:"url"           xml:"url,omitempty"           yaml:"url"`
+	Command    string        `json:"command"      toml:"command"       xml:"command,omitempty"       yaml:"command"`
+	CType      string        `json:"contentType"  toml:"content_type"  xml:"content_type,omitempty"  yaml:"contentType"`
+	TmplPath   string        `json:"templatePath" toml:"template_path" xml:"template_path,omitempty" yaml:"templatePath"`
+	TempName   string        `json:"template"     toml:"template"      xml:"template,omitempty"      yaml:"template"`
+	Timeout    cnfg.Duration `json:"timeout"      toml:"timeout"       xml:"timeout"                 yaml:"timeout"`
+	Shell      bool          `json:"shell"        toml:"shell"         xml:"shell"                   yaml:"shell"`
+	IgnoreSSL  bool          `json:"ignoreSsl"    toml:"ignore_ssl"    xml:"ignore_ssl,omitempty"    yaml:"ignoreSsl"`
+	Silent     bool          `json:"silent"       toml:"silent"        xml:"silent"                  yaml:"silent"`
+	Events     Statuses      `json:"events"       toml:"events"        xml:"events"                  yaml:"events"`
+	Exclude    StringSlice   `json:"exclude"      toml:"exclude"       xml:"exclude"                 yaml:"exclude"`
+	Nickname   string        `json:"nickname"     toml:"nickname"      xml:"nickname,omitempty"     yaml:"nickname"`
+	Token      string        `json:"token"        toml:"token"         xml:"token,omitempty"        yaml:"token"`
+	Channel    string        `json:"channel"      toml:"channel"       xml:"channel,omitempty"      yaml:"channel"`
+	Update     *bool         `json:"update"       toml:"update"        xml:"update,omitempty"       yaml:"update"`
 	client     *http.Client
 	fails      uint
 	posts      uint
@@ -234,8 +236,32 @@ func CloneList(src []*Config) []*Config {
 			Nickname:  hook.Nickname,
 			Token:     hook.Token,
 			Channel:   hook.Channel,
+			Update:    cloneBool(hook.Update),
 		}
 	}
 
 	return out
+}
+
+// WantUpdate is true for Discord and Telegram unless the operator set update=false.
+func (w *Config) WantUpdate() bool {
+	if w == nil || !Detect(w.TempName, w.URL, w.TmplPath).CanUpdate {
+		return false
+	}
+
+	if w.Update != nil {
+		return *w.Update
+	}
+
+	return true
+}
+
+func cloneBool(v *bool) *bool {
+	if v == nil {
+		return nil
+	}
+
+	val := *v
+
+	return &val
 }

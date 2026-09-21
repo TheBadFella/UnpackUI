@@ -46,6 +46,7 @@
   } from '../../lib/validate'
   import { failure } from '../../lib/toast'
   import { envHas } from '../../lib/env.svelte'
+  import { HOOK_TEMPLATE_NAMES } from '../../lib/hooktmpl'
   import {
     envField,
     HOOK_ENV_FIELDS,
@@ -161,12 +162,7 @@
 
   const templateChoices = $derived([
     { value: '', name: $_('config.hooks.template.auto') },
-    { value: 'notifiarr', name: 'notifiarr' },
-    { value: 'discord', name: 'discord' },
-    { value: 'gotify', name: 'gotify' },
-    { value: 'pushover', name: 'pushover' },
-    { value: 'slack', name: 'slack' },
-    { value: 'telegram', name: 'telegram' },
+    ...HOOK_TEMPLATE_NAMES.map((name) => ({ value: name, name })),
   ])
 
   function blank(): WebhookConfig {
@@ -186,6 +182,7 @@
       nickname: '',
       token: '',
       channel: '',
+      update: true,
     }
   }
 
@@ -198,6 +195,7 @@
       timeout: explicitTimeout(h?.timeout),
       events: Array.isArray(h?.events) ? [...h.events] : [],
       exclude: Array.isArray(h?.exclude) ? [...h.exclude] : [],
+      update: h?.update ?? true,
     }
   }
 
@@ -694,6 +692,18 @@
                 original={prev?.silent}
                 disabled={!canWrite || row.envOnly}
                 envVar={envField(envPrefix, slug, 'SILENT')}
+              />
+            </Col>
+            <Col md="6">
+              <Input
+                id={`${section}-${row.id}-update`}
+                helpKey="config.hooks.update"
+                type="select"
+                label={$_('config.hooks.update.label')}
+                bind:value={hook.update}
+                original={prev?.update}
+                disabled={!canWrite || row.envOnly}
+                envVar={envField(envPrefix, slug, 'UPDATE')}
               />
             </Col>
           {/if}

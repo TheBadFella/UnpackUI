@@ -199,7 +199,7 @@ func (u *Unpackerr) forgetQueueID(itemID string) error {
 			item.Label(), itemID, item.Path)
 	}
 
-	delete(u.Map, itemID)
+	u.deleteExtract(itemID)
 
 	if item.App != FolderString {
 		u.forgotten[itemID] = struct{}{}
