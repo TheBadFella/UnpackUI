@@ -288,6 +288,7 @@
       "Archive": "Archive",
       "Queue": "Extract queue",
       "Retries": "Retries",
+      "HookFail": "Hook failures",
       "Note": "Note",
       "Error": "Error",
       "ExtractedFiles": "Extracted files",
@@ -885,23 +886,28 @@
         "description": "Hide successful runs from the logs.",
         "tooltip": "Failures still log. Use this to cut noise from a chatty Discord or Slack hook."
       },
+      "update": {
+        "label": "Update messages",
+        "description": "Edit the previous Discord or Telegram message instead of posting a new one.",
+        "tooltip": "On by default for Discord and Telegram. Other templates ignore this. Turn off to stack a new message for every extract event."
+      },
       "events": {
         "label": "Events",
         "description": "Empty means all events."
       },
       "nickname": {
         "label": "Nickname",
-        "description": "Bot name for Discord and Slack. Chat ID for Telegram.",
+        "description": "Bot name for Discord, Slack, and Mattermost. Chat ID for Telegram. Title prefix for Gotify, ntfy, and Apprise.",
         "tooltip": "Passed into the built-in templates. Telegram needs the chat_id here."
       },
       "channel": {
         "label": "Channel",
-        "description": "Destination channel for Slack webhooks.",
+        "description": "Destination channel for Slack and Mattermost. Pushover user key.",
         "tooltip": "Ignored by Discord and Telegram. Custom templates can still use it."
       },
       "token": {
         "label": "Token",
-        "description": "Bot token for Discord, Telegram, Slack, and similar templates.",
+        "description": "Pushover application token, or optional ntfy Bearer token.",
         "tooltip": "Passed into webhook templates. Leave empty unless the template needs it."
       },
       "exclude": {
@@ -912,7 +918,7 @@
       "template": {
         "label": "Template",
         "description": "Built-in template. Empty picks one from the URL or template file.",
-        "tooltip": "Force notifiarr, discord, telegram, gotify, pushover, or slack. Leave automatic to use the URL or template file.",
+        "tooltip": "Force notifiarr, discord, telegram, gotify, pushover, slack, ntfy, apprise, or mattermost. Leave automatic to use the URL or template file.",
         "auto": "Automatic (from URL or file)"
       },
       "templatePath": {

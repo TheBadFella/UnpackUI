@@ -4,6 +4,12 @@ package hooks
 type Item struct {
 	*Config
 	*Payload
+	// Done is called once per failed webhook POST or command-hook run.
+	Done func(error)
+	// LookupID/SaveID read and record Discord/Telegram message ids for later edits.
+	// Unpackerr wires these to a worker-local cache; the main loop persists Map.
+	LookupID func() string
+	SaveID   func(string)
 }
 
 // Worker runs hook deliveries on a buffered channel.
@@ -30,7 +36,9 @@ func (w *Worker) Cap() int { return cap(w.queue) }
 // Run delivers queued hooks until the queue is closed. after runs after each item.
 func (w *Worker) Run(log Logger, after func()) {
 	for item := range w.queue {
-		item.run(log, w)
+		if item != nil {
+			item.run(log, w)
+		}
 
 		if after != nil {
 			after()
@@ -40,10 +48,36 @@ func (w *Worker) Run(log Logger, after func()) {
 
 func (item *Item) run(log Logger, worker *Worker) {
 	if item.URL != "" {
-		SendWithLog(log, item.Config, item.Payload)
+		if err := item.deliverHTTP(log); err != nil {
+			item.done(err)
+		}
 	}
 
 	if item.Command != "" {
-		runCmdWithLog(log, item.Config, item.Payload, worker.Len(), worker.Cap())
+		if err := runCmdWithLog(log, item.Config, item.Payload, worker.Len(), worker.Cap()); err != nil {
+			item.done(err)
+		}
+	}
+}
+
+func (item *Item) deliverHTTP(log Logger) error {
+	var (
+		msgID string
+		save  func(string)
+	)
+
+	if item.Config != nil && item.WantUpdate() {
+		save = item.SaveID
+		if item.LookupID != nil {
+			msgID = item.LookupID()
+		}
+	}
+
+	return deliverWebhook(log, item.Config, item.Payload, msgID, save)
+}
+
+func (item *Item) done(err error) {
+	if item != nil && item.Done != nil {
+		item.Done(err)
 	}
 }

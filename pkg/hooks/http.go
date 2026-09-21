@@ -1,11 +1,11 @@
 package hooks
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -37,7 +37,7 @@ func (w *Config) send(ctx context.Context, body io.Reader) ([]byte, error) {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", w.CType)
+	w.setRequestHeaders(req)
 
 	res, err := w.client.Do(req)
 	if err != nil {
@@ -56,29 +56,19 @@ func (w *Config) send(ctx context.Context, body io.Reader) ([]byte, error) {
 	return reply, nil
 }
 
-// SendWithLog renders and POSTs a webhook payload.
-func SendWithLog(log Logger, hook *Config, payload *Payload) {
-	var body bytes.Buffer
+func (w *Config) setRequestHeaders(req *http.Request) {
+	req.Header.Set("Content-Type", w.CType)
 
-	if tmpl, err := hook.Template(); err != nil {
-		log.Errorf("Webhook Template (%s = %s): %v", payload.Path, payload.Event, err)
-		return
-	} else if err = tmpl.Execute(&body, payload); err != nil {
-		log.Errorf("Webhook Payload (%s = %s): %v", payload.Path, payload.Event, err)
+	if DetectTransport(w.TempName, w.URL).Name != ProfileNtfy {
 		return
 	}
 
-	bodyBytes := body.Bytes()
-	bodyStr := string(bodyBytes)
-
-	reply, err := hook.Send(bytes.NewReader(bodyBytes))
-
-	if err != nil {
-		log.Debugf("Webhook Payload: %s", bodyStr)
-		log.Errorf("Webhook (%s = %s): %s: %v", payload.Path, payload.Event, hook.Name, err)
-		log.Debugf("Webhook Response: %s", string(reply))
-	} else if !hook.Silent {
-		log.Debugf("Webhook Payload: %s", bodyStr)
-		log.Printf("[Webhook] Posted Payload (%s = %s): %s: OK", payload.Path, payload.Event, hook.Name)
+	if token := strings.TrimSpace(w.Token); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
+}
+
+// SendWithLog renders and POSTs a webhook payload. Sample -w stays a create.
+func SendWithLog(log Logger, hook *Config, payload *Payload) error {
+	return deliverWebhook(log, hook, payload, "", nil)
 }

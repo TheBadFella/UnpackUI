@@ -11,12 +11,16 @@ import (
 
 // Extract holds data for files being extracted.
 type Extract struct {
-	Syncthing  bool
-	SplitFlac  bool
-	Retries    uint
-	Path       string // Local path (resolved for extraction on this host).
-	OutputPath string // Original path from Starr app (may be UNC/remote — used for ManualImport).
-	App        starr.App
+	Syncthing bool
+	SplitFlac bool
+	Retries   uint
+	// HookFail is how many webhook or command-hook deliveries failed for this extract.
+	HookFail uint
+	// HookMessages maps webhook/cmdhook instance slug to Discord message id or Telegram message_id.
+	HookMessages map[string]string
+	Path         string // Local path (resolved for extraction on this host).
+	OutputPath   string // Original path from Starr app (may be UNC/remote — used for ManualImport).
+	App          starr.App
 	// Name is an optional Starr instance label for logs, hooks, and the dashboard.
 	// Empty uses App (Sonarr, Radarr, Folder, …). App stays the dialect for logic.
 	Name        string
