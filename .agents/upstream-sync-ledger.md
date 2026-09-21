@@ -9,21 +9,24 @@ baseline, not a replacement for the repository contracts in
 
 - Upstream: `https://github.com/Unpackerr/unpackerr.git`, `main`
 - Fork: `https://github.com/TheBadFella/UnpackUI.git`, `web-ui`
-- Last reviewed upstream commit: `5f8acf1d9551941ef22bb33284d36c0d2352fb51`
-  (`5f8acf1`, PR #770, frontend dependency bump)
-- Fork merge commit: `6bac2f824b7adb1ab72bb1a5205bb5cfb560dab9`
-  (`6bac2f8`), with fork parent `c4fbccc` and upstream parent `5f8acf1`
-- Merge base at review: `git merge-base HEAD upstream/main` = `5f8acf1`.
+- Last reviewed upstream commit: `c08b0bff7fe44cd39a342f7fc8b3df1af0b23c6e`
+  (`c08b0bf`, PR #773, webhook message updates)
+- Fork merge commit: `cce412e3607b6bfbfa5f6928cea35f4eaf0942e4`
+  (`cce412e`), with fork parent `d49febc` and upstream parent `c08b0bf`
+- Merge base at review: `git merge-base HEAD upstream/main` = `c08b0bf`.
   Upstream was fully merged; `HEAD..upstream/main` is empty.
 - Upstream delta reviewed since previous upstream parent
-  `e5c47abbcdb95e5147e4ecfb685be27b751ad4c6`: 20 commits across PRs #764,
-  #765, #766, #767, #768, #769, and #770 (86 files, 5,161 insertions and
-  563 deletions).
+  `5f8acf1d9551941ef22bb33284d36c0d2352fb51`: 15 commits across PRs #771,
+  #772, and #773 (38 files, 2,405 insertions and 240 deletions).
 - Current fork delta after the merge: `git diff upstream/main..HEAD` is the
   fork's intentional product, recovery, UI, documentation, test, and workflow
-  surface (96 paths; 8,708 insertions and 1,573 deletions at this baseline).
+  surface (95 paths; 8,694 insertions and 1,556 deletions at this baseline).
   Review that delta separately from new upstream commits; it is not a reason to
   re-review old upstream history.
+
+### Previous baseline recorded 2026-09-21 (earlier)
+- Baseline SHA: `5f8acf1d9551941ef22bb33284d36c0d2352fb51` (`5f8acf1`)
+- Fork merge commit: `6bac2f824b7adb1ab72bb1a5205bb5cfb560dab9` (`6bac2f8`)
 
 ### Previous baseline recorded 2026-09-18
 - Baseline SHA: `e5c47abbcdb95e5147e4ecfb685be27b751ad4c6` (`e5c47ab`)
@@ -84,7 +87,6 @@ pkg/folders/config.go
 pkg/folders/folder_test.go
 pkg/folders/watch.go
 pkg/hooks/config.go
-pkg/hooks/http.go
 pkg/hooks/sample.go
 pkg/hooks/templates.go
 pkg/ui/UnpackUI.png
@@ -103,10 +105,10 @@ pkg/unpackerr/folder.go
 pkg/unpackerr/folder_recursion_test.go
 pkg/unpackerr/folder_test.go
 pkg/unpackerr/folder_track_test.go
+pkg/unpackerr/folder_wait_test.go
 pkg/unpackerr/historyfile.go
 pkg/unpackerr/historyfile_test.go
 pkg/unpackerr/historyrestore.go
-pkg/unpackerr/historyrestore_test.go
 pkg/unpackerr/historyrestore_windows_test.go
 pkg/unpackerr/logs.go
 pkg/unpackerr/metrics.go
@@ -132,6 +134,8 @@ tests/stop-local.ps1
 
 ### Merge decisions and invariants
 
+- Adopted upstream PR #771 (`HookFail` tracking across restart and retries), PR #772 (webhook template profiles `ntfy`, `Apprise`, `Mattermost`), and PR #773 (Discord/Telegram message-id editing), integrating cleanly with fork's queue item/history fields (`Title`, `Reason`, `ArchiveFiles`, `DeleteAt`) and recovery channels.
+- `pkg/hooks/http.go` was brought back into full alignment with upstream as delivery logic moved upstream to `pkg/hooks/update.go`.
 - Adopted upstream's per-watch-path folder pollers and non-recursive poller
   roots, while retaining the fork's recursive discovery, nested-watch handling,
   path confinement, and incomplete-extraction recovery.
