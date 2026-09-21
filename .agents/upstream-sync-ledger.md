@@ -20,7 +20,7 @@ baseline, not a replacement for the repository contracts in
   #772, and #773 (38 files, 2,405 insertions and 240 deletions).
 - Current fork delta after the merge: `git diff upstream/main..HEAD` is the
   fork's intentional product, recovery, UI, documentation, test, and workflow
-  surface (95 paths; 8,694 insertions and 1,556 deletions at this baseline).
+  surface (94 paths; 8,694 insertions and 1,556 deletions at this baseline).
   Review that delta separately from new upstream commits; it is not a reason to
   re-review old upstream history.
 
@@ -86,7 +86,6 @@ pkg/configdef/definitions.yml
 pkg/folders/config.go
 pkg/folders/folder_test.go
 pkg/folders/watch.go
-pkg/hooks/config.go
 pkg/hooks/sample.go
 pkg/hooks/templates.go
 pkg/ui/UnpackUI.png

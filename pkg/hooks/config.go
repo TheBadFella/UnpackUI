@@ -47,10 +47,10 @@ type Config struct {
 	Silent     bool          `json:"silent"       toml:"silent"        xml:"silent"                  yaml:"silent"`
 	Events     Statuses      `json:"events"       toml:"events"        xml:"events"                  yaml:"events"`
 	Exclude    StringSlice   `json:"exclude"      toml:"exclude"       xml:"exclude"                 yaml:"exclude"`
-	Nickname   string        `json:"nickname"     toml:"nickname"      xml:"nickname,omitempty"     yaml:"nickname"`
-	Token      string        `json:"token"        toml:"token"         xml:"token,omitempty"        yaml:"token"`
-	Channel    string        `json:"channel"      toml:"channel"       xml:"channel,omitempty"      yaml:"channel"`
-	Update     *bool         `json:"update"       toml:"update"        xml:"update,omitempty"       yaml:"update"`
+	Nickname   string        `json:"nickname"     toml:"nickname"      xml:"nickname,omitempty"      yaml:"nickname"`
+	Token      string        `json:"token"        toml:"token"         xml:"token,omitempty"         yaml:"token"`
+	Channel    string        `json:"channel"      toml:"channel"       xml:"channel,omitempty"       yaml:"channel"`
+	Update     *bool         `json:"update"       toml:"update"        xml:"update,omitempty"        yaml:"update"`
 	client     *http.Client
 	fails      uint
 	posts      uint
