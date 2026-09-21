@@ -5,25 +5,29 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
-## Baseline recorded 2026-09-18
+## Baseline recorded 2026-09-21
 
 - Upstream: `https://github.com/Unpackerr/unpackerr.git`, `main`
 - Fork: `https://github.com/TheBadFella/UnpackUI.git`, `web-ui`
-- Last reviewed upstream commit: `e5c47abbcdb95e5147e4ecfb685be27b751ad4c6`
-  (`e5c47ab`, PR #763, per-folder polling)
-- Fork merge commit: `3eda941cc31368c8330c2e8ff160536ea8931f19`
-  (`3eda941`), with fork parent `95f728e` and upstream parent `e5c47ab`
-- Merge base at review: `git merge-base HEAD upstream/main` = `e5c47ab`.
-  Upstream was fully merged; `HEAD..upstream/main` was empty.
-- Upstream delta reviewed since the previous upstream parent
-  `076719bb5b336add6beee7d12a4091ebcf2f801e`: four commits, 24 files,
-  531 insertions and 193 deletions. The fork-side merge result changed 25
-  files, with 750 insertions and 211 deletions relative to `95f728e`.
+- Last reviewed upstream commit: `5f8acf1d9551941ef22bb33284d36c0d2352fb51`
+  (`5f8acf1`, PR #770, frontend dependency bump)
+- Fork merge commit: `6bac2f824b7adb1ab72bb1a5205bb5cfb560dab9`
+  (`6bac2f8`), with fork parent `c4fbccc` and upstream parent `5f8acf1`
+- Merge base at review: `git merge-base HEAD upstream/main` = `5f8acf1`.
+  Upstream was fully merged; `HEAD..upstream/main` is empty.
+- Upstream delta reviewed since previous upstream parent
+  `e5c47abbcdb95e5147e4ecfb685be27b751ad4c6`: 20 commits across PRs #764,
+  #765, #766, #767, #768, #769, and #770 (86 files, 5,161 insertions and
+  563 deletions).
 - Current fork delta after the merge: `git diff upstream/main..HEAD` is the
   fork's intentional product, recovery, UI, documentation, test, and workflow
-  surface (96 paths; 8,648 insertions and 1,599 deletions at this baseline).
+  surface (96 paths; 8,708 insertions and 1,573 deletions at this baseline).
   Review that delta separately from new upstream commits; it is not a reason to
   re-review old upstream history.
+
+### Previous baseline recorded 2026-09-18
+- Baseline SHA: `e5c47abbcdb95e5147e4ecfb685be27b751ad4c6` (`e5c47ab`)
+- Fork merge commit: `3eda941cc31368c8330c2e8ff160536ea8931f19` (`3eda941`)
 
 ### Fork-modified file inventory
 
