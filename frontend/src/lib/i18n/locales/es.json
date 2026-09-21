@@ -51,7 +51,8 @@
     "Test": "Probar",
     "ResetColumns": "Restablecer columnas",
     "HideCompleted": "Ocultar completados",
-    "ShowHidden": "Mostrar ocultos"
+    "ShowHidden": "Mostrar ocultos",
+    "AddPair": "Añadir par"
   },
   "phrases": {
     "EnvironmentVariable": "Variable de entorno: <code>{variableName}</code>",
@@ -72,6 +73,8 @@
     "NoInstances": "No hay instancias de {section} configuradas.",
     "NoFolders": "No hay carpetas configuradas.",
     "NoWebhooks": "No hay webhooks configurados.",
+    "MapKey": "Clave",
+    "MapValue": "Valor",
     "NoCmdhooks": "No hay ganchos de comando configurados.",
     "NoApiKeys": "No hay claves API.",
     "ClearHistoryTitle": "¿Borrar historial?",
@@ -93,6 +96,7 @@
     "UiPasswordFilepath": "Esta contraseña es una referencia filepath:. Guardar una contraseña o un tipo de autenticación nuevos escribe el valor en el archivo de configuración.",
     "ReservedUsername": "Los nombres de usuario webauth, noauth y filepath están reservados, y un nombre de usuario no puede contener dos puntos.",
     "FilterPlaceholder": "Filtrar…",
+    "FilterHint": "Coincide con ruta, app, estado y texto de error.",
     "Empty": "—",
     "Output": "Salida",
     "Details": "Detalles",
@@ -130,7 +134,9 @@
     "TestReply": "Respuesta",
     "TestDuration": "Duración",
     "TestStarrEnvOwned": "No se puede probar cuando la URL o la clave API vienen del entorno.",
-    "TestHookEnvOwned": "No se puede probar cuando la URL o el comando vienen del entorno."
+    "TestHookEnvOwned": "No se puede probar cuando la URL o el comando vienen del entorno.",
+    "CreateHookTemplate": "Crear archivo de plantilla",
+    "CreateFailed": "No se pudo crear el archivo."
   },
   "nav": {
     "Dashboard": "Panel",
@@ -218,6 +224,11 @@
       "Refresh": "Actualizar",
       "UpdatedAgo": "Actualizado hace {age}",
       "LastWrite": "Última escritura",
+      "WaitFile": "Esperando {file}",
+      "FSNotify": "fsnotify",
+      "Polling": "polling",
+      "FSNotifyHint": "Esta carpeta usa eventos del sistema de archivos (inotify y similares).",
+      "PollingHint": "Esta carpeta se sondea con un temporizador. Úsalo cuando Docker o CIFS no puedan enviar eventos del sistema de archivos.",
       "ArchiveOf": "Archivo {n} de {total}",
       "SpeedAvg": "{speed}/s prom.",
       "SpeedNow": "{speed}/s",
@@ -246,6 +257,43 @@
       "ConfirmEachHint": "Se requiere confirmación para cada eliminación. Haga clic para cambiar.",
       "ConfirmAllOnlyHint": "La confirmación solo es necesaria para Borrar todo. Haga clic para cambiar."
     },
+    "detail": {
+      "OpenItem": "Detalles del elemento: {id}",
+      "Info": "Info",
+      "Title": "Título",
+      "DownloadId": "ID de descarga",
+      "SeriesId": "ID de serie",
+      "EpisodeId": "ID de episodio",
+      "MovieId": "ID de película",
+      "ArtistId": "ID de artista",
+      "AlbumId": "ID de álbum",
+      "AuthorId": "ID de autor",
+      "BookId": "ID de libro",
+      "Reason": "Motivo",
+      "Path": "Ruta",
+      "OutputPath": "Ruta de salida",
+      "Dest": "Carpeta de extracción",
+      "URL": "URL",
+      "Kind": "Tipo",
+      "Started": "Inicio",
+      "Elapsed": "Duración",
+      "Finished": "Terminado",
+      "Updated": "Actualizado",
+      "Due": "Pendiente",
+      "DeleteDelay": "Retraso de borrado",
+      "Size": "Tamaño",
+      "Ratio": "Relación",
+      "Files": "Archivos",
+      "Archives": "Archivos",
+      "Archive": "Archivo",
+      "Queue": "Cola de extracción",
+      "Retries": "Reintentos",
+      "Note": "Nota",
+      "Error": "Error",
+      "ExtractedFiles": "Archivos extraídos",
+      "ArchiveFiles": "Archivos comprimidos",
+      "DownloadList": "Descargar {name} como archivo de texto"
+    },
     "settings": {
       "Title": "Configuración",
       "Heading": "{settings} — {page}",
@@ -261,7 +309,8 @@
       },
       "hooks": {
         "label": "Ganchos",
-        "intro": "Devoluciones HTTP y comandos locales cuando una extracción cambia de estado."
+        "tab": "Payload",
+        "intro": "IDs extra y títulos de evento personalizados enviados con cada webhook y gancho de comando."
       },
       "webserver": {
         "label": "Servidor web",
@@ -392,6 +441,21 @@
     "DeleteFailed": "Eliminación fallida",
     "Deleted": "Eliminado",
     "ExtractedNothing": "Nada extraído"
+  },
+  "errors": {
+    "NoCompressedFiles": "No se encontraron archivos comprimidos",
+    "NoExtractableFiles": "No hay archivos extraíbles",
+    "WaitingSyncthing": "Esperando a Syncthing",
+    "InterruptedRestart": "Interrumpido por reinicio",
+    "UnknownArchiveType": "Tipo de archivo desconocido",
+    "Checksum": "La suma de comprobación del archivo no coincide",
+    "MaxBytes": "El tamaño extraído supera el máximo de bytes",
+    "MaxFiles": "El recuento de archivos extraídos supera el máximo",
+    "MaxRatio": "El tamaño extraído supera la relación de compresión máxima",
+    "MaxNested": "El recuento de archivos anidados supera el máximo",
+    "ArchiveSymlink": "Se rechaza extraer un enlace simbólico como archivo",
+    "InvalidPath": "El archivo contiene una ruta no válida",
+    "InvalidHead": "El archivo contiene un archivo de cabecera no válido"
   },
   "config": {
     "general": {
@@ -686,7 +750,7 @@
     "folders": {
       "interval": {
         "label": "Intervalo de sondeo",
-        "description": "Con qué frecuencia explorar las carpetas vigiladas en busca de archivos nuevos.",
+        "description": "Con qué frecuencia explorar las carpetas vigiladas en busca de archivos nuevos. Desactivado usa inotify o fsnotify.",
         "tooltip": "Desactivado usa eventos del sistema de archivos (inotify y similares). Elige un intervalo de sondeo si los archivos nunca aparecen en la cola, lo habitual en Docker y CIFS. El sondeo aumenta las lecturas de disco y no se recomienda cuando fsnotify funciona."
       },
       "buffer": {
@@ -768,6 +832,16 @@
         "label": "Rutas excluidas",
         "description": "Rutas a ignorar bajo esta carpeta, una por línea.",
         "tooltip": "Las rutas excluidas y sus hijos no se vigilan ni extraen. Absolutas, o relativas a la ruta vigilada."
+      },
+      "wait_extensions": {
+        "label": "Extensiones de espera",
+        "description": "Seguir en espera mientras exista un archivo coincidente en la carpeta superior.",
+        "tooltip": "Un sufijo por línea, con un punto inicial (.part, .crdownload). No se recorren subcarpetas. La extracción empieza tras el retraso de inicio cuando esos archivos desaparecen. Los elementos en espera se vuelven a comprobar cada 5s aunque no haya sondeo. Activar el sondeo de carpetas sondea la carpeta dos veces y aumenta las lecturas de disco. Útil cuando fsnotify no está disponible, y no recomendado cuando sí lo está."
+      },
+      "skip_empty": {
+        "label": "Omitir carpetas vacías",
+        "description": "No poner en cola carpetas que no contienen archivos comprimidos.",
+        "tooltip": "Tras el retraso de inicio, las carpetas sin archivos comprimidos salen del estado de espera sin historial ni webhooks."
       }
     },
     "hooks": {
@@ -837,14 +911,26 @@
       },
       "template": {
         "label": "Plantilla",
-        "description": "Plantilla integrada. Vacío elige una a partir de la URL.",
-        "tooltip": "Fuerza notifiarr, discord, telegram, gotify, pushover o slack. Deja automático salvo que la URL no se reconozca.",
-        "auto": "Automático (desde la URL)"
+        "description": "Plantilla integrada. Vacío elige una a partir de la URL o el archivo de plantilla.",
+        "tooltip": "Fuerza notifiarr, discord, telegram, gotify, pushover o slack. Deja automático para usar la URL o el archivo de plantilla.",
+        "auto": "Automático (desde la URL o el archivo)"
       },
       "templatePath": {
         "label": "Archivo de plantilla",
         "description": "Archivo de plantilla Go personalizado en lugar de una integrada.",
-        "tooltip": "Anula la detección automática y el ajuste Plantilla. Elige un archivo existente."
+        "tooltip": "Se usa cuando Plantilla es Automático. Una plantilla con nombre ignora este archivo."
+      }
+    },
+    "payload": {
+      "customIDs": {
+        "label": "IDs globales de gancho",
+        "description": "IDs de texto extra en cada payload de gancho, separados de los IDs del elemento de Starr.",
+        "tooltip": "Webhooks: customIDs JSON y {{index .CustomIDs \"key\"}}. Ganchos de comando: UN_CUSTOM_ID_<key>. Las claves deben ser letras, dígitos, guion bajo o guion."
+      },
+      "titles": {
+        "label": "Títulos de evento",
+        "description": "Texto personalizado para cada estado de extracción en los payloads. Vacío mantiene el título en inglés integrado.",
+        "tooltip": "Se usa como eventTitle en JSON y como encabezado en las plantillas de Discord, Slack, Telegram, Gotify y Pushover."
       }
     }
   },
@@ -853,6 +939,7 @@
     "Path": "Ruta",
     "intro": "Elige una ruta en esta máquina.",
     "introFolderFile": "Elige una carpeta. El archivo se llamará <code>{file}</code>, pero puedes cambiar el nombre después de elegir.",
+    "introLockedFile": "Elige una carpeta. El archivo se llamará <code>{file}</code>.",
     "tooltip": {
       "Go": "<code>cd {path}</code><br />Cambiar el directorio a la ruta del recuadro.",
       "SelectPath": "Seleccionar ruta: <code>{path}</code>",

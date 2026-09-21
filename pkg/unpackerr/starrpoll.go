@@ -95,7 +95,7 @@ func (u *Unpackerr) getStarrQueue[T any, P starrApp[T]](server P, app starr.App,
 	}
 
 	bind, total, retrieved, err := server.pollQueue()
-	u.publishStarrPoll(cfg, bind, total, retrieved, err)
+	u.publishStarrPoll(cfg, bind, total, retrieved, time.Now(), err)
 
 	if err != nil {
 		u.saveQueueMetrics(0, start, app, cfg.URL, label, err)
@@ -106,14 +106,14 @@ func (u *Unpackerr) getStarrQueue[T any, P starrApp[T]](server P, app starr.App,
 	u.saveQueueMetrics(total, start, app, cfg.URL, label, nil)
 
 	if !u.Activity || total > 0 {
-		u.Printf("[%s] Updated (%s): %d Items Queued, %d Retrieved", label, cfg.URL, total, retrieved)
+		u.Printf("[%s] Updated: %d Items Queued, %d Retrieved", label, total, retrieved)
 	}
 }
 
 // publishStarrPoll stores the last poll snapshot under History.mu so HTTP
 // stats() and Prometheus Collect cannot race the pointer swap or lastPollErr.
-// GetQueue stays outside this lock.
-func (u *Unpackerr) publishStarrPoll(cfg *StarrConfig, bind func(), total, retrieved int, err error) {
+// GetQueue stays outside this lock. lastPolled is the successful snapshot time.
+func (u *Unpackerr) publishStarrPoll(cfg *StarrConfig, bind func(), total, retrieved int, polled time.Time, err error) {
 	u.lockHistory()
 	defer u.unlockHistory()
 
@@ -127,6 +127,7 @@ func (u *Unpackerr) publishStarrPoll(cfg *StarrConfig, bind func(), total, retri
 
 	cfg.lastQueued = total
 	cfg.lastRetrieved = retrieved
+	cfg.lastPolled = polled
 	cfg.lastPollErr = ""
 	cfg.polled = true
 }
@@ -149,7 +150,7 @@ func checkStarrQueue[T any, P starrApp[T]](unpack *Unpackerr, list InstanceMap[T
 
 			switch {
 			case found && item.Status == EXTRACTED && isComplete(rec.Status, rec.Protocol, cfg.Protocols):
-				unpack.Debugf("%s (%s): Item Waiting for Import (%s): %v", cfg.Label(app), cfg.URL, rec.Protocol, rec.Title)
+				unpack.Debugf("%s: Item Waiting for Import (%s): %v", cfg.Label(app), rec.Protocol, rec.Title)
 			case !found && isComplete(rec.Status, rec.Protocol, cfg.Protocols) && !unpack.isForgotten(rec.Title):
 				waiting := &Extract{
 					App:         app,
@@ -171,8 +172,8 @@ func checkStarrQueue[T any, P starrApp[T]](unpack *Unpackerr, list InstanceMap[T
 
 				fallthrough
 			default:
-				unpack.Debugf("%s (%s): %s (%s:%d%%): %v%s",
-					cfg.Label(app), cfg.URL, rec.Status, rec.Protocol,
+				unpack.Debugf("%s: %s (%s:%d%%): %v%s",
+					cfg.Label(app), rec.Status, rec.Protocol,
 					percent(rec.Sizeleft, rec.Size), rec.Title, rec.DebugExtra)
 			}
 		}
@@ -281,6 +282,7 @@ func starrQueueRows[T any, P starrApp[T]](list InstanceMap[T], app starr.App) []
 			Match:       counts.match,
 			Issues:      counts.issues,
 			Downloading: counts.downloading,
+			UpdatedAt:   cfg.lastPolled,
 			Error:       cfg.lastPollErr,
 		})
 	}

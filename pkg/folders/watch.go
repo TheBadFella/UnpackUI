@@ -398,12 +398,23 @@ func (f *Folders) ProcessEvent(event *Event, now time.Time) []string {
 	}
 
 	if stat.IsDir() {
-		// A directory is only a discovery boundary. Scan it now so a moved or
+		// A directory is a scan/watch container. Scan it now so a moved or
 		// quickly copied tree cannot outrun watcher registration, then watch its
 		// descendants for later archive writes.
-		delete(f.Folders, dirPath)
+		discovered := f.scanWatchDir(event, dirPath, now, true)
+		if len(discovered) > 0 {
+			delete(f.Folders, dirPath)
+			return append([]string{dirPath}, discovered...)
+		}
 
-		return append([]string{dirPath}, f.scanWatchDir(event, dirPath, now, true)...)
+		if event.Config != nil && ((len(event.Config.WaitExtensions) > 0 &&
+			WaitFileInTop(dirPath, event.Config.WaitExtensions) != "") || event.Config.SkipEmpty) {
+			f.saveEvent(event, dirPath, now)
+			return []string{dirPath}
+		}
+
+		delete(f.Folders, dirPath)
+		return []string{dirPath}
 	}
 
 	if f.insideExtractDest(event.Config.Path, filepath.Dir(dirPath)) || !isPrimaryArchive(dirPath) {
@@ -445,7 +456,7 @@ func eventPath(event *Event) (string, bool) {
 	}
 
 	path := event.File
-	if path == "" {
+	if path == "" || hasWaitSuffix(path, event.Config.WaitExtensions) {
 		path = filepath.Join(event.Config.Path, event.Name)
 	}
 	path = filepath.Clean(path)

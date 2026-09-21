@@ -51,7 +51,8 @@
     "Test": "Test",
     "ResetColumns": "Reset columns",
     "HideCompleted": "Hide completed",
-    "ShowHidden": "Show hidden"
+    "ShowHidden": "Show hidden",
+    "AddPair": "Add pair"
   },
   "phrases": {
     "EnvironmentVariable": "Environment variable: <code>{variableName}</code>",
@@ -72,6 +73,8 @@
     "NoInstances": "No {section} instances configured.",
     "NoFolders": "No folders configured.",
     "NoWebhooks": "No webhooks configured.",
+    "MapKey": "Key",
+    "MapValue": "Value",
     "NoCmdhooks": "No command hooks configured.",
     "NoApiKeys": "No API keys.",
     "ClearHistoryTitle": "Clear history?",
@@ -93,6 +96,7 @@
     "UiPasswordFilepath": "This password is a filepath: reference. Saving a new password or auth type writes the value into the config file instead.",
     "ReservedUsername": "Usernames webauth, noauth, and filepath are reserved, and a username cannot contain a colon.",
     "FilterPlaceholder": "Filter…",
+    "FilterHint": "Matches path, app, status, and error text.",
     "Empty": "—",
     "Output": "Output",
     "Details": "Details",
@@ -130,7 +134,9 @@
     "TestReply": "Reply",
     "TestDuration": "Duration",
     "TestStarrEnvOwned": "Test cannot run when the URL or API key comes from the environment.",
-    "TestHookEnvOwned": "Test cannot run when the URL or command comes from the environment."
+    "TestHookEnvOwned": "Test cannot run when the URL or command comes from the environment.",
+    "CreateHookTemplate": "Create template file",
+    "CreateFailed": "Could not create the file."
   },
   "nav": {
     "Dashboard": "Dashboard",
@@ -218,6 +224,11 @@
       "Refresh": "Refresh",
       "UpdatedAgo": "Updated {age} ago",
       "LastWrite": "Last write",
+      "WaitFile": "Waiting for {file}",
+      "FSNotify": "fsnotify",
+      "Polling": "polling",
+      "FSNotifyHint": "This folder uses filesystem events (inotify and friends).",
+      "PollingHint": "This folder is polled on a timer. Use that when Docker or CIFS cannot deliver filesystem events.",
       "ArchiveOf": "Archive {n} of {total}",
       "SpeedAvg": "{speed}/s avg",
       "SpeedNow": "{speed}/s",
@@ -246,6 +257,43 @@
       "ConfirmEachHint": "Confirmation is required for each delete. Click to toggle.",
       "ConfirmAllOnlyHint": "Confirmation is only required for Clear All. Click to toggle."
     },
+    "detail": {
+      "OpenItem": "Item details: {id}",
+      "Info": "Info",
+      "Title": "Title",
+      "DownloadId": "Download ID",
+      "SeriesId": "Series ID",
+      "EpisodeId": "Episode ID",
+      "MovieId": "Movie ID",
+      "ArtistId": "Artist ID",
+      "AlbumId": "Album ID",
+      "AuthorId": "Author ID",
+      "BookId": "Book ID",
+      "Reason": "Reason",
+      "Path": "Path",
+      "OutputPath": "Output path",
+      "Dest": "Extract folder",
+      "URL": "URL",
+      "Kind": "Kind",
+      "Started": "Started",
+      "Elapsed": "Elapsed",
+      "Finished": "Finished",
+      "Updated": "Updated",
+      "Due": "Due",
+      "DeleteDelay": "Delete delay",
+      "Size": "Size",
+      "Ratio": "Ratio",
+      "Files": "Files",
+      "Archives": "Archives",
+      "Archive": "Archive",
+      "Queue": "Extract queue",
+      "Retries": "Retries",
+      "Note": "Note",
+      "Error": "Error",
+      "ExtractedFiles": "Extracted files",
+      "ArchiveFiles": "Archives",
+      "DownloadList": "Download {name} as a text file"
+    },
     "settings": {
       "Title": "Configuration",
       "Heading": "{settings} — {page}",
@@ -261,7 +309,8 @@
       },
       "hooks": {
         "label": "Hooks",
-        "intro": "HTTP callbacks and local commands when an extract changes status."
+        "tab": "Payload",
+        "intro": "Extra IDs and custom event titles sent with every webhook and command hook."
       },
       "webserver": {
         "label": "Web Server",
@@ -392,6 +441,21 @@
     "DeleteFailed": "Delete Failed",
     "Deleted": "Deleted",
     "ExtractedNothing": "Nothing Extracted"
+  },
+  "errors": {
+    "NoCompressedFiles": "No compressed files found",
+    "NoExtractableFiles": "No extractable files",
+    "WaitingSyncthing": "Waiting for Syncthing",
+    "InterruptedRestart": "Interrupted by restart",
+    "UnknownArchiveType": "Unknown archive file type",
+    "Checksum": "Archived file checksum mismatch",
+    "MaxBytes": "Extracted size exceeds maximum bytes",
+    "MaxFiles": "Extracted file count exceeds maximum",
+    "MaxRatio": "Extracted size exceeds maximum compression ratio",
+    "MaxNested": "Nested archive count exceeds maximum",
+    "ArchiveSymlink": "Refusing to extract a symbolic link as an archive",
+    "InvalidPath": "Archived file contains invalid path",
+    "InvalidHead": "Archived file contains invalid header file"
   },
   "config": {
     "general": {
@@ -686,7 +750,7 @@
     "folders": {
       "interval": {
         "label": "Poll interval",
-        "description": "How often to scan watch folders for new archives.",
+        "description": "How often to scan watch folders for new archives. Disabled uses inotify or fsnotify.",
         "tooltip": "Off uses filesystem events (inotify and friends). Enable a poll interval if files never show up in the queue, which is common on Docker and CIFS. Polling increases disk reads and is not recommended when fsnotify works."
       },
       "buffer": {
@@ -768,6 +832,16 @@
         "label": "Exclude paths",
         "description": "Paths to ignore under this folder, one per line.",
         "tooltip": "Excluded paths and their children are not watched or extracted. Absolute, or relative to the watch path."
+      },
+      "wait_extensions": {
+        "label": "Wait extensions",
+        "description": "Stay waiting while a matching file exists.",
+        "tooltip": "One suffix per line, with a leading period (.part, .crdownload). Top folder only, subfolders are not scanned. Extraction starts after start delay once those files are gone. Waiting items are rechecked every 5s even without the poller. Enabling folder poller will double-poll the folder and increase disk reads. This is useful when fsnotify is not available, and not recommended when it is."
+      },
+      "skip_empty": {
+        "label": "Skip empty folders",
+        "description": "Do not queue folders that contain no archives.",
+        "tooltip": "After start delay, archive-free folders leave the waiting state without history or webhooks."
       }
     },
     "hooks": {
@@ -837,14 +911,26 @@
       },
       "template": {
         "label": "Template",
-        "description": "Built-in template. Empty picks one from the URL.",
-        "tooltip": "Force notifiarr, discord, telegram, gotify, pushover, or slack. Leave automatic unless the URL is not recognized.",
-        "auto": "Automatic (from URL)"
+        "description": "Built-in template. Empty picks one from the URL or template file.",
+        "tooltip": "Force notifiarr, discord, telegram, gotify, pushover, or slack. Leave automatic to use the URL or template file.",
+        "auto": "Automatic (from URL or file)"
       },
       "templatePath": {
         "label": "Template file",
         "description": "Custom Go template file instead of a built-in template.",
-        "tooltip": "Overrides automatic template detection and the Template setting. Pick an existing file."
+        "tooltip": "Used when Template is Automatic. A named Template ignores this file."
+      }
+    },
+    "payload": {
+      "customIDs": {
+        "label": "Global hook IDs",
+        "description": "Extra string IDs on every hook payload, separate from Starr item IDs.",
+        "tooltip": "Webhooks: customIDs JSON and {{index .CustomIDs \"key\"}}. Command hooks: UN_CUSTOM_ID_<key>. Keys must be letters, digits, underscore, or hyphen."
+      },
+      "titles": {
+        "label": "Event titles",
+        "description": "Custom text for each extract status in hook payloads. Empty keeps the built-in English title.",
+        "tooltip": "Used as eventTitle in JSON and as the heading in Discord, Slack, Telegram, Gotify, and Pushover templates."
       }
     }
   },
@@ -853,6 +939,7 @@
     "Path": "Path",
     "intro": "Pick a path on this machine.",
     "introFolderFile": "Pick a folder. The file will be named <code>{file}</code>, but you can change the name after choosing.",
+    "introLockedFile": "Pick a folder. The file will be named <code>{file}</code>.",
     "tooltip": {
       "Go": "<code>cd {path}</code><br />Change directory to the path in the box.",
       "SelectPath": "Select path: <code>{path}</code>",

@@ -64,10 +64,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.stat-card {
-  cursor: help;
-}
-
 .stat-side-table {
   font-size: 0.8125rem;
 }
@@ -80,7 +76,49 @@ body {
 .stat-side-table th {
   color: var(--bs-secondary-color);
   font-weight: 500;
-  cursor: help;
+}
+
+.hint-target {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  vertical-align: baseline;
+}
+
+.hint-target:focus {
+  outline: none;
+}
+
+.hint-target:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.stat-side-table th.starr-q-app {
+  color: var(--bs-body-color);
+}
+
+.starr-q-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.starr-q-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.5rem;
+  row-gap: 0.1rem;
+  margin-top: 0.15rem;
 }
 
 .stat-side-table td {
@@ -224,14 +262,24 @@ code.wrap {
   width: 100%;
 }
 
-.queue-progress {
-  width: 42%;
-  min-width: 12rem;
+/* 1% + nowrap shrink-wraps App/Status/Retries/Updated/Actions to content.
+   Progress at 99% takes the leftover so telemetry does not wrap in a 8–12rem strip. */
+.queue-table > thead > tr > *,
+.queue-table > tbody > tr:first-child > * {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.queue-table > thead > tr > .queue-progress,
+.queue-table > tbody > tr:first-child > .queue-progress {
+  width: 99%;
+  white-space: normal;
 }
 
 .queue-progress-inner {
   min-width: 0;
   width: 100%;
+  overflow: hidden;
 }
 
 .queue-progress .progress {
@@ -253,19 +301,222 @@ code.wrap {
   font-variant-numeric: tabular-nums;
 }
 
+.queue-progress-caption:not(.text-danger) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-updated-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .queue-progress-archive {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-path {
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: break-all;
+}
+
+.queue-event-badge {
+  font-family: var(--bs-body-font-family);
+  font-weight: 500;
+  vertical-align: middle;
+  margin-left: 0.4em;
+  white-space: nowrap;
+}
+
+.queue-path-btn {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.queue-path-btn:hover,
+.queue-path-btn:focus-visible {
+  text-decoration: underline;
+}
+
+.modal-dialog.item-detail-modal,
+.modal-dialog.file-browser-modal {
+  --bs-modal-width: min(96vw, 96rem);
+  max-width: var(--bs-modal-width);
+  width: var(--bs-modal-width);
+  height: calc(100vh - 2rem);
+  height: calc(100dvh - 2rem);
+  margin: 1rem auto;
+}
+
+.item-detail-modal .modal-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-browser-modal .modal-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-browser-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-browser-modal .modal-footer {
+  flex: 0 0 auto;
+}
+
+.item-detail-modal .modal-title {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.item-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.item-detail-event {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2em 0.5em;
+}
+
+.item-detail-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.item-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 1rem;
+  row-gap: 0.35rem;
+  margin: 0;
+  flex: 0 0 auto;
+  min-height: 8rem;
+}
+
+.item-detail dt {
+  color: var(--bs-secondary-color);
+  font-weight: 500;
+}
+
+.item-detail dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.item-file-panes {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.item-file-panes-single {
+  grid-template-columns: 1fr;
+}
+
+.item-file-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 10rem;
+}
+
+.item-file-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  margin: 0 0 0.35rem;
+}
+
+.item-file-pane-head h6 {
+  margin: 0;
+  min-width: 0;
+}
+
+.item-file-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.15rem 0.35rem;
+  line-height: 1;
+}
+
+.item-file-list {
+  flex: 1 1 auto;
+  min-height: 8rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.5rem 0.75rem 0.5rem 1.5rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-tertiary-bg);
+}
+
+.item-file-list code {
+  word-break: break-all;
+}
+
+.queue-meta {
+  display: none;
 }
 
 @media (max-width: 767.98px) {
-  .queue-table thead {
-    display: none;
+  .modal-dialog.item-detail-modal,
+  .modal-dialog.file-browser-modal {
+    height: calc(100vh - 1rem);
+    height: calc(100dvh - 1rem);
+    margin: 0.5rem auto;
+  }
+
+  .item-file-panes:not(.item-file-panes-single) {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(10rem, 1fr) minmax(10rem, 1fr);
+    min-height: 21rem;
   }
 
   .queue-table,
-  .queue-table > :not(caption) {
+  .queue-table > tbody {
     display: block;
+  }
+
+  .queue-table > thead {
+    display: none;
   }
 
   .queue-table tbody.stack-item {
@@ -287,13 +538,14 @@ code.wrap {
     border: 0;
     width: auto;
     max-width: none;
+    white-space: normal;
   }
 
-  .queue-table tbody.stack-item > tr:first-child > td:nth-child(1) {
+  .queue-table tbody.stack-item > tr:first-child > td.queue-app {
     order: 1;
   }
 
-  .queue-table tbody.stack-item > tr:first-child > td:nth-child(2) {
+  .queue-table tbody.stack-item > tr:first-child > td.queue-status {
     order: 2;
   }
 
@@ -306,19 +558,33 @@ code.wrap {
     flex: 1 1 100%;
     order: 4;
     width: 100%;
+    min-width: 0;
     padding-top: 0.4rem;
+  }
+
+  .queue-table
+    tbody.stack-item
+    > tr:first-child
+    > td.queue-progress:not(
+      :has(.progress, .queue-progress-caption, .queue-progress-archive)
+    ) {
+    display: none;
   }
 
   .queue-table tbody.stack-item > tr:first-child > td.queue-retries,
   .queue-table tbody.stack-item > tr:first-child > td.queue-updated {
-    order: 5;
-    font-size: 0.8rem;
-    color: var(--bs-secondary-color);
+    display: none;
   }
 
-  .queue-table tbody.stack-item > tr:first-child > td.queue-retries::before,
-  .queue-table tbody.stack-item > tr:first-child > td.queue-updated::before {
-    content: attr(data-label) ' ';
+  .queue-table tbody.stack-item > tr:first-child > td.queue-meta {
+    display: block;
+    flex: 1 1 100%;
+    order: 5;
+    width: 100%;
+    font-size: 0.8rem;
+    color: var(--bs-secondary-color);
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.15rem;
   }
 
   .queue-table tbody.stack-item > tr.stack-item-path > * {

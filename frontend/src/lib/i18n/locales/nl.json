@@ -51,7 +51,8 @@
     "Test": "Testen",
     "ResetColumns": "Kolommen resetten",
     "HideCompleted": "Voltooide verbergen",
-    "ShowHidden": "Verborgen tonen"
+    "ShowHidden": "Verborgen tonen",
+    "AddPair": "Paar toevoegen"
   },
   "phrases": {
     "EnvironmentVariable": "Omgevingsvariabele: <code>{variableName}</code>",
@@ -72,6 +73,8 @@
     "NoInstances": "Geen {section}-instanties geconfigureerd.",
     "NoFolders": "Geen mappen geconfigureerd.",
     "NoWebhooks": "Geen webhooks geconfigureerd.",
+    "MapKey": "Sleutel",
+    "MapValue": "Waarde",
     "NoCmdhooks": "Geen opdracht-hooks geconfigureerd.",
     "NoApiKeys": "Geen API-sleutels.",
     "ClearHistoryTitle": "Geschiedenis wissen?",
@@ -93,6 +96,7 @@
     "UiPasswordFilepath": "Dit wachtwoord is een filepath:-verwijzing. Een nieuw wachtwoord of authenticatietype opslaan schrijft de waarde naar het configuratiebestand.",
     "ReservedUsername": "De gebruikersnamen webauth, noauth en filepath zijn gereserveerd, en een gebruikersnaam mag geen dubbele punt bevatten.",
     "FilterPlaceholder": "Filteren…",
+    "FilterHint": "Zoekt in pad, app, status en fouttekst.",
     "Empty": "—",
     "Output": "Uitvoer",
     "Details": "Details",
@@ -130,7 +134,9 @@
     "TestReply": "Antwoord",
     "TestDuration": "Duur",
     "TestStarrEnvOwned": "Testen kan niet als de URL of API-sleutel uit de omgeving komt.",
-    "TestHookEnvOwned": "Testen kan niet als de URL of opdracht uit de omgeving komt."
+    "TestHookEnvOwned": "Testen kan niet als de URL of opdracht uit de omgeving komt.",
+    "CreateHookTemplate": "Sjabloonbestand maken",
+    "CreateFailed": "Het bestand kon niet worden gemaakt."
   },
   "nav": {
     "Dashboard": "Dashboard",
@@ -218,6 +224,11 @@
       "Refresh": "Vernieuwen",
       "UpdatedAgo": "{age} geleden bijgewerkt",
       "LastWrite": "Laatste schrijf",
+      "WaitFile": "Wachten op {file}",
+      "FSNotify": "fsnotify",
+      "Polling": "polling",
+      "FSNotifyHint": "Deze map gebruikt bestandssysteemgebeurtenissen (inotify en vrienden).",
+      "PollingHint": "Deze map wordt op een timer gepolld. Gebruik dat als Docker of CIFS geen bestandssysteemgebeurtenissen kan leveren.",
       "ArchiveOf": "Archief {n} van {total}",
       "SpeedAvg": "{speed}/s gem.",
       "SpeedNow": "{speed}/s",
@@ -246,6 +257,43 @@
       "ConfirmEachHint": "Bevestiging is vereist voor elke verwijdering. Klik om te schakelen.",
       "ConfirmAllOnlyHint": "Bevestiging is alleen vereist voor Alles wissen. Klik om te schakelen."
     },
+    "detail": {
+      "OpenItem": "Itemdetails: {id}",
+      "Info": "Info",
+      "Title": "Titel",
+      "DownloadId": "Download-ID",
+      "SeriesId": "Serie-ID",
+      "EpisodeId": "Aflevering-ID",
+      "MovieId": "Film-ID",
+      "ArtistId": "Artiest-ID",
+      "AlbumId": "Album-ID",
+      "AuthorId": "Auteur-ID",
+      "BookId": "Boek-ID",
+      "Reason": "Reden",
+      "Path": "Pad",
+      "OutputPath": "Uitvoerpad",
+      "Dest": "Uitpakmap",
+      "URL": "URL",
+      "Kind": "Soort",
+      "Started": "Gestart",
+      "Elapsed": "Duur",
+      "Finished": "Klaar",
+      "Updated": "Bijgewerkt",
+      "Due": "Gepland",
+      "DeleteDelay": "Verwijdervertraging",
+      "Size": "Grootte",
+      "Ratio": "Verhouding",
+      "Files": "Bestanden",
+      "Archives": "Archieven",
+      "Archive": "Archief",
+      "Queue": "Uitpakwachtrij",
+      "Retries": "Pogingen",
+      "Note": "Opmerking",
+      "Error": "Fout",
+      "ExtractedFiles": "Uitgepakte bestanden",
+      "ArchiveFiles": "Archieven",
+      "DownloadList": "{name} downloaden als tekstbestand"
+    },
     "settings": {
       "Title": "Configuratie",
       "Heading": "{settings} — {page}",
@@ -261,7 +309,8 @@
       },
       "hooks": {
         "label": "Hooks",
-        "intro": "HTTP-callbacks en lokale opdrachten wanneer een uitpakstatus verandert."
+        "tab": "Payload",
+        "intro": "Extra IDs en aangepaste gebeurtenistitels bij elke webhook en opdracht-hook."
       },
       "webserver": {
         "label": "Webserver",
@@ -392,6 +441,21 @@
     "DeleteFailed": "Verwijderen mislukt",
     "Deleted": "Verwijderd",
     "ExtractedNothing": "Niets uitgepakt"
+  },
+  "errors": {
+    "NoCompressedFiles": "Geen gecomprimeerde bestanden gevonden",
+    "NoExtractableFiles": "Geen uitpakbare bestanden",
+    "WaitingSyncthing": "Wachten op Syncthing",
+    "InterruptedRestart": "Onderbroken door herstart",
+    "UnknownArchiveType": "Onbekend archieftype",
+    "Checksum": "Checksum van gearchiveerd bestand komt niet overeen",
+    "MaxBytes": "Uitgepakte grootte overschrijdt het maximum aantal bytes",
+    "MaxFiles": "Aantal uitgepakte bestanden overschrijdt het maximum",
+    "MaxRatio": "Uitgepakte grootte overschrijdt de maximale compressieverhouding",
+    "MaxNested": "Aantal geneste archieven overschrijdt het maximum",
+    "ArchiveSymlink": "Weigeren een symbolische koppeling als archief uit te pakken",
+    "InvalidPath": "Gearchiveerd bestand bevat een ongeldig pad",
+    "InvalidHead": "Gearchiveerd bestand bevat een ongeldig headerbestand"
   },
   "config": {
     "general": {
@@ -686,7 +750,7 @@
     "folders": {
       "interval": {
         "label": "Poll-interval",
-        "description": "Hoe vaak bewaakte mappen op nieuwe archieven worden gescand.",
+        "description": "Hoe vaak bewaakte mappen op nieuwe archieven worden gescand. Uitgeschakeld gebruikt inotify of fsnotify.",
         "tooltip": "Uit gebruikt bestandssysteemgebeurtenissen (inotify en vrienden). Kies een poll-interval als bestanden nooit in de wachtrij verschijnen, wat gebruikelijk is op Docker en CIFS. Polling verhoogt schijflezingen en wordt afgeraden als fsnotify werkt."
       },
       "buffer": {
@@ -768,6 +832,16 @@
         "label": "Uitgesloten paden",
         "description": "Paden om onder deze map te negeren, één per regel.",
         "tooltip": "Uitgesloten paden en hun kinderen worden niet bewaakt of uitgepakt. Absoluut, of relatief aan het bewaakte pad."
+      },
+      "wait_extensions": {
+        "label": "Wacht-extensies",
+        "description": "Wachten zolang een bijpassend bestand in de bovenste map staat.",
+        "tooltip": "Eén achtervoegsel per regel, met een punt vooraan (.part, .crdownload). Submappen worden niet gescand. Uitpakken start na de startvertraging zodra die bestanden weg zijn. Wachtende items worden elke 5s opnieuw gecontroleerd, ook zonder poller. De map-poller inschakelen pollt de map dubbel en verhoogt het aantal schijflezingen. Nuttig als fsnotify niet beschikbaar is, en niet aanbevolen wanneer dat wel zo is."
+      },
+      "skip_empty": {
+        "label": "Lege mappen overslaan",
+        "description": "Mappen zonder archieven niet in de wachtrij zetten.",
+        "tooltip": "Na de startvertraging verlaten archiefloze mappen de wachtstatus zonder geschiedenis of webhooks."
       }
     },
     "hooks": {
@@ -837,14 +911,26 @@
       },
       "template": {
         "label": "Sjabloon",
-        "description": "Ingebouwd sjabloon. Leeg kiest er een uit de URL.",
-        "tooltip": "Dwing notifiarr, discord, telegram, gotify, pushover of slack af. Laat automatisch tenzij de URL niet herkend wordt.",
-        "auto": "Automatisch (uit de URL)"
+        "description": "Ingebouwd sjabloon. Leeg kiest er een uit de URL of het sjabloonbestand.",
+        "tooltip": "Dwing notifiarr, discord, telegram, gotify, pushover of slack af. Laat automatisch om de URL of het sjabloonbestand te gebruiken.",
+        "auto": "Automatisch (uit de URL of het bestand)"
       },
       "templatePath": {
         "label": "Sjabloonbestand",
         "description": "Aangepast Go-sjabloonbestand in plaats van een ingebouwd sjabloon.",
-        "tooltip": "Overschrijft automatische herkenning en de Sjabloon-instelling. Kies een bestaand bestand."
+        "tooltip": "Gebruikt als Sjabloon op Automatisch staat. Een gekozen sjabloon negeert dit bestand."
+      }
+    },
+    "payload": {
+      "customIDs": {
+        "label": "Globale hook-IDs",
+        "description": "Extra tekst-IDs op elke hook-payload, los van Starr-item-IDs.",
+        "tooltip": "Webhooks: customIDs JSON en {{index .CustomIDs \"key\"}}. Opdracht-hooks: UN_CUSTOM_ID_<key>. Sleutels moeten letters, cijfers, underscore of koppelteken zijn."
+      },
+      "titles": {
+        "label": "Gebeurtenistitels",
+        "description": "Aangepaste tekst per uitpakstatus in hook-payloads. Leeg houdt de ingebouwde Engelse titel.",
+        "tooltip": "Wordt gebruikt als eventTitle in JSON en als kop in Discord-, Slack-, Telegram-, Gotify- en Pushover-sjablonen."
       }
     }
   },
@@ -853,6 +939,7 @@
     "Path": "Pad",
     "intro": "Kies een pad op deze machine.",
     "introFolderFile": "Kies een map. Het bestand heet <code>{file}</code>, maar je kunt de naam na het kiezen nog wijzigen.",
+    "introLockedFile": "Kies een map. Het bestand heet <code>{file}</code>.",
     "tooltip": {
       "Go": "<code>cd {path}</code><br />Wijzig de map naar het pad in het vak.",
       "SelectPath": "Pad selecteren: <code>{path}</code>",

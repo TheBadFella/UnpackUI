@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/Unpackerr/unpackerr/pkg/configdef"
@@ -50,6 +51,7 @@ func (u *Unpackerr) registerAPIRoutes() {
 	u.Webserver.handleGet(basePath("system"), u.requirePerm(PermReadSystemInfo, u.systemHandler))
 	u.Webserver.handleGet(basePath("system/export"), u.requirePerm(PermReadSystemInfo, u.systemExportHandler))
 	u.Webserver.handleGet(basePath("queue"), u.requirePerm(PermReadSystemQueue, u.queueHandler))
+	u.Webserver.handleGet(basePath("queue/item"), u.requirePerm(PermReadSystemQueue, u.queueItemHandler))
 	u.Webserver.handlePost(basePath("queue/retry"), u.requirePerm(PermWriteSystemQueue, u.queueRetryHandler))
 	u.Webserver.handlePost(basePath("queue/forget"), u.requirePerm(PermWriteSystemQueue, u.queueForgetHandler))
 	u.Webserver.handleGet(basePath("history"), u.requirePerm(PermReadSystemHistory, u.historyHandler))
@@ -57,6 +59,7 @@ func (u *Unpackerr) registerAPIRoutes() {
 	u.Webserver.handlePost(basePath("history/delete"), u.requirePerm(PermWriteSystemHistory, u.historyDeleteHandler))
 	u.Webserver.handleGet(basePath("browse"), u.requirePerm(PermReadSystemBrowse, u.browseHandler))
 	u.Webserver.handlePost(basePath("browse"), u.requirePerm(PermWriteSystemBrowse, u.browseCreateHandler))
+	u.Webserver.handlePost(basePath("browse/template"), u.requirePerm(PermWriteSystemBrowse, u.browseTemplateHandler))
 	u.Webserver.handleGet(basePath("config/help"), u.requireAuth(u.configHelpHandler))
 	u.Webserver.handleGet(basePath("config/env"), u.requireAuth(u.configEnvHandler))
 	u.Webserver.handleGet(basePath("config/{section}/live"), u.requireConfigPerm(false, u.configGetLiveHandler))
@@ -84,6 +87,30 @@ func (u *Unpackerr) statsHandler(response http.ResponseWriter, _ *http.Request) 
 
 func (u *Unpackerr) queueHandler(response http.ResponseWriter, _ *http.Request) {
 	writeJSON(response, http.StatusOK, u.queueSnapshot())
+}
+
+func (u *Unpackerr) queueItemHandler(response http.ResponseWriter, request *http.Request) {
+	itemID := request.URL.Query().Get("id")
+	if strings.TrimSpace(itemID) == "" {
+		writeJSON(response, http.StatusBadRequest, map[string]string{"error": errMissingID.Error()})
+		return
+	}
+
+	u.rLockHistory()
+
+	item := u.Map[itemID]
+	if item == nil {
+		u.rUnlockHistory()
+		writeJSON(response, http.StatusNotFound, map[string]string{"error": errQueueNotFound.Error()})
+
+		return
+	}
+
+	queue := u.queueFromExtract(itemID, item)
+	fillQueueFiles(&queue, item)
+	u.rUnlockHistory()
+
+	writeJSON(response, http.StatusOK, queue)
 }
 
 func (u *Unpackerr) historyHandler(response http.ResponseWriter, _ *http.Request) {

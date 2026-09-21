@@ -44,7 +44,7 @@ Unpackerr is **one process**. One goroutine — `(*Unpackerr).Run()` in `pkg/unp
 
 HTTP handlers **must not** mutate those on the HTTP goroutine. They validate the body, then call `onMainLoop`. Queue retry/forget use the same handoff. Config GET of the **file** snapshot does **not** need the main loop (it is under `configMu`). Config GET of **live** general/starr/folders **does**, because live `Config` is main-loop memory.
 
-`GET /api/stats` (and Prometheus `Collect`) is the exception that reads live Starr/folder map headers off-loop. That path takes `configMu` for the instance headers (same as hook counts) and `History.mu` for `Queue` / `lastQueued` / `lastRetrieved` / `lastPollErr`. Poll workers publish those fields under the history write lock **after** `GetQueue` returns. Do not hop stats onto `onMainLoop`; that would stall scrapes behind Starr HTTP. Other new readers of live `u.Sonarr` / `u.Passwords` / `u.StartDelay` still go through `onMainLoop`.
+`GET /api/stats` (and Prometheus `Collect`) is the exception that reads live Starr/folder map headers off-loop. That path takes `configMu` for the instance headers (same as hook counts) and `History.mu` for `Queue` / `lastQueued` / `lastRetrieved` / `lastPolled` / `lastPollErr`. Poll workers publish those fields under the history write lock **after** `GetQueue` returns. Do not hop stats onto `onMainLoop`; that would stall scrapes behind Starr HTTP. Other new readers of live `u.Sonarr` / `u.Passwords` / `u.StartDelay` still go through `onMainLoop`.
 
 ---
 
@@ -246,7 +246,7 @@ Permission: `config:{section}:write` (same as PUT). Does not persist.
 
 **Hooks** (`webhooks` / `cmdhooks`): overlay posted fields onto a clone of the live hook (or a new hook). Non-empty strings replace live values; omitted strings keep them. `shell` and `ignoreSsl` override when present (including `false`); omitted keep live. `event` defaults to `extracted`; `app` defaults to Sonarr (`sonarr` / `radarr` / `lidarr` / `readarr` / `folder` or a named instance). `hooks.Fire` runs on the HTTP goroutine (not the hook worker). Reply is `{status, reply, elapsed}` with `reply` clipped to 2048 runes. Missing URL/command is **400**. Delivery failure is **424** `{error, elapsed}`.
 
-**general**, **webserver**, **folders**: **400** `this section cannot be tested`.
+**general**, **webserver**, **folders**, **hooks**: **400** `this section cannot be tested`.
 
 ---
 
@@ -280,6 +280,7 @@ Index is `GET {urlbase}{$}` so `GET /` is not a ServeMux prefix match (that woul
 | GET | `{urlbase}api/system` | yes | `system:info:read` | Version, uptime, bind addr, urlbase, auth type, metrics flag, config file, hostname, GOOS, log folders |
 | GET | `{urlbase}api/system/export` | yes | `system:info:read` | Startup-log style live rundown; each section also needs `config:{section}:read` (or `*`); omitted sections say so. Secrets omitted. |
 | GET | `{urlbase}api/queue` | yes | `system:queue:read` | In-flight items |
+| GET | `{urlbase}api/queue/item` | yes | `system:queue:read` | `?id=`; one live item, incl. newFiles/origFiles; 400 without id, 404 unknown |
 | POST | `{urlbase}api/queue/retry` | yes | `system:queue:write` | `{id}`; only `extractfailed`; Starr → `WAITING`; folder resets on main loop |
 | POST | `{urlbase}api/queue/forget` | yes | `system:queue:write` | Terminal statuses only; in-progress **409**; Starr titles get a tombstone until they leave the upstream queue |
 | GET | `{urlbase}api/history` | yes | `system:history:read` | Durable JSONL-backed rows |
@@ -287,16 +288,17 @@ Index is `GET {urlbase}{$}` so `GET /` is not a ServeMux prefix match (that woul
 | POST | `{urlbase}api/history/delete` | yes | `system:history:write` | `{id}`; in-progress **409** |
 | GET | `{urlbase}api/browse` | yes | `system:browse:read` | `?dir=`; empty → home; file path lists parent; unreadable path (Stat or ReadDir) with readable parent is 200 + `error`; both fail → 406. `mom` is empty at a volume root. Windows empty/`/`/`\` lists `C:\`–`Z:\` that exist. |
 | POST | `{urlbase}api/browse` | yes | `system:browse:write` | `{path}`; folder `MkdirAll` 0755 (existing folders succeed) |
+| POST | `{urlbase}api/browse/template` | yes | `system:browse:write` | `{path, template}`; writes `unpackerr-webhook-<template>.tmpl` (0644) with the built-in Go template; basename must match; 409 if the file exists |
 | GET | `{urlbase}api/config/help` | yes | any auth | English field help from definitions.yml |
 | GET | `{urlbase}api/config/env` | yes | any auth | UN_* overlays from startup; secret values blank unless `*`; `WEBSERVER_UI_PASSWORD` always blank (key kept so the UI can lock the field) |
 | GET | `{urlbase}api/config/{section}` | yes | `config:{section}:read` | File snapshot |
 | GET | `{urlbase}api/config/{section}/live` | yes | `config:{section}:read` | Running copy |
 | PUT | `{urlbase}api/config/{section}` | yes | `config:{section}:write` | Replace section |
-| POST | `{urlbase}api/config/{section}/test` | yes | `config:{section}:write` | Starr queue probe or one-shot hook Fire. Does not persist. general/webserver/folders → 400. Remote failure → 424 |
+| POST | `{urlbase}api/config/{section}/test` | yes | `config:{section}:write` | Starr queue probe or one-shot hook Fire. Does not persist. general/webserver/folders/hooks → 400. Remote failure → 424 |
 | GET | `/metrics` (+ urlbase) | **API key / Bearer only** | `system:metrics:read` | No session cookie, no webauth/noauth |
 | GET | `/debug/pprof/…` | none extra | — | Only if `pprof = true`. Treat as a loaded gun. |
 
-`{section}` is one of: `general`, `webserver`, `sonarr`, `radarr`, `lidarr`, `readarr`, `folders`, `webhooks`, `cmdhooks`. Unknown → 404 from `requireConfigPerm`.
+`{section}` is one of: `general`, `webserver`, `sonarr`, `radarr`, `lidarr`, `readarr`, `folders`, `hooks`, `webhooks`, `cmdhooks`. Unknown → 404 from `requireConfigPerm`.
 
 Stdlib mux does **not** redirect trailing slashes the way httprouter did. `/api/stats/` is 404. Documented as acceptable for this API (no external consumers). Do not add a compatibility wrapper unless product asks.
 
@@ -357,7 +359,7 @@ This file is **ours**. Do not add line-length caps, atomic rename, or `.bak` har
 | `configMu` | `fileConfig` + hook/Starr/folder maps `/api/stats` counts |
 | `uiPassMu` | live webserver auth fields HTTP reads |
 | `histMu` | history records + JSONL |
-| `History.mu` | extract map; Starr poll snapshot (`Queue`, `lastQueued`, `lastRetrieved`, `lastPollErr`) |
+| `History.mu` | extract map; Starr poll snapshot (`Queue`, `lastQueued`, `lastRetrieved`, `lastPolled`, `lastPollErr`) |
 
 `syncFileUIPassword` takes `uiPassword()` (uiPassMu) **then** `configMu`. That order is intentional.
 
@@ -396,6 +398,7 @@ Two admins saving at once is not a design target. Do not add snapshot-merge.
 | webserver | Auth fields in place | listen, urlbase, TLS, metrics, pprof, HTTP log |
 | sonarr…readarr | Rebuild clients, carry queues, grow workers | No |
 | folders | Live map updated | **Always** (watcher) |
+| hooks | Replace custom_ids map / titles struct | No |
 | webhooks / cmdhooks | Replace maps, ensure worker | No |
 
 ---

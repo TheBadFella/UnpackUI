@@ -67,6 +67,7 @@ export interface StarrQueueStat {
   match: number
   issues: number
   downloading: number
+  updatedAt?: string
   error?: string
 }
 
@@ -135,6 +136,15 @@ export interface QueueItem {
   speedBytesPerSecond?: number
   etaSeconds?: number
   deleteAt?: string
+  note?: string
+  event?: 'fsnotify' | 'polling'
+  bytes?: number
+  ratio?: number
+  queue?: number
+  output?: string
+  kind?: string
+  ids?: Record<string, unknown>
+  origFiles?: string[]
 }
 
 export interface HistoryRecord {
@@ -166,9 +176,17 @@ export interface HistoryRecord {
   maxBytes?: number
   noRetry?: boolean
   newFiles?: string[]
+  origFiles?: string[]
+  extraFiles?: string[]
   preFiles?: string[]
   forgotten?: boolean
+  ids?: Record<string, unknown>
+  event?: 'fsnotify' | 'polling'
+  queue?: number
+  output?: string
 }
+
+export type ItemMeta = QueueItem | HistoryRecord
 
 export interface BrowseDir {
   sep: string
@@ -295,6 +313,8 @@ export interface FolderConfig {
   maxFiles: number
   maxRatio: number
   exclude_paths: string[]
+  wait_extensions: string[]
+  skip_empty: boolean
 }
 
 export interface FoldersSection {
@@ -322,6 +342,24 @@ export interface WebhookConfig {
   channel: string
 }
 
+export interface HookTitles {
+  waiting: string
+  queued: string
+  extracting: string
+  extractfailed: string
+  extracted: string
+  imported: string
+  deleting: string
+  deletefailed: string
+  deleted: string
+  extractednothing: string
+}
+
+export interface HooksConfig {
+  customIDs: Record<string, string>
+  titles: HookTitles
+}
+
 export type ConfigSection =
   | 'general'
   | 'webserver'
@@ -330,6 +368,7 @@ export type ConfigSection =
   | 'lidarr'
   | 'readarr'
   | 'folders'
+  | 'hooks'
   | 'webhooks'
   | 'cmdhooks'
 
@@ -341,16 +380,47 @@ export const STARR_SECTIONS: ConfigSection[] = [
 ]
 
 // Extract statuses used by webhook `events`, matching pkg/unpackerr ExtractStatus.
-export const EXTRACT_STATUSES: { value: number; id: string; label: string }[] =
-  [
-    { value: 0, id: 'waiting', label: 'Waiting' },
-    { value: 1, id: 'queued', label: 'Queued' },
-    { value: 2, id: 'extracting', label: 'Extracting' },
-    { value: 3, id: 'extractfailed', label: 'Extract Failed' },
-    { value: 4, id: 'extracted', label: 'Extracted' },
-    { value: 5, id: 'imported', label: 'Imported' },
-    { value: 6, id: 'deleting', label: 'Deleting' },
-    { value: 7, id: 'deletefailed', label: 'Delete Failed' },
-    { value: 8, id: 'deleted', label: 'Deleted' },
-    { value: 9, id: 'extractednothing', label: 'Nothing Extracted' },
-  ]
+export const EXTRACT_STATUSES: {
+  value: number
+  id: keyof HookTitles
+  label: string
+}[] = [
+  { value: 0, id: 'waiting', label: 'Waiting' },
+  { value: 1, id: 'queued', label: 'Queued' },
+  { value: 2, id: 'extracting', label: 'Extracting' },
+  { value: 3, id: 'extractfailed', label: 'Extract Failed' },
+  { value: 4, id: 'extracted', label: 'Extracted' },
+  { value: 5, id: 'imported', label: 'Imported' },
+  { value: 6, id: 'deleting', label: 'Deleting' },
+  { value: 7, id: 'deletefailed', label: 'Delete Failed' },
+  { value: 8, id: 'deleted', label: 'Deleted' },
+  { value: 9, id: 'extractednothing', label: 'Nothing Extracted' },
+]
+
+export const EXTRACT_EVENT_TITLES: Record<keyof HookTitles, string> = {
+  waiting: 'Waiting, pre-Queue',
+  queued: 'Queued',
+  extracting: 'Extracting',
+  extractfailed: 'Extraction Failed',
+  extracted: 'Extracted, Awaiting Import',
+  imported: 'Imported',
+  deleting: 'Deleting',
+  deletefailed: 'Delete Failed',
+  deleted: 'Deleted',
+  extractednothing: 'Nothing Extracted',
+}
+
+export function emptyHookTitles(): HookTitles {
+  return {
+    waiting: '',
+    queued: '',
+    extracting: '',
+    extractfailed: '',
+    extracted: '',
+    imported: '',
+    deleting: '',
+    deletefailed: '',
+    deleted: '',
+    extractednothing: '',
+  }
+}
