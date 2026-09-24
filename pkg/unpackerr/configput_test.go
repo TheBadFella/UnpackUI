@@ -521,6 +521,45 @@ func TestConfigPutWebhooksValidationDoesNotApply(t *testing.T) {
 	}
 }
 
+func TestConfigPutWebhookRewritesNotifiarrURL(t *testing.T) {
+	t.Parallel()
+
+	const key = "00000000-0000-4000-8000-000000000000"
+
+	unpack := testAuthUnpackerr(t)
+	unpack.ConfigFile = filepath.Join(t.TempDir(), "unpackerr.conf")
+	unpack.snapshotFileConfig()
+
+	legacy := "https://notifiarr.com/api/v1/notification/unpackerr/" + key
+	body := `{"notifiarr":{"name":"Notifiarr","url":"` + legacy + `"}}`
+
+	rec := doAuth(t, unpack, http.MethodPut, "/api/config/webhooks", body, putKey(unpack))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("put %d %s", rec.Code, rec.Body.String())
+	}
+
+	wantURL := "https://notifiarr.com/api/v1/notification/unpackerr"
+	check := func(got *WebhookConfig) {
+		t.Helper()
+
+		if got == nil || got.URL != wantURL || got.Headers["X-Api-Key"] != key {
+			t.Fatalf("webhook %+v", got)
+		}
+	}
+
+	check(unpack.fileConfig.Webhook["notifiarr"])
+	check(unpack.Webhook["notifiarr"])
+
+	written, err := os.ReadFile(unpack.ConfigFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(string(written), "/unpackerr/"+key) {
+		t.Fatalf("path key written:\n%s", written)
+	}
+}
+
 func TestConfigPutSonarrPreservesQueueAndPath(t *testing.T) {
 	t.Parallel()
 
@@ -1914,6 +1953,39 @@ func TestConfigGetLiveRedactsInstanceSecrets(t *testing.T) {
 	fileCmd := doAuth(t, unpack, http.MethodGet, "/api/config/cmdhooks", "", key)
 	if fileCmd.Code != http.StatusOK || !strings.Contains(fileCmd.Body.String(), "cmd-token") {
 		t.Fatalf("file cmdhooks %d %s", fileCmd.Code, fileCmd.Body.String())
+	}
+}
+
+func TestConfigGetLiveRedactsHookHeaders(t *testing.T) {
+	t.Parallel()
+
+	unpack := testAuthUnpackerr(t)
+	unpack.Webhook = InstanceMap[WebhookConfig]{
+		"discord": {
+			URL:  "http://hooks.example/discord",
+			Name: "discord",
+			Headers: map[string]string{
+				"Authorization": "Bearer header-secret",
+				"Title":         "Unpackerr",
+			},
+		},
+	}
+	unpack.snapshotFileConfig()
+
+	key := putKey(unpack)
+
+	live := doAuth(t, unpack, http.MethodGet, "/api/config/webhooks/live", "", key)
+	if live.Code != http.StatusOK {
+		t.Fatalf("live %d %s", live.Code, live.Body.String())
+	}
+
+	if strings.Contains(live.Body.String(), "header-secret") {
+		t.Fatalf("live GET leaked header secret: %s", live.Body.String())
+	}
+
+	file := doAuth(t, unpack, http.MethodGet, "/api/config/webhooks", "", key)
+	if file.Code != http.StatusOK || !strings.Contains(file.Body.String(), "header-secret") {
+		t.Fatalf("file GET %d %s", file.Code, file.Body.String())
 	}
 }
 

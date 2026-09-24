@@ -5,24 +5,29 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
-## Baseline recorded 2026-09-21
+## Baseline recorded 2026-09-24
 
 - Upstream: `https://github.com/Unpackerr/unpackerr.git`, `main`
 - Fork: `https://github.com/TheBadFella/UnpackUI.git`, `web-ui`
-- Last reviewed upstream commit: `c08b0bff7fe44cd39a342f7fc8b3df1af0b23c6e`
-  (`c08b0bf`, PR #773, webhook message updates)
-- Fork merge commit: `cce412e3607b6bfbfa5f6928cea35f4eaf0942e4`
-  (`cce412e`), with fork parent `d49febc` and upstream parent `c08b0bf`
-- Merge base at review: `git merge-base HEAD upstream/main` = `c08b0bf`.
+- Last reviewed upstream commit: `c0dfb1b2af6760d2f7f969be264cd4d821b75d06`
+  (`c0dfb1b`, PR #786, buildx bump)
+- Fork parent: `2a910166cffea8bb484dca21815d7e59b6fe183f` (`2a91016`)
+  with upstream parent `c0dfb1b`
+- Merge base at review: `git merge-base HEAD upstream/main` = `c0dfb1b`.
   Upstream was fully merged; `HEAD..upstream/main` is empty.
 - Upstream delta reviewed since previous upstream parent
-  `5f8acf1d9551941ef22bb33284d36c0d2352fb51`: 15 commits across PRs #771,
-  #772, and #773 (38 files, 2,405 insertions and 240 deletions).
+  `c08b0bff7fe44cd39a342f7fc8b3df1af0b23c6e`: 30 commits across PRs #774,
+  #775, #777, #778, #781, #784, #785, and #786 (38 files, 2,142 insertions and
+  280 deletions).
 - Current fork delta after the merge: `git diff upstream/main..HEAD` is the
   fork's intentional product, recovery, UI, documentation, test, and workflow
-  surface (94 paths; 8,694 insertions and 1,556 deletions at this baseline).
+  surface (94 paths; 8,709 insertions and 1,558 deletions at this baseline).
   Review that delta separately from new upstream commits; it is not a reason to
   re-review old upstream history.
+
+### Previous baseline recorded 2026-09-21
+- Baseline SHA: `c08b0bff7fe44cd39a342f7fc8b3df1af0b23c6e` (`c08b0bf`)
+- Fork merge commit: `cce412e3607b6bfbfa5f6928cea35f4eaf0942e4` (`cce412e`)
 
 ### Previous baseline recorded 2026-09-21 (earlier)
 - Baseline SHA: `5f8acf1d9551941ef22bb33284d36c0d2352fb51` (`5f8acf1`)
@@ -133,6 +138,9 @@ tests/stop-local.ps1
 
 ### Merge decisions and invariants
 
+- Adopted upstream PR #774 / #775 (`HooksForm.svelte` in-app setup guides, automatic template detection, and custom headers `[webhook.headers]`), `pkg/hooks/headers.go`, and header redaction on config read/test.
+- Adopted upstream PR #778 (`folderExcludeSuffixes(cfg)`), keeping watched archives searchable when `disable_recursion` is active while preserving fork's incomplete folder recovery and recursive watch logic.
+- Adopted upstream PR #781 (`X-Api-Key` header migration for Notifiarr webhooks and URL key sanitization) via upstream's `pkg/hooks/notifiarr.go`.
 - Adopted upstream PR #771 (`HookFail` tracking across restart and retries), PR #772 (webhook template profiles `ntfy`, `Apprise`, `Mattermost`), and PR #773 (Discord/Telegram message-id editing), integrating cleanly with fork's queue item/history fields (`Title`, `Reason`, `ArchiveFiles`, `DeleteAt`) and recovery channels.
 - `pkg/hooks/http.go` was brought back into full alignment with upstream as delivery logic moved upstream to `pkg/hooks/update.go`.
 - Adopted upstream's per-watch-path folder pollers and non-recursive poller
@@ -173,7 +181,7 @@ tests/stop-local.ps1
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.6`; existing `v2.0.5` remains untouched.
+- The next safe patch release is `v2.0.7`; existing `v2.0.6` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
