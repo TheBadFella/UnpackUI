@@ -3,6 +3,7 @@ package unpackerr
 import (
 	"net/http"
 
+	"github.com/Unpackerr/unpackerr/pkg/hooks"
 	"golift.io/cnfg"
 )
 
@@ -265,6 +266,7 @@ func redactHookSecrets(items InstanceMap[WebhookConfig]) {
 	for _, hook := range items {
 		if hook != nil {
 			hook.Token = ""
+			hooks.RedactHeaderSecrets(hook.Headers)
 		}
 	}
 }

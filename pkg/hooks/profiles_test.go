@@ -15,7 +15,6 @@ func TestDetectNamedAndURL(t *testing.T) {
 		{name: "default", url: "https://example.com", want: ProfileNotifiarr},
 		{name: "nope", path: "/tmp/custom.tmpl", want: ProfileCustom},
 		{url: "https://notifiarr.com/api/v1/notification/unpackerr", want: ProfileNotifiarr},
-		{url: "https://discordnotifier.com/api", want: ProfileNotifiarr},
 		{url: "https://discord.com/api/webhooks/1/token", want: ProfileDiscord, update: true},
 		{url: "https://discordapp.com/api/webhooks/1/token", want: ProfileDiscord, update: true},
 		{url: "https://api.telegram.org/bot123:abc/sendMessage", want: ProfileTelegram, update: true},
@@ -70,5 +69,19 @@ func TestDetectTransportIgnoresTemplatePath(t *testing.T) {
 
 	if got := DetectTransport("discord", "https://ntfy.sh/unpackerr"); got.Name != ProfileDiscord {
 		t.Fatalf("named %q", got.Name)
+	}
+}
+
+func TestDefaultContentType(t *testing.T) {
+	t.Parallel()
+
+	got := DefaultContentType("", "https://api.pushover.net/1/messages.json")
+	if got != "application/x-www-form-urlencoded" {
+		t.Fatalf("pushover %q", got)
+	}
+
+	got = DefaultContentType("", "https://discord.com/api/webhooks/1/x")
+	if got != "application/json" {
+		t.Fatalf("discord %q", got)
 	}
 }

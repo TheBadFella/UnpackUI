@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Unpackerr/unpackerr/pkg/configdef"
+	"github.com/Unpackerr/unpackerr/pkg/hooks"
 	"github.com/Unpackerr/unpackerr/pkg/ui"
 	homedir "github.com/mitchellh/go-homedir"
 	"golift.io/cnfg"
@@ -359,14 +360,16 @@ func envValueSecret(suffix string) bool {
 		return true
 	}
 
-	_, afterKeys, found := strings.Cut(name, "API_KEYS_")
-	if !found {
-		return false
+	if _, afterKeys, found := strings.Cut(name, "API_KEYS_"); found {
+		_, after, ok := strings.Cut(afterKeys, "_")
+		if ok && after == "KEY" {
+			return true
+		}
 	}
 
-	_, after, ok := strings.Cut(afterKeys, "_")
+	_, header, ok := strings.Cut(name, "_HEADERS_")
 
-	return ok && after == "KEY"
+	return ok && hooks.SecretHeaderName(header)
 }
 
 func (u *Unpackerr) syncFileUIPassword() {
