@@ -29,22 +29,8 @@ export function getApiKey(): string {
   return apiKey
 }
 
-export function setUrlbase(base: string) {
-  urlbase = base || '/'
-}
-
 export function getUrlbase(): string {
   return urlbase
-}
-
-function rtrim(s: string, c: string): string {
-  while (s.endsWith(c)) s = s.slice(0, -c.length)
-  return s
-}
-
-function ltrim(s: string, c: string): string {
-  while (s.startsWith(c)) s = s.slice(c.length)
-  return s
 }
 
 export interface BackendResponse<T = any> {
@@ -81,7 +67,7 @@ async function request<T = any>(
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== null) headers['Content-Type'] = 'application/json'
 
-  const full = rtrim(urlbase, '/') + '/' + ltrim(uri, '/')
+  const full = urlbase.replace(/\/+$/, '') + '/' + uri.replace(/^\/+/, '')
 
   try {
     const response = await fetchWithTimeout(
