@@ -5,7 +5,24 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
-## Baseline recorded 2026-09-24
+## Baseline recorded 2026-09-27
+
+- Last reviewed upstream commit: `c88fb41850cd8b625639e4d3fd54120e13badfa6`
+  (PR #787, Alpine 3.24 digest update).
+- Fork parent: `a11d31077e894e5c67027c88bedb15fbc1fb563a` (v2.0.9)
+  with upstream parent `c0dfb1b`.
+- Merge commit: `1a9873b` with upstream parent `c88fb41`. The merge was clean.
+- New upstream history since `c0dfb1b`: two commits (Renovate commit and its
+  merge commit), changing only `Dockerfile` and
+  `init/docker/Dockerfile.goreleaser`.
+- Adopted Alpine digest `sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6`
+  in both files. Kept the fork's source-build Dockerfile and GoReleaser
+  executable-copy instructions. The fork delta is 96 paths after the merge.
+- Local `go test ./...`, `golangci-lint run ./...`, frontend check/build, and
+  registry inspection of the pinned Alpine manifest passed. The Linux PR and
+  release workflows remain the generation and multi-platform image gates.
+
+### Previous baseline recorded 2026-09-24
 
 - Upstream: `https://github.com/Unpackerr/unpackerr.git`, `main`
 - Fork: `https://github.com/TheBadFella/UnpackUI.git`, `web-ui`
@@ -181,7 +198,7 @@ tests/stop-local.ps1
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.7`; existing `v2.0.6` remains untouched.
+- The next safe patch release is `v2.0.10`; existing `v2.0.9` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
@@ -195,7 +212,7 @@ with the value in this file before starting the next review.
 git fetch --prune upstream main
 git fetch --prune origin web-ui --tags
 git status --short --branch
-$lastReviewed = 'e5c47abbcdb95e5147e4ecfb685be27b751ad4c6'
+$lastReviewed = 'c88fb41850cd8b625639e4d3fd54120e13badfa6'
 git rev-parse upstream/main
 git rev-list --left-right --count "$lastReviewed..upstream/main"
 git log --oneline --decorate "$lastReviewed..upstream/main"
