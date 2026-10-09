@@ -33,7 +33,9 @@ baseline, not a replacement for the repository contracts in
   integration suite. Both remain CI gates.
 - Dependency audit: source-map-js has one high advisory; esbuild/svelte-i18n
   have two moderate advisories. No forced dependency changes were made.
-- Merge is local; no remote publication or release tag is part of this sync.
+- Fork merge commit: `5804768c31e7694511559cedfe89678da86ab452`.
+- Release: `v2.0.11`; tag publication runs the fork Docker workflow for
+  `linux/amd64` and `linux/arm64`.
 
 ### Previous baseline recorded 2026-09-27
 
@@ -232,7 +234,7 @@ tests/stop-local.ps1
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.10`; existing `v2.0.9` remains untouched.
+- The next safe patch release is `v2.0.12`; existing `v2.0.11` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
