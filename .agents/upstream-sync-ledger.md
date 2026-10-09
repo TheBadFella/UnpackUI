@@ -5,7 +5,37 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
-## Baseline recorded 2026-09-27
+## Baseline recorded 2026-10-09
+
+- Last reviewed upstream commit: `5203befbc0c3e06c05e7d8a3b56855f16998bcd0`
+  (PR #801, Dockerfile syntax digest update).
+- Fork parent: `7b7b0d4`; previous upstream baseline: `c88fb41`.
+- Reviewed 29 upstream commits across 33 paths (738 insertions, 303 deletions).
+- Adopted upstream Lidarr APE/CUE output format and compression settings,
+  extraction helpers, validation, API/schema, and settings controls. Extraction
+  uses upstream code without a parallel fork implementation.
+- Adopted xtractr's nested-archive fixes, Starr expansion-ratio cap of 7.5,
+  Go 1.27.1 and dependency updates, frontend lockfile updates, and Docker pins.
+- Retained fork history fields, compatibility aliases, recursive watch tracking,
+  interrupted extraction cleanup, recovery state, webhook behavior, dashboard
+  layout, and fork branding. Upstream's new delta does not replace these contracts.
+- Resolved conflicts in history serialization, README, INTERNALS, and CI.
+  History writes and restores the new APE fields alongside fork fields.
+  Added a regression test for that round trip.
+- Kept `web-ui` in CI triggers, enabled the upstream integration workflow for
+  the fork branch, and removed a stale matrix condition that skipped npm check.
+- Passed: `go test ./...`, uncached folder/hook/unpackerr tests,
+  `golangci-lint run ./...` (installed v2.13.0), `npm ci`,
+  `npm run check` (zero errors/warnings), `npm run build`,
+  `go generate ./...` using Git's installed shell, and diff checks.
+  Generated timestamps were restored; the generated October release note was kept.
+- Not run locally: hosted Linux/macOS lint v2.14 and the external Linux archive
+  integration suite. Both remain CI gates.
+- Dependency audit: source-map-js has one high advisory; esbuild/svelte-i18n
+  have two moderate advisories. No forced dependency changes were made.
+- Merge is local; no remote publication or release tag is part of this sync.
+
+### Previous baseline recorded 2026-09-27
 
 - Last reviewed upstream commit: `c88fb41850cd8b625639e4d3fd54120e13badfa6`
   (PR #787, Alpine 3.24 digest update).
@@ -69,6 +99,7 @@ baseline, not a replacement for the repository contracts in
 .github/dependabot.yml
 .github/workflows/cleanup-images.yml
 .github/workflows/codetests.yml
+.github/workflows/inttest.yml
 .github/workflows/release.yml
 .gitignore
 .golangci.yml
@@ -86,6 +117,8 @@ examples/docker-compose.yml
 examples/unpackerr.conf.example
 frontend/src/App.svelte
 frontend/src/app.css
+frontend/src/components/Hint.svelte
+frontend/src/components/ItemDetail.svelte
 frontend/src/components/Nav.svelte
 frontend/src/components/TaskDetails.svelte
 frontend/src/lib/api.ts
@@ -130,6 +163,7 @@ pkg/unpackerr/folder_wait_test.go
 pkg/unpackerr/historyfile.go
 pkg/unpackerr/historyfile_test.go
 pkg/unpackerr/historyrestore.go
+pkg/unpackerr/historyrestore_test.go
 pkg/unpackerr/historyrestore_windows_test.go
 pkg/unpackerr/logs.go
 pkg/unpackerr/metrics.go
@@ -212,7 +246,7 @@ with the value in this file before starting the next review.
 git fetch --prune upstream main
 git fetch --prune origin web-ui --tags
 git status --short --branch
-$lastReviewed = 'c88fb41850cd8b625639e4d3fd54120e13badfa6'
+$lastReviewed = '5203befbc0c3e06c05e7d8a3b56855f16998bcd0'
 git rev-parse upstream/main
 git rev-list --left-right --count "$lastReviewed..upstream/main"
 git log --oneline --decorate "$lastReviewed..upstream/main"

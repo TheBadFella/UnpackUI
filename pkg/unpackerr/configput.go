@@ -647,6 +647,10 @@ func putStarrList[T any, P starrApp[T]](
 			return fmt.Errorf("%s instance %q: %w", app, key, err)
 		}
 
+		if err := validateStarrSettings(server); err != nil {
+			return fmt.Errorf("%s instance %q: %w", app, key, err)
+		}
+
 		server.connect()
 	}
 

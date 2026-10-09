@@ -7,6 +7,10 @@ on:
       - unstable
       - web-ui
   pull_request:
+    branches:
+      - main
+      - unstable
+      - web-ui
 permissions:
   contents: read
 jobs:
@@ -26,7 +30,6 @@ jobs:
         shell: bash
         run: go generate ./...
       - name: npm-check
-        if: matrix.os == 'ubuntu'
         working-directory: frontend
         run: npm run check
       - name: go-test
@@ -56,7 +59,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.13
+          version: v2.14
 
   golangci-linux:
     name: golangci-lint
@@ -78,4 +81,4 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
-          version: v2.13
+          version: v2.14

@@ -13,11 +13,12 @@ import (
 	"golift.io/xtractr"
 )
 
-// restoreQueueFromHistory copies recent Starr rows from the JSONL into History.Map
-// so a crash or kill does not lose EXTRACTED-awaiting-import or IMPORTED-awaiting-delete.
-// Folder rows stay out: the watch tracker rebuilds those. Call after validateApps so
-// URL→dialect matching sees the live Starr list. Does not take histMu and History.mu
-// at the same time (updateQueueStatus holds History.mu then histMu).
+// restoreQueueFromHistory copies recent JSONL rows into History.Map so a crash
+// or kill does not lose Starr import-wait / delete-delay or folder delete-after
+// / retry work. Folder items land in Map here; seedFolderTracker (after
+// PollFolders) attaches them to the watch tracker. Call after validateApps so
+// URL→dialect matching sees the live Starr list. Does not take histMu and
+// History.mu at the same time (updateQueueStatus holds History.mu then histMu).
 func (u *Unpackerr) restoreQueueFromHistory() {
 	if u.KeepHistory == 0 {
 		return
@@ -134,23 +135,25 @@ func (u *Unpackerr) extractFromHistoryRecord(
 	stamp, now time.Time,
 ) *Extract {
 	item := &Extract{
-		Syncthing:    rec.Syncthing,
-		SplitFlac:    rec.SplitFlac,
-		Retries:      rec.Retries,
-		HookFail:     rec.HookFail,
-		HookMessages: maps.Clone(rec.HookMessages),
-		Path:         rec.Path,
-		OutputPath:   rec.OutputPath,
-		App:          starr.App(kind),
-		URL:          rec.URL,
-		Updated:      rec.Updated,
-		DeleteOrig:   rec.DeleteOrig,
-		Status:       status,
-		NoRetry:      rec.NoRetry,
-		MaxBytes:     rec.MaxBytes,
-		PreFiles:     preFilesFromKeys(rec.PreFiles),
-		IDs:          cloneIDs(rec.IDs),
-		Event:        rec.Event,
+		Syncthing:      rec.Syncthing,
+		SplitFlac:      rec.SplitFlac,
+		APEFormat:      rec.APEFormat,
+		APECompression: rec.APECompression,
+		Retries:        rec.Retries,
+		HookFail:       rec.HookFail,
+		HookMessages:   maps.Clone(rec.HookMessages),
+		Path:           rec.Path,
+		OutputPath:     rec.OutputPath,
+		App:            starr.App(kind),
+		URL:            rec.URL,
+		Updated:        rec.Updated,
+		DeleteOrig:     rec.DeleteOrig,
+		Status:         status,
+		NoRetry:        rec.NoRetry,
+		MaxBytes:       rec.MaxBytes,
+		PreFiles:       preFilesFromKeys(rec.PreFiles),
+		IDs:            cloneIDs(rec.IDs),
+		Event:          rec.Event,
 	}
 
 	if rec.App != "" && rec.App != kind {
