@@ -70,7 +70,7 @@ func TestRestoreQueueInterruptedAndQueued(t *testing.T) {
 	})
 	unpack.upsertHistory(HistoryRecord{
 		ID: "queued", Kind: string(starr.Lidarr), App: "Lidarr", Path: "/dl/album",
-		Status: QUEUED, Updated: now,
+		Status: QUEUED, Updated: now, SplitFlac: true, APEFormat: "flac", APECompression: 4000,
 	})
 	unpack.restoreQueueFromHistory()
 
@@ -90,6 +90,15 @@ func TestRestoreQueueInterruptedAndQueued(t *testing.T) {
 	queued := unpack.Map["queued"]
 	if queued == nil || queued.Status != WAITING || queued.App != starr.Lidarr {
 		t.Fatalf("queued %+v", queued)
+	}
+
+	if !queued.SplitFlac || queued.APEFormat != "flac" || queued.APECompression != 4000 {
+		t.Fatalf("restored audio settings %+v", queued)
+	}
+
+	recorded := historyFromExtract("queued", queued)
+	if !recorded.SplitFlac || recorded.APEFormat != "flac" || recorded.APECompression != 4000 {
+		t.Fatalf("recorded audio settings %+v", recorded)
 	}
 }
 
