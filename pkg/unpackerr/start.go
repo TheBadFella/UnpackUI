@@ -491,6 +491,7 @@ func (u *Unpackerr) Run() {
 	}
 
 	u.PollFolders()                  // This initializes channel(s) used below.
+	u.seedFolderTracker()            // Attach restored history and drop removed watch paths.
 	u.recoverInterruptedFolders(now) // Re-queue watched folder items that were active before shutdown.
 	u.scanWatchedFolders(now)        // Discover archives copied in while Unpackerr was stopped.
 	u.retrieveAppQueues(now)         // Get in-app queues on startup.
