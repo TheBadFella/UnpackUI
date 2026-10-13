@@ -37,6 +37,10 @@
     itemReason,
     itemTitle,
     deleteRemaining,
+    mergeQueueDetail,
+    shouldRefetchDetail,
+    isDetailResponseValid,
+    statusHasExtractResult,
   } from '../lib/dashboard'
   import {
     loadColumnWidths,
@@ -56,7 +60,13 @@
   let now = $state(Date.now())
   let ageTimer: ReturnType<typeof setInterval> | undefined
   let pendingForget = $state<QueueItem | null>(null)
-  let selectedQueueId = $state<string | null>(null)
+  let pendingDetail = $state<QueueItem | null>(null)
+  let detailFiles = $state<QueueItem | null>(null)
+  let detailFilesReady = $state(false)
+  let detailLoading = $state(false)
+  let detailError = $state<string | null>(null)
+  let detailRequestId = 0
+  let lastTriggerElement: HTMLElement | null = null
 
   type QueueColumn =
     | 'item'
@@ -198,13 +208,72 @@
     queueColumnKeys.filter((key) => key !== 'deletes' || queueShowsDelete),
   )
   const queueTableWidth = $derived(tableWidth(queueColumnWidths, queueVisibleColumns))
-  const selectedQueueItem = $derived(
-    queue.find((item) => item.id === selectedQueueId) ?? null
-  )
+  const detailItem = $derived.by(() => {
+    const target = pendingDetail
+    if (!target) return null
+    const queueRow = live.queue.find((row) => row.id === target.id)
+    if (queueRow) {
+      return mergeQueueDetail(target, queueRow, detailFiles)
+    }
+    const historyRow = live.history.find((row) => row.id === target.id)
+    if (historyRow) {
+      return mergeQueueDetail(target, historyRow, detailFiles)
+    }
+    const merged = mergeQueueDetail(target, target, detailFiles)
+    if (!merged) return null
+    return {
+      ...merged,
+      isUnavailable: true,
+    }
+  })
 
-  function toggleQueueSelect(id: string) {
-    selectedQueueId = selectedQueueId === id ? null : id
+  async function fetchDetail(id: string) {
+    const currentReq = ++detailRequestId
+    detailLoading = true
+    detailError = null
+    const res = await api.get<QueueItem>('queue/item?id=' + encodeURIComponent(id))
+    if (!isDetailResponseValid(currentReq, detailRequestId, id, pendingDetail?.id)) {
+      return
+    }
+    detailLoading = false
+    if (res.ok) {
+      detailFiles = res.body
+    } else {
+      const errPayload = res.body as { error?: string } | undefined
+      detailError = errPayload?.error || (res.status === 404 ? 'Item not found (404)' : 'Failed to load details')
+    }
   }
+
+  async function openDetail(item: QueueItem, triggerEl?: HTMLElement | null) {
+    lastTriggerElement = triggerEl ?? (document.activeElement as HTMLElement | null)
+    pendingDetail = item
+    detailFiles = null
+    detailFilesReady = statusHasExtractResult(item.status)
+    await fetchDetail(item.id)
+  }
+
+  function closeDetail() {
+    detailRequestId++
+    pendingDetail = null
+    detailFiles = null
+    detailFilesReady = false
+    detailLoading = false
+    detailError = null
+    if (lastTriggerElement && document.contains(lastTriggerElement)) {
+      lastTriggerElement.focus()
+    }
+    lastTriggerElement = null
+  }
+
+  $effect(() => {
+    const open = pendingDetail
+    if (!open) return
+    const currentStatus = live.queue.find((row) => row.id === open.id)?.status
+    if (shouldRefetchDetail(open, currentStatus, detailFilesReady)) {
+      detailFilesReady = true
+      void fetchDetail(open.id)
+    }
+  })
   // The badge belongs to the queue table below. History is rendered in its
   // own capped list and may contain the same durable terminal item, so adding
   // both collections would count some visible records twice.
@@ -785,17 +854,17 @@
               {#each queue as item (item.id)}
                 <tr
                   class="items-row"
-                  class:is-selected={selectedQueueId === item.id}
+                  class:is-selected={pendingDetail?.id === item.id}
                   tabindex="0"
                   role="button"
-                  aria-pressed={selectedQueueId === item.id}
+                  aria-haspopup="dialog"
                   aria-label={itemTitle(item)}
-                  onclick={() => toggleQueueSelect(item.id)}
+                  onclick={(e) => openDetail(item, e.currentTarget as HTMLElement)}
                   onkeydown={(event) => {
                     if (event.target !== event.currentTarget) return
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      toggleQueueSelect(item.id)
+                      openDetail(item, event.currentTarget as HTMLElement)
                     }
                   }}
                 >
@@ -911,9 +980,10 @@
                         type="button"
                         color="secondary"
                         outline
+                        aria-haspopup="dialog"
                         onclick={(e) => {
                           e.stopPropagation()
-                          selectedQueueId = item.id
+                          openDetail(item, e.currentTarget as HTMLElement)
                         }}
                         >{$_('phrases.Details')}</Button
                       >
@@ -953,15 +1023,13 @@
         {/if}
       </CardBody>
     </Card>
-    {#if selectedQueueItem}
-      <div class="mt-3">
-        <TaskDetails
-          item={selectedQueueItem}
-          {now}
-          onclose={() => (selectedQueueId = null)}
-        />
-      </div>
-    {/if}
+    <TaskDetails
+      item={detailItem}
+      {now}
+      loading={detailLoading}
+      error={detailError}
+      onclose={closeDetail}
+    />
   {/if}
 {/if}
 
