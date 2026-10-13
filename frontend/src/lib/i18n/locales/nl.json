@@ -293,7 +293,13 @@
       "Error": "Fout",
       "ExtractedFiles": "Uitgepakte bestanden",
       "ArchiveFiles": "Archieven",
-      "DownloadList": "{name} downloaden als tekstbestand"
+      "DownloadList": "{name} downloaden als tekstbestand",
+      "CurrentArchive": "Huidig archief",
+      "Speed": "Snelheid",
+      "ScheduledCleanup": "Geplande opruiming",
+      "LoadingDetails": "Volledige details laden...",
+      "RecordUnavailable": "Dit item bevindt zich niet langer in de actieve wachtrij of geschiedenis.",
+      "Unavailable": "Niet beschikbaar"
     },
     "settings": {
       "Title": "Configuratie",

@@ -293,7 +293,13 @@
       "Error": "Σφάλμα",
       "ExtractedFiles": "Εξαχθέντα αρχεία",
       "ArchiveFiles": "Συμπιεσμένα αρχεία",
-      "DownloadList": "Λήψη {name} ως αρχείο κειμένου"
+      "DownloadList": "Λήψη {name} ως αρχείο κειμένου",
+      "CurrentArchive": "Τρέχον αρχείο",
+      "Speed": "Ταχύτητα",
+      "ScheduledCleanup": "Προγραμματισμένη εκκαθάριση",
+      "LoadingDetails": "Φόρτωση πλήρων λεπτομερειών...",
+      "RecordUnavailable": "Αυτό το στοιχείο δεν βρίσκεται πλέον στην ενεργή ουρά ή στο ιστορικό.",
+      "Unavailable": "Μη διαθέσιμο"
     },
     "settings": {
       "Title": "Διαμόρφωση",

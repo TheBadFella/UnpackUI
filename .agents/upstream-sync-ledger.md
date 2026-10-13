@@ -5,6 +5,24 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
+## Baseline recorded 2026-10-13
+
+- Last reviewed upstream commit: `1e60e6eb59af3fbbdd861321979f2506191d40b5`
+  (PR #805, `code.cloudfoundry.org/bytefmt` to v0.93.0).
+- Fork parent: `420e30aab82332e63bc62b7634cf1ebeea08cd33`; previous upstream baseline: `5203befbc0c3e06c05e7d8a3b56855f16998bcd0`.
+- Reviewed 2 upstream commits across 2 paths (`go.mod`, `go.sum`). Merged in `bbd4ea2`.
+- Converted below-table task details panel into shared modal dialog (`TaskDetails.svelte`)
+  across both Queue and History tables. Preserved dark/light themes, typography, and layout.
+- Adopted upstream full-item loading via `GET /api/queue/item`, one-shot completion refetch,
+  and text file downloads via Blob API while keeping fork marker-file filtering (`visibleFiles`),
+  progress/speed/ETA summaries, and recovery contracts.
+- Passed: `go test -count=1 ./...`, `npm run check` (0 errors, 0 warnings), `npm run build`,
+  `node --experimental-strip-types --test tests/detail-modal-regression.mjs` (6/6 tests),
+  headless Chromium browser verification (focus restoration, Escape/Enter dismiss/open,
+  scheduled cleanup display, marker file filtering, row-action isolation, and 375px mobile layout),
+  and `git diff --check`.
+- Fork merge commit: `bbd4ea2`.
+
 ## Baseline recorded 2026-10-09
 
 - Last reviewed upstream commit: `5203befbc0c3e06c05e7d8a3b56855f16998bcd0`
@@ -248,7 +266,7 @@ with the value in this file before starting the next review.
 git fetch --prune upstream main
 git fetch --prune origin web-ui --tags
 git status --short --branch
-$lastReviewed = '5203befbc0c3e06c05e7d8a3b56855f16998bcd0'
+$lastReviewed = '1e60e6eb59af3fbbdd861321979f2506191d40b5'
 git rev-parse upstream/main
 git rev-list --left-right --count "$lastReviewed..upstream/main"
 git log --oneline --decorate "$lastReviewed..upstream/main"

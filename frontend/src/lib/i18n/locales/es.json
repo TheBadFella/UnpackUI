@@ -293,7 +293,13 @@
       "Error": "Error",
       "ExtractedFiles": "Archivos extraídos",
       "ArchiveFiles": "Archivos comprimidos",
-      "DownloadList": "Descargar {name} como archivo de texto"
+      "DownloadList": "Descargar {name} como archivo de texto",
+      "CurrentArchive": "Archivo actual",
+      "Speed": "Velocidad",
+      "ScheduledCleanup": "Limpieza programada",
+      "LoadingDetails": "Cargando detalles completos...",
+      "RecordUnavailable": "Este elemento ya no está en la cola activa ni en el historial.",
+      "Unavailable": "No disponible"
     },
     "settings": {
       "Title": "Configuración",
