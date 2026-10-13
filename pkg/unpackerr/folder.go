@@ -602,7 +602,7 @@ func (u *Unpackerr) syncFolderQueue(dirPath, kind string) {
 	if _, exists := u.Map[dirPath]; !exists {
 		waitFile := ""
 		if folder.Config != nil {
-			waitFile = folders.WaitFileInTop(dirPath, folder.Config.WaitExtensions)
+			waitFile = folderWaitFile(dirPath, folder.Config.WaitExtensions)
 		}
 
 		folder.WaitFile = waitFile
@@ -872,13 +872,22 @@ func (u *Unpackerr) refreshFolderWait(name string) bool {
 
 	var waitFile string
 	if folder.Config != nil {
-		waitFile = folders.WaitFileInTop(name, folder.Config.WaitExtensions)
+		waitFile = folderWaitFile(name, folder.Config.WaitExtensions)
 	}
 
 	folder.WaitFile = waitFile
 	u.setFolderWaitNote(name, waitFile)
 
 	return waitFile != ""
+}
+
+// Archive work items use the containing directory for upstream wait extensions.
+func folderWaitFile(name string, extensions []string) string {
+	if info, err := os.Stat(name); err == nil && !info.IsDir() {
+		name = filepath.Dir(name)
+	}
+
+	return folders.WaitFileInTop(name, extensions)
 }
 
 func (u *Unpackerr) setFolderWaitNote(name, waitFile string) {
