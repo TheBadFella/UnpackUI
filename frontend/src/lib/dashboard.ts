@@ -66,3 +66,102 @@ export function formatEta(seconds: number | undefined): string {
 export function visibleFiles(files: string[] | undefined): string[] {
   return (files ?? []).filter((file) => !MARKER_FILE.test(file.split(/[\\/]/).pop() ?? ''))
 }
+
+export function statusHasExtractResult(status: string): boolean {
+  switch (status.toLowerCase()) {
+    case 'extracted':
+    case 'extractednothing':
+    case 'extractfailed':
+    case 'imported':
+    case 'deleting':
+    case 'deleted':
+    case 'deletefailed':
+      return true
+    default:
+      return false
+  }
+}
+
+export function shouldRefetchDetail(
+  open: QueueItem | null,
+  currentStatus: string | undefined,
+  detailFilesReady: boolean,
+): boolean {
+  if (!open || detailFilesReady || !currentStatus) return false
+  return statusHasExtractResult(currentStatus)
+}
+
+export function isDetailResponseValid(
+  requestSeq: number,
+  activeSeq: number,
+  itemId: string,
+  activeItemId: string | undefined,
+): boolean {
+  return requestSeq === activeSeq && Boolean(activeItemId) && itemId === activeItemId
+}
+
+export function mergeQueueDetail(
+  pending: QueueItem | null,
+  liveRow: QueueItem | HistoryRecord | null | undefined,
+  detailFiles: QueueItem | null,
+): QueueItem | null {
+  if (!pending) return null
+  const base = liveRow ?? pending
+  const baseArchiveFiles = 'archiveFiles' in base ? base.archiveFiles : undefined
+  const baseExtraFiles = 'extraFiles' in base ? base.extraFiles : undefined
+
+  // Completed or history items have authoritative output paths and final file lists.
+  // When an item has reached a finished or history state, its explicitly provided
+  // file arrays and output paths (even if empty, e.g. extractednothing) are authoritative.
+  // In-flight progress frames omit file lists entirely (undefined); in that case,
+  // supplement with detailFiles.
+  const isHistoryOrFinished =
+    Boolean(liveRow) &&
+    (('finished' in base && Boolean(base.finished)) || statusHasExtractResult(base.status))
+
+  const newFiles = isHistoryOrFinished
+    ? (Array.isArray(base.newFiles) ? base.newFiles : (detailFiles?.newFiles ?? base.newFiles))
+    : (detailFiles?.newFiles && detailFiles.newFiles.length > 0
+        ? detailFiles.newFiles
+        : base.newFiles)
+
+  const origFiles = isHistoryOrFinished
+    ? (Array.isArray(base.origFiles) ? base.origFiles : (detailFiles?.origFiles ?? base.origFiles))
+    : (detailFiles?.origFiles && detailFiles.origFiles.length > 0
+        ? detailFiles.origFiles
+        : base.origFiles)
+
+  const archiveFiles = isHistoryOrFinished
+    ? (Array.isArray(baseArchiveFiles) ? baseArchiveFiles : (detailFiles?.archiveFiles ?? baseArchiveFiles))
+    : (detailFiles?.archiveFiles && detailFiles.archiveFiles.length > 0
+        ? detailFiles.archiveFiles
+        : baseArchiveFiles)
+
+  const extraFiles = isHistoryOrFinished
+    ? (Array.isArray(baseExtraFiles) ? baseExtraFiles : (detailFiles?.extraFiles ?? baseExtraFiles))
+    : (detailFiles?.extraFiles && detailFiles.extraFiles.length > 0
+        ? detailFiles.extraFiles
+        : baseExtraFiles)
+
+  const baseOutputPath = 'outputPath' in base ? base.outputPath : undefined
+  const baseOutput = 'output' in base ? base.output : undefined
+
+  const outputPath = isHistoryOrFinished
+    ? (baseOutputPath !== undefined ? baseOutputPath : (detailFiles?.outputPath || ''))
+    : (detailFiles?.outputPath || baseOutputPath || '')
+
+  const output = isHistoryOrFinished
+    ? (baseOutput !== undefined ? baseOutput : (detailFiles?.output || ''))
+    : (detailFiles?.output || baseOutput || '')
+
+  return {
+    ...base,
+    newFiles,
+    origFiles,
+    archiveFiles,
+    extraFiles,
+    outputPath,
+    output,
+    ids: base.ids ?? detailFiles?.ids,
+  } as unknown as QueueItem
+}

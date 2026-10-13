@@ -27,7 +27,12 @@ jobs:
       - name: Build unpackerr
         run: go build -o unpackerr .
       - name: Clone integration tests
-        run: git clone --depth 1 https://github.com/Unpackerr/unpackerr-inttest.git inttest
+        run: |
+          git clone https://github.com/Unpackerr/unpackerr-inttest.git inttest
+          git -C inttest checkout c0586b22d42840d39fb774f7fbbf9971cbefda26
+          # The fork discovers nested archives at startup and tracks each archive separately.
+          git -C inttest apply --check "${GITHUB_WORKSPACE}/tests/upstream-inttest.patch"
+          git -C inttest apply "${GITHUB_WORKSPACE}/tests/upstream-inttest.patch"
       - name: Integration tests
         working-directory: inttest
         env:

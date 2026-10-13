@@ -59,7 +59,8 @@
   let pendingDeleteRow = $state<HistoryRecord | null>(null)
   let dontAskAgainRowDelete = $state(false)
   let dismissedIds = $state<string[]>([])
-  let selectedHistoryId = $state<string | null>(null)
+  let pendingDetail = $state<HistoryRecord | null>(null)
+  let lastTriggerElement: HTMLElement | null = null
 
   const dismissedStorageKey = 'unpackerr.dashboard.dismissed-history.v1'
   const confirmDeleteStorageKey = 'unpackerr.history.confirm-each-delete.v1'
@@ -192,12 +193,28 @@
 
   const canWrite = has(systemPerm('history', 'write'))
   const allRows = $derived(live.history.filter(isFinishedHistory))
-  const selectedHistoryItem = $derived(
-    allRows.find((row) => row.id === selectedHistoryId) ?? null
-  )
+  const detailItem = $derived.by(() => {
+    const target = pendingDetail
+    if (!target) return null
+    const found = allRows.find((row) => row.id === target.id)
+    if (found) return found
+    return {
+      ...target,
+      isUnavailable: true,
+    }
+  })
 
-  function toggleHistorySelect(id: string) {
-    selectedHistoryId = selectedHistoryId === id ? null : id
+  function openDetail(row: HistoryRecord, triggerEl?: HTMLElement | null) {
+    lastTriggerElement = triggerEl ?? (document.activeElement as HTMLElement | null)
+    pendingDetail = row
+  }
+
+  function closeDetail() {
+    pendingDetail = null
+    if (lastTriggerElement && document.contains(lastTriggerElement)) {
+      lastTriggerElement.focus()
+    }
+    lastTriggerElement = null
   }
   const rows = $derived(
     allRows.filter((row) => !dismissedIds.includes(row.id)),
@@ -489,17 +506,17 @@
           {#each shown as row (row.id)}
             <tr
               class="items-row"
-              class:is-selected={selectedHistoryId === row.id}
+              class:is-selected={pendingDetail?.id === row.id}
               tabindex="0"
               role="button"
-              aria-pressed={selectedHistoryId === row.id}
+              aria-haspopup="dialog"
               aria-label={itemTitle(row)}
-              onclick={() => toggleHistorySelect(row.id)}
+              onclick={(e) => openDetail(row, e.currentTarget as HTMLElement)}
               onkeydown={(event) => {
                 if (event.target !== event.currentTarget) return
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
-                  toggleHistorySelect(row.id)
+                  openDetail(row, event.currentTarget as HTMLElement)
                 }
               }}
             >
@@ -548,9 +565,10 @@
                     color="secondary"
                     outline
                     type="button"
+                    aria-haspopup="dialog"
                     onclick={(e) => {
                       e.stopPropagation()
-                      selectedHistoryId = row.id
+                      openDetail(row, e.currentTarget as HTMLElement)
                     }}>{$_('phrases.Details')}</Button
                   >
                   {#if canWrite}
@@ -575,15 +593,11 @@
   </CardBody>
 </Card>
 
-{#if selectedHistoryItem}
-  <div class="mt-3">
-    <TaskDetails
-      item={selectedHistoryItem}
-      {now}
-      onclose={() => (selectedHistoryId = null)}
-    />
-  </div>
-{/if}
+<TaskDetails
+  item={detailItem}
+  {now}
+  onclose={closeDetail}
+/>
 
 <Modal isOpen={pendingClear} toggle={cancelClear}>
   <ModalHeader toggle={cancelClear}

@@ -293,7 +293,13 @@
       "Error": "Error",
       "ExtractedFiles": "Extracted files",
       "ArchiveFiles": "Archives",
-      "DownloadList": "Download {name} as a text file"
+      "DownloadList": "Download {name} as a text file",
+      "CurrentArchive": "Current archive",
+      "Speed": "Speed",
+      "ScheduledCleanup": "Scheduled cleanup",
+      "LoadingDetails": "Loading full details...",
+      "RecordUnavailable": "This item is no longer in the active queue or history.",
+      "Unavailable": "Unavailable"
     },
     "settings": {
       "Title": "Configuration",

@@ -146,6 +146,8 @@ export interface QueueItem {
   kind?: string
   ids?: Record<string, unknown>
   origFiles?: string[]
+  extraFiles?: string[]
+  isUnavailable?: boolean
 }
 
 export interface HistoryRecord {
@@ -189,6 +191,7 @@ export interface HistoryRecord {
   event?: 'fsnotify' | 'polling'
   queue?: number
   output?: string
+  isUnavailable?: boolean
 }
 
 export type ItemMeta = QueueItem | HistoryRecord
