@@ -22,6 +22,14 @@ baseline, not a replacement for the repository contracts in
   scheduled cleanup display, marker file filtering, row-action isolation, and 375px mobile layout),
   and `git diff --check`.
 - Fork merge commit: `bbd4ea2`.
+- PR #63 and Dependabot PRs #58–#62 and #64 were merged in `fb5e7a1`.
+  Hosted test/lint run `38395645849` and integration run `38395645840` passed.
+  Startup now seeds restored folder history before recovery, and per-archive
+  work checks wait extensions in its containing directory. The integration
+  suite is pinned and its two directory-tracking expectations are adapted to
+  the fork's recursive, per-archive contract without skipping tests.
+- Release: `v2.0.12`. Docker build dependencies use verified registry mirrors
+  after the v2.0.11 QEMU pull was rate-limited.
 
 ## Baseline recorded 2026-10-09
 
@@ -252,7 +260,7 @@ tests/stop-local.ps1
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.12`; existing `v2.0.11` remains untouched.
+- The next safe patch release is `v2.0.13`; existing `v2.0.12` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
