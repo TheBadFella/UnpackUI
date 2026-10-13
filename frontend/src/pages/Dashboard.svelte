@@ -217,7 +217,7 @@
     }
     const historyRow = live.history.find((row) => row.id === target.id)
     if (historyRow) {
-      return mergeQueueDetail(target, historyRow, detailFiles)
+      return mergeQueueDetail(target, historyRow, null)
     }
     const merged = mergeQueueDetail(target, target, detailFiles)
     if (!merged) return null

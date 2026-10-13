@@ -1,0 +1,47 @@
+warning: in the working copy of 'test/folder_v1_test.go', LF will be replaced by CRLF the next time Git touches it
+diff --git a/test/folder_v1_test.go b/test/folder_v1_test.go
+index 8c7f2fc..25cfcd6 100644
+--- a/test/folder_v1_test.go
++++ b/test/folder_v1_test.go
+@@ -43,7 +43,7 @@ func TestFolderPollerUsesInterval(t *testing.T) {
+ 	assertExtractedMarker(t, watch)
+ }
+ 
+-func TestFolderNestedArchiveAtStartIsIgnored(t *testing.T) {
++func TestFolderNestedArchiveAtStartIsExtracted(t *testing.T) {
+ 	t.Parallel()
+ 
+ 	root := t.TempDir()
+@@ -61,7 +61,7 @@ func TestFolderNestedArchiveAtStartIsIgnored(t *testing.T) {
+ 		Interval:    200 * time.Millisecond,
+ 		DeleteAfter: 0,
+ 	}, nil)
+-	h.AssertNeverQueue(t, nested, harness.SkipTimeout)
++	h.WaitQueue(t, filepath.Join(nested, "show.zip"), "extracted", harness.ExtractTimeout)
+ }
+ 
+ func TestFolderWaitExtensions(t *testing.T) {
+@@ -93,20 +93,21 @@ func TestFolderWaitExtensions(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 
+-	got := h.WaitQueueFunc(t, item, harness.ExtractTimeout, func(row harness.QueueItem) bool {
++	archive := filepath.Join(item, "show.zip")
++	got := h.WaitQueueFunc(t, archive, harness.ExtractTimeout, func(row harness.QueueItem) bool {
+ 		return row.Status == "waiting" && strings.Contains(row.Note, ".part") && row.DueKind == "start"
+ 	})
+ 	if got.Note != "show.zip.part" {
+ 		t.Fatalf("note %+v", got)
+ 	}
+ 
+-	h.AssertStatusNot(t, item, "extracted", 3*time.Second)
++	h.AssertStatusNot(t, archive, "extracted", 3*time.Second)
+ 
+ 	if err := os.Remove(filepath.Join(item, "show.zip.part")); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 
+-	h.WaitQueue(t, item, "extracted", harness.ExtractTimeout)
++	h.WaitQueue(t, archive, "extracted", harness.ExtractTimeout)
+ 	assertExtractedMarker(t, watch)
+ }

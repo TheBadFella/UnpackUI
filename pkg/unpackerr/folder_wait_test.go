@@ -9,6 +9,27 @@ import (
 	"golift.io/cnfg"
 )
 
+func TestWaitExtensionsForArchiveWorkItem(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	archive := filepath.Join(root, "show.zip")
+	marker := filepath.Join(root, "show.zip.part")
+	for _, path := range []string{archive, marker} {
+		if err := os.WriteFile(path, []byte("fixture"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := folderWaitFile(archive, []string{".part"}); got != "show.zip.part" {
+		t.Fatalf("wait file = %q", got)
+	}
+	if err := os.Remove(marker); err != nil {
+		t.Fatal(err)
+	}
+	if got := folderWaitFile(archive, []string{".part"}); got != "" {
+		t.Fatalf("wait file after completion = %q", got)
+	}
+}
+
 func TestWaitExtensionsKeepsFolderWaiting(t *testing.T) {
 	t.Parallel()
 
