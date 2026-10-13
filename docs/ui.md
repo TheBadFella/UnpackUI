@@ -47,6 +47,13 @@ The dashboard combines the upstream API resources with the live WebSocket:
   takes a REST snapshot after login and whenever the socket reconnects.
 
 The UI derives active/completed counts and relative times in the browser. It
+opens task details in a shared modal when an entry or its Details button is
+selected. Queue details load complete file lists from `/api/queue/item` and
+refresh when extraction finishes. The modal retains live progress, displays
+cleanup time, and offers text downloads of visible archive and extracted-file
+lists. Removed entries are marked unavailable.
+
+The dashboard
 uses the upstream status labels and keeps marker files named
 `_unpackerred*.txt` out of extracted-file details. Queue and history tables are
 responsive; desktop column widths are saved per browser and can be reset. The

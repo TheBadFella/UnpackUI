@@ -17,7 +17,7 @@ baseline, not a replacement for the repository contracts in
   and text file downloads via Blob API while keeping fork marker-file filtering (`visibleFiles`),
   progress/speed/ETA summaries, and recovery contracts.
 - Passed: `go test -count=1 ./...`, `npm run check` (0 errors, 0 warnings), `npm run build`,
-  `node --experimental-strip-types --test tests/detail-modal-regression.mjs` (6/6 tests),
+  `node --experimental-strip-types --test tests/detail-modal-regression.mjs` (7/7 tests),
   headless Chromium browser verification (focus restoration, Escape/Enter dismiss/open,
   scheduled cleanup display, marker file filtering, row-action isolation, and 375px mobile layout),
   and `git diff --check`.

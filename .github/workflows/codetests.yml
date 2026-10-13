@@ -34,6 +34,7 @@ jobs:
         run: npm run check
       - name: go-test
         run: |
+          node --experimental-strip-types --test tests/detail-modal-regression.mjs
           go test ./...
 
   golangci-darwin:
