@@ -15,9 +15,11 @@ State the requested behavior and observable acceptance condition. Use repository
 
 For a bug, seek a focused reproduction of the user's symptom. If it requires unavailable production access, continue source analysis with hypotheses clearly labeled; do not claim reproduction. Test a falsifiable hypothesis with a targeted probe, then fix the responsible code and remove temporary instrumentation.
 
-For behavior with a useful automated test interface, use one failing regression or feature test, implement the smallest coherent change, and rerun it. Reuse the established test interface rather than requiring a new approval for every test. Keep external calls replaceable at existing interfaces. Tests should observe real outputs and side effects with independent expected values.
+For behavior with a useful automated test interface, use one failing regression or feature test, implement the smallest coherent change, and rerun it. Reuse the established test interface rather than requiring a new approval for every test. Keep external calls replaceable at existing interfaces. Tests should observe real outputs and side effects with independent expected values. A useful regression catches broken behavior and survives an internal refactor. Extracted fixture files, recovery state, web responses and outgoing webhook payloads can be observable behavior at existing interfaces; private helper calls usually are not.
 
 Preserve the contracts in the repository context. Prefer existing modules and simple data structures; remove unnecessary new abstractions only when callers and tests prove they are redundant. Do not delete defensive checks, compatibility handling, comments or fallbacks merely because they look repetitive. Propose larger architectural work separately when it exceeds the request.
+
+For interrupted extraction and watched-folder recovery, review an interrupted run and a repeat run using temporary archives and outputs. Preserve completed files and webhook deduplication; a partial artifact is not disposable merely because it is old.
 
 ## Review the result
 
