@@ -315,6 +315,7 @@ export interface FolderConfig {
   move_back: boolean
   delete_after: string | null
   extract_isos: boolean
+  preserve_exec: boolean
   disableRecursion: boolean
   maxNested: number
   extrasMaxDepth: number
