@@ -31,7 +31,7 @@ baseline, not a replacement for the repository contracts in
   `node --experimental-strip-types --test tests/detail-modal-regression.mjs` (7/7 tests passed),
   `npm run build` (clean Vite production build), `golangci-lint run ./...` (0 issues), and `git diff --check`.
 - Fork merge commit: `540a91e`.
-- Release: `v2.0.13`.
+- Release: `v2.0.14` (`v2.0.13` sync + `v2.0.14` dark monospace theming retention in task details and global modals).
 
 ### Previous baseline recorded 2026-10-13
 
