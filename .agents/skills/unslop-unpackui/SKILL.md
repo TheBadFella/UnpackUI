@@ -8,7 +8,7 @@ description: Edit UnpackUI documentation, UI prose and change summaries for plai
 Read the applicable repository instructions. Work only on the prose requested or already being changed.
 
 1. Identify the reader and what they need to understand or do. Preserve the author's point, scope and uncertainty.
-2. Remove promotional claims, generic openings/conclusions, repeated labels, unnecessary jargon and filler. Prefer concrete subjects, active verbs and consistent terminology. Split sentences that require rereading.
+2. Remove promotional claims, generic openings/conclusions, repeated labels, unnecessary jargon and filler. Prefer concrete subjects, active verbs and consistent terminology. Split sentences that require rereading. Use complete sentences with articles and verbs; avoid compressed fragments, unexplained arrows and decorative metaphors that make the reader decode the meaning.
 3. Keep evidence, qualifications that affect accuracy, source links and useful lists/tables. Never invent a number, opinion, personal experience or test result to make the writing sound human.
 4. Preserve commands, code fences, paths, identifiers, schemas, placeholders, quoted source text and license notices. Comments that explain operational constraints keep those facts. Prompts and tool descriptions can change behavior; treat substantive rewrites as behavior changes with the appropriate checks.
 5. Use restrained formatting and the repository's release/document style. Avoid gratuitous em dashes and decorative emphasis; do not mechanically replace punctuation inside code or required templates. Useful parentheses, colons and real technical terms are allowed.
