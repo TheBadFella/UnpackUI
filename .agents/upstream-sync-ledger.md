@@ -5,7 +5,34 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
-## Baseline recorded 2026-10-13
+## Baseline recorded 2026-10-25
+
+- Last reviewed upstream commit: `3ff4271eadae0c294e354458a86ca5f15be05e37`
+  (PR #822, Update dependency rapidoc to v11).
+- Fork parent: `ac33e09` / `cbb7adc`; previous upstream baseline: `1e60e6eb59af3fbbdd861321979f2506191d40b5`.
+- Reviewed 52 upstream commits across 40 paths (1,973 insertions, 1,600 deletions). Merged in `540a91e`.
+- Adopted upstream `preserve_exec` mode for watched folders (`pkg/folders/config.go`, `pkg/unpackerr/folder.go`,
+  `pkg/unpackerr/configdump.go`, `pkg/unpackerr/openapi.json`, `pkg/configdef/definitions.yml`,
+  `FoldersForm.svelte`, types, and locales).
+- Adopted upstream xtractr v0.8.0, bytefmt v0.94.0, RapiDoc v11, and the Vitest frontend unit test suite
+  (`src/**/*.spec.ts`) along with workflow integration.
+- Adopted dependency updates: zod 4.6.7, fast-uri 3.1.9, undici, @scalar/openapi-parser, phosphor-svelte 3.1.1,
+  vite 8.3.4, svelte 5.57.2, @types/node 24.19.2, golangci-lint v2.15, goreleaser-action v7.3.0,
+  golang.org/x/net v0.61.0, and golang:1.27-alpine Docker digest.
+- Preserved fork contracts:
+  - Custom UI layouts, branding, dark/light themes, and dashboard/history views.
+  - Detail modal dialog and regression tests (`tests/detail-modal-regression.mjs`).
+  - Watched folder recovery, incomplete download deferral, and recursive folder semantics.
+  - Fork release workflow and multi-architecture Docker builds (`ghcr.io/thebadfella/unpackui`).
+  - Legacy `UN_FOLDERS_INTERVAL` fallback, `webserver.api` and `webserver.ui` compatibility switches,
+    and flat stats fields for dashboard clients.
+- Passed: `go test -count=1 ./...` (all Go packages passed), `npm run check` (0 errors, 0 warnings),
+  `npm test` (Vitest: 13/13 test files, 43/43 tests passed),
+  `node --experimental-strip-types --test tests/detail-modal-regression.mjs` (7/7 tests passed),
+  `npm run build` (clean Vite production build), `golangci-lint run ./...` (0 issues), and `git diff --check`.
+- Fork merge commit: `540a91e`.
+
+### Previous baseline recorded 2026-10-13
 
 - Last reviewed upstream commit: `1e60e6eb59af3fbbdd861321979f2506191d40b5`
   (PR #805, `code.cloudfoundry.org/bytefmt` to v0.93.0).
@@ -127,6 +154,7 @@ baseline, not a replacement for the repository contracts in
 .github/dependabot.yml
 .github/workflows/cleanup-images.yml
 .github/workflows/codetests.yml
+.github/workflows/fork.yml
 .github/workflows/inttest.yml
 .github/workflows/release.yml
 .gitignore
@@ -146,7 +174,6 @@ examples/unpackerr.conf.example
 frontend/src/App.svelte
 frontend/src/app.css
 frontend/src/components/Hint.svelte
-frontend/src/components/ItemDetail.svelte
 frontend/src/components/Nav.svelte
 frontend/src/components/TaskDetails.svelte
 frontend/src/lib/api.ts
@@ -164,6 +191,7 @@ frontend/src/pages/Login.svelte
 frontend/src/pages/Settings.svelte
 frontend/src/pages/System.svelte
 frontend/src/pages/settings/FoldersForm.svelte
+go.sum
 init/docker/Dockerfile.goreleaser
 pkg/configdef/definitions.yml
 pkg/folders/config.go
@@ -209,10 +237,12 @@ pkg/unpackerr/webserver_test.go
 settings.sh
 tests/README.md
 tests/add-dummy-entry.ps1
+tests/detail-modal-regression.mjs
 tests/run-codetests.ps1
 tests/run-codetests.sh
 tests/start-local.ps1
 tests/stop-local.ps1
+tests/upstream-inttest.patch
 ```
 
 ### Merge decisions and invariants
@@ -274,7 +304,7 @@ with the value in this file before starting the next review.
 git fetch --prune upstream main
 git fetch --prune origin web-ui --tags
 git status --short --branch
-$lastReviewed = '1e60e6eb59af3fbbdd861321979f2506191d40b5'
+$lastReviewed = '3ff4271eadae0c294e354458a86ca5f15be05e37'
 git rev-parse upstream/main
 git rev-list --left-right --count "$lastReviewed..upstream/main"
 git log --oneline --decorate "$lastReviewed..upstream/main"
