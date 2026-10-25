@@ -31,6 +31,7 @@ baseline, not a replacement for the repository contracts in
   `node --experimental-strip-types --test tests/detail-modal-regression.mjs` (7/7 tests passed),
   `npm run build` (clean Vite production build), `golangci-lint run ./...` (0 issues), and `git diff --check`.
 - Fork merge commit: `540a91e`.
+- Release: `v2.0.13`.
 
 ### Previous baseline recorded 2026-10-13
 
@@ -290,7 +291,7 @@ tests/upstream-inttest.patch
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.13`; existing `v2.0.12` remains untouched.
+- The next safe patch release is `v2.0.14`; existing `v2.0.13` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
