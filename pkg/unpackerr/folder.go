@@ -160,6 +160,7 @@ func (u *Unpackerr) queueFolderExtract(
 		Path:             name,
 		ExcludeSuffix:    exclude,
 		AllowSymlinks:    folder.Config.AllowSymlinks,
+		PreserveExec:     folder.Config.PreserveExec,
 		MaxBytes:         folder.Config.ResolvedMaxBytes,
 		MaxFiles:         folder.Config.MaxFiles,
 		MaxRatio:         folder.Config.MaxRatio,

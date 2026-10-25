@@ -5,6 +5,7 @@
 
 import { readCookie } from './util'
 
+export const LoggedOut = new Error('logged out')
 export const TimedOut = new Error('request timed out')
 
 // urlbase lets a reverse-proxied SPA know its prefix. The backend drops a cookie;
@@ -27,6 +28,10 @@ export function setApiKey(key: string) {
 
 export function getApiKey(): string {
   return apiKey
+}
+
+export function setUrlbase(base: string) {
+  urlbase = base || '/'
 }
 
 export function getUrlbase(): string {
