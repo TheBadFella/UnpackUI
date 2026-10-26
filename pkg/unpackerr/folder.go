@@ -5,8 +5,10 @@ package unpackerr
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -411,6 +413,10 @@ func (u *Unpackerr) folderXtractrCallback(resp *xtractr.Response) {
 
 	u.unlockHistory()
 
+	if resp.Error == nil && len(resp.NewFiles) > 0 {
+		resp.NewFiles = expandExtractedFiles(resp.NewFiles)
+	}
+
 	remnantStatus, remnants := u.finishFolderExtractWork(resp, preFiles, retries, configPath)
 
 	u.lockHistory()
@@ -738,21 +744,45 @@ func (u *Unpackerr) checkFailedFolder(name string, folder *Folder, now time.Time
 //nolint:wsl_v5
 func (u *Unpackerr) deleteAfterReached(name string, now time.Time, folder *Folder) {
 	var webhook bool
-	// Folder reached delete delay (after extraction), nuke it.
-	if folder.Config.DeleteFiles && !folder.Config.MoveBack {
-		u.queueDelete(&fileDeleteReq{Paths: []string{strings.TrimRight(name, `/\`) + suffix}})
-		webhook = true
-	} else if folder.Config.DeleteFiles && len(folder.Files) > 0 {
-		u.queueDelete(&fileDeleteReq{Paths: folder.Files})
-		webhook = true
+
+	var purgeRoot string
+	if info, err := os.Stat(name); err == nil && info.IsDir() {
+		if folder.Config == nil || filepath.Clean(name) != filepath.Clean(folder.Config.Path) {
+			purgeRoot = name
+		}
 	}
 
-	if folder.Config.DeleteOrig && !folder.Config.MoveBack {
-		u.queueDelete(&fileDeleteReq{Paths: []string{name}})
-		webhook = true
-	} else if folder.Config.DeleteOrig && len(folder.Archives) > 0 {
-		u.queueDelete(&fileDeleteReq{Paths: folder.Archives.List()})
-		webhook = true
+	// Folder reached delete delay (after extraction), nuke it.
+	if folder.Config.DeleteFiles {
+		delPaths := slices.Clone(folder.Files)
+		if len(delPaths) == 0 && !folder.Config.MoveBack {
+			delPaths = []string{strings.TrimRight(name, `/\`) + suffix}
+		}
+
+		if len(delPaths) > 0 {
+			u.queueDelete(&fileDeleteReq{
+				Paths:            delPaths,
+				PurgeEmptyParent: purgeRoot != "",
+				PurgeEmptyRoot:   purgeRoot,
+			})
+			webhook = true
+		}
+	}
+
+	if folder.Config.DeleteOrig {
+		delOrig := folder.Archives.List()
+		if len(delOrig) == 0 && !folder.Config.MoveBack {
+			delOrig = []string{name}
+		}
+
+		if len(delOrig) > 0 {
+			u.queueDelete(&fileDeleteReq{
+				Paths:            delOrig,
+				PurgeEmptyParent: purgeRoot != "",
+				PurgeEmptyRoot:   purgeRoot,
+			})
+			webhook = true
+		}
 	}
 
 	u.lockHistory()
@@ -946,4 +976,56 @@ func (u *Unpackerr) copyFolderRetriesLocked(name string, folder *Folder) {
 	if item := u.Map[name]; item != nil {
 		item.Retries = folder.Retries
 	}
+}
+
+// expandExtractedFiles checks each path in paths. If a path is an existing directory
+// (such as an archive extracting into an enclosing folder), it walks the directory
+// recursively and returns all leaf files. If walking yields no files or the path is
+// a file / non-existent path, the path itself is retained.
+func expandExtractedFiles(paths []string) []string {
+	if len(paths) == 0 {
+		return paths
+	}
+
+	result := make([]string, 0, len(paths))
+	seen := make(map[string]struct{}, len(paths))
+
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err != nil || !info.IsDir() {
+			if _, ok := seen[p]; !ok {
+				seen[p] = struct{}{}
+				result = append(result, p)
+			}
+
+			continue
+		}
+
+		var subFiles []string
+		_ = filepath.WalkDir(p, func(child string, d fs.DirEntry, walkErr error) error {
+			if walkErr == nil && d != nil && !d.IsDir() {
+				subFiles = append(subFiles, child)
+			}
+
+			return nil
+		})
+
+		if len(subFiles) > 0 {
+			sort.Strings(subFiles)
+
+			for _, sf := range subFiles {
+				if _, ok := seen[sf]; !ok {
+					seen[sf] = struct{}{}
+					result = append(result, sf)
+				}
+			}
+		} else {
+			if _, ok := seen[p]; !ok {
+				seen[p] = struct{}{}
+				result = append(result, p)
+			}
+		}
+	}
+
+	return result
 }

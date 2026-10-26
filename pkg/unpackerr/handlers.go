@@ -394,6 +394,10 @@ func (u *Unpackerr) handleXtractrCallback(resp *xtractr.Response) { //nolint:fun
 	u.unlockHistory()
 	u.updateMetrics(resp, app, url)
 
+	if resp.Error == nil && len(resp.NewFiles) > 0 {
+		resp.NewFiles = expandExtractedFiles(resp.NewFiles)
+	}
+
 	remnantStatus, remnants := u.handleRemnants(resp, preFiles, retries)
 
 	var files []string
