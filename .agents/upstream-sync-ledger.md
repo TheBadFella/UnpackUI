@@ -32,6 +32,7 @@ baseline, not a replacement for the repository contracts in
   `npm run build` (clean Vite production build), `golangci-lint run ./...` (0 issues), and `git diff --check`.
 - Fork merge commit: `540a91e`.
 - Release: `v2.0.14` (`v2.0.13` sync + `v2.0.14` dark monospace theming retention in task details and global modals).
+- Release: `v2.0.15` (expand extracted directory paths into individual leaf files for history, queue, and webhooks; fix watched folder `delete_files` and `delete_orig` cleanup deletion to purge leaf files and empty subdirectories up to tracked folder).
 
 ### Previous baseline recorded 2026-10-13
 
