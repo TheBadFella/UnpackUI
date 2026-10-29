@@ -481,6 +481,19 @@
           </Col>
           <Col md="4">
             <Input
+              id={`folder-${row.id}-disable-log`}
+              helpKey="config.folders.disable_log"
+              type="select"
+              invert
+              label={$_('config.folders.disable_log.label')}
+              bind:value={folder.disable_log}
+              original={prev?.disable_log}
+              disabled={!canWrite}
+              envVar={envField(envPrefix, slug, 'DISABLE_LOG')}
+            />
+          </Col>
+          <Col md="4">
+            <Input
               id={`folder-${row.id}-skip-empty`}
               helpKey="config.folders.skip_empty"
               type="select"

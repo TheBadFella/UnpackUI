@@ -645,4 +645,12 @@
     text-transform: uppercase;
     margin: 0.75rem 0 0;
   }
+
+  @media (max-width: 767.98px) {
+    .input :global(.form-control),
+    .input :global(.form-select),
+    .input :global(.input-group > .btn) {
+      min-height: 44px;
+    }
+  }
 </style>

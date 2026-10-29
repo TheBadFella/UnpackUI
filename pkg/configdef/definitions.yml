@@ -340,6 +340,23 @@ sections:
         desc: |
           How often to poll starr apps (sonarr, radarr, etc).
           Recommend 1m-5m. Uses Go Duration.
+      - name: timeout
+        envvar: TIMEOUT
+        default: 10s
+        recommend: *TIMEOUTS
+        short: Default request timeout for Starr apps and hooks.
+        desc: |
+          Used when an app or hook does not set its own timeout.
+          Restart after changing this default so existing clients are rebuilt.
+      - name: delete_delay
+        envvar: DELETE_DELAY
+        default: 5m
+        recommend: *GLOBAL_INTERVALS
+        short: Default delay before cleaning up extracted files after Starr import.
+        desc: |
+          Used when a Starr app does not set its own delete_delay.
+          Restart after changing this default so existing apps use the new delay.
+          This does not control watched-folder cleanup; use folder delete_after.
       - name: progress
         envvar: PROGRESS
         default: 15s

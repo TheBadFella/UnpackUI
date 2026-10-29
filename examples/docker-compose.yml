@@ -37,6 +37,8 @@ services:
     - UN_STATE_FILE=/downloads/unpackerr.state.json
     - UN_KEEP_HISTORY=400
     - UN_INTERVAL=2m
+    - UN_TIMEOUT=10s
+    - UN_DELETE_DELAY=5m
     - UN_PROGRESS=15s
     - UN_START_DELAY=1m
     - UN_RETRY_DELAY=5m
@@ -180,4 +182,4 @@ services:
     - UN_CMDHOOK_0_EXCLUDE_1=lidarr
     - UN_CMDHOOK_0_TIMEOUT=10s
 
-## => Content Auto Generated, 04 OCT 2026 06:03 UTC
+## => Content Auto Generated, 29 OCT 2026 19:18 UTC

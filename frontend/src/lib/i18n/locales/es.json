@@ -147,8 +147,6 @@
     "LogFiles": "Registros",
     "API": "API",
     "Theme": "Tema",
-    "ThemeLight": "Claro",
-    "ThemeDark": "Oscuro",
     "Language": "Idioma",
     "Toggle": "Mostrar u ocultar la navegación"
   },
@@ -217,7 +215,7 @@
       "Status": "Estado",
       "Item": "Elemento",
       "Progress": "Progreso",
-      "ETA": "ETA",
+      "ETA": "ETA {remain}",
       "Retries": "Reintentos",
       "Updated": "Actualizado",
       "Actions": "Acciones",
@@ -232,7 +230,6 @@
       "ArchiveOf": "Archivo {n} de {total}",
       "SpeedAvg": "{speed}/s prom.",
       "SpeedNow": "{speed}/s",
-      "ETA": "ETA {remain}",
       "DueStart": "Empieza en {remain}",
       "DueRetry": "Reintento en {remain}",
       "DueCleanup": "Limpieza en {remain}",
@@ -299,7 +296,8 @@
       "ScheduledCleanup": "Limpieza programada",
       "LoadingDetails": "Cargando detalles completos...",
       "RecordUnavailable": "Este elemento ya no está en la cola activa ni en el historial.",
-      "Unavailable": "No disponible"
+      "Unavailable": "No disponible",
+      "ETA": "Tiempo restante"
     },
     "settings": {
       "Title": "Configuración",
@@ -524,7 +522,7 @@
       "logQueues": {
         "label": "Intervalo de colas en el registro",
         "description": "Con qué frecuencia imprimir los recuentos de cola de Starr.",
-        "tooltip": "Apagado detiene esas líneas. El modo actividad sigue ocultando los recuentos en cero si dejas esto encendido."
+        "tooltip": "Intervalo de registro de las colas. El modo de actividad oculta los recuentos vacíos."
       },
       "keepHistory": {
         "label": "Conservar historial",
@@ -571,6 +569,14 @@
         "label": "Contraseñas RAR/7z",
         "description": "Contraseñas a probar en archivos cifrados, una por línea.",
         "tooltip": "Se prueban en orden hasta que una funciona. Una línea filepath:/ruta/a/passwords.txt lee más contraseñas de ese archivo."
+      },
+      "logFileMode": {
+        "label": "Permisos del archivo de registro",
+        "description": "Permisos POSIX para nuevos archivos de registro de la aplicación."
+      },
+      "timeout": {
+        "label": "Tiempo de espera predeterminado",
+        "description": "Tiempo de espera para Starr y hooks. Los clientes existentes requieren un reinicio para usar el nuevo valor."
       }
     },
     "webserver": {
@@ -872,6 +878,10 @@
         "label": "Omitir carpetas vacías",
         "description": "No poner en cola carpetas que no contienen archivos comprimidos.",
         "tooltip": "Tras el retraso de inicio, las carpetas sin archivos comprimidos salen del estado de espera sin historial ni webhooks."
+      },
+      "disable_log": {
+        "label": "Crear registro de extracción",
+        "description": "Escribe unpackerred.txt tras extraer en esta carpeta. El registro de la aplicación sigue activo."
       }
     },
     "hooks": {

@@ -719,10 +719,13 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 	unpack.LogFile = "/var/log/unpackerr.log"
 	unpack.LogFiles = 4
 	unpack.LogFileMb = 12
+	unpack.LogFileMode = "0640"
 	unpack.FileMode = "0640"
 	unpack.DirMode = "0750"
 	unpack.KeepHistory = 50
 	unpack.Interval = cnfg.Duration{Duration: 3 * time.Minute}
+	unpack.Timeout = cnfg.Duration{Duration: 37 * time.Second}
+	unpack.DeleteDelay = cnfg.Duration{Duration: 9 * time.Minute}
 	unpack.StartDelay = cnfg.Duration{Duration: 2 * time.Minute}
 	unpack.Passwords = StringSlice{"plain-pass", "filepath:/run/secrets/rarpass"}
 	unpack.Webserver.ListenAddr = "127.0.0.1:5656"
@@ -760,6 +763,7 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 	unpack.Folder.Buffer = 5000
 	unpack.Folders = instanceMap([]*FolderConfig{{
 		Path: "/watch", ExtractPath: "/extracted", DeleteOrig: true, MoveBack: true, ExtractISOs: true,
+		DisableLog:  true,
 		Interval:    cnfg.Duration{Duration: 4 * time.Second},
 		DeleteAfter: &cnfg.Duration{Duration: 11 * time.Minute}, MaxNested: 2, MaxFiles: 99, MaxRatio: 3.5,
 		ExcludePaths: []string{"/watch/skip"},
