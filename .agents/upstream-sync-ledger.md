@@ -24,6 +24,9 @@ baseline, not a replacement for the repository contracts in
 - Dependabot PRs #66–#69 merged with passing checks. #67's original integration
   failure was a smoke-test port collision (`bind: address already in use`);
   its final head `f655c22` passed all six checks before merge.
+- Aligned the root source-build Dockerfile with #69's Alpine digest; the bot
+  had only changed the GoReleaser Dockerfile. Registry inspection confirmed
+  the new index and supported architectures. No user configuration changes.
 - This release removes `.commandcode/taste` and light-mode selection, adds
   watched-folder extraction-log, global request-timeout and POSIX log-mode
   controls, and improves the shared task dialog and keyboard focus handling.
