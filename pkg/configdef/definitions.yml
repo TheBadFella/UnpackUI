@@ -1036,7 +1036,7 @@ sections:
         default: false
         recommend: *BOOLEAN
         short: Turns off creation of extraction log files for this folder.
-        desc: Disable extraction log (unpackerred.txt) file creation?
+        desc: Disable extraction log (_unpackerred.*.txt) file creation?
       - name: move_back
         envvar: MOVE_BACK
         default: false

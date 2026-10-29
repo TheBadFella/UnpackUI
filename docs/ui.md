@@ -46,7 +46,7 @@ surfaces, clearer labels and larger touch targets. Tab stays inside the dialog;
 Escape closes it and returns focus to the entry or button that opened it.
 
 Under **Configuration → Folders → Extraction**, **Create extraction log**
-controls `disable_log`. Choose **Disabled** to stop creating `unpackerred.txt`
+controls `disable_log`. Choose **Disabled** to stop creating extraction logs named `_unpackerred.*.txt`
 for that watched folder. This does not disable application or HTTP access logs
 and does not remove existing extraction logs. Save and restart to apply folder
 changes.

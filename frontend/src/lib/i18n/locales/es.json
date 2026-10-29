@@ -881,7 +881,7 @@
       },
       "disable_log": {
         "label": "Crear registro de extracción",
-        "description": "Escribe unpackerred.txt tras extraer en esta carpeta. El registro de la aplicación sigue activo."
+        "description": "Crea un registro de texto junto a los archivos extraídos. El registro de la aplicación sigue activo."
       }
     },
     "hooks": {
