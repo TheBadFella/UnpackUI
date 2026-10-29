@@ -147,8 +147,6 @@
     "LogFiles": "Logs",
     "API": "API",
     "Theme": "Theme",
-    "ThemeLight": "Light",
-    "ThemeDark": "Dark",
     "Language": "Language",
     "Toggle": "Toggle navigation"
   },
@@ -217,7 +215,7 @@
       "Status": "Status",
       "Item": "Item",
       "Progress": "Progress",
-      "ETA": "ETA",
+      "ETA": "ETA {remain}",
       "Retries": "Retries",
       "Updated": "Updated",
       "Actions": "Actions",
@@ -232,7 +230,6 @@
       "ArchiveOf": "Archive {n} of {total}",
       "SpeedAvg": "{speed}/s avg",
       "SpeedNow": "{speed}/s",
-      "ETA": "ETA {remain}",
       "DueStart": "Starts in {remain}",
       "DueRetry": "Retry in {remain}",
       "DueCleanup": "Cleanup in {remain}",
@@ -299,7 +296,8 @@
       "ScheduledCleanup": "Scheduled cleanup",
       "LoadingDetails": "Loading full details...",
       "RecordUnavailable": "This item is no longer in the active queue or history.",
-      "Unavailable": "Unavailable"
+      "Unavailable": "Unavailable",
+      "ETA": "ETA"
     },
     "settings": {
       "Title": "Configuration",
@@ -524,7 +522,7 @@
       "logQueues": {
         "label": "Log queues interval",
         "description": "How often to print Starr queue counts.",
-        "tooltip": "Off stops those lines. Activity mode still hides all-zero counts when you leave this on."
+        "tooltip": "Queue counts are logged at this interval. Activity mode hides counts that are all zero."
       },
       "keepHistory": {
         "label": "Keep history",
@@ -571,6 +569,14 @@
         "label": "RAR/7z passwords",
         "description": "Passwords to try on encrypted archives, one per line.",
         "tooltip": "Tried in order until one works. A line filepath:/path/to/passwords.txt reads more passwords from that file."
+      },
+      "logFileMode": {
+        "label": "Log file permissions",
+        "description": "POSIX permissions for new application log files."
+      },
+      "timeout": {
+        "label": "Default request timeout",
+        "description": "Default timeout for Starr apps and hooks. Existing clients need a restart to use a changed default."
       }
     },
     "webserver": {
@@ -872,6 +878,10 @@
         "label": "Skip empty folders",
         "description": "Do not queue folders that contain no archives.",
         "tooltip": "After start delay, archive-free folders leave the waiting state without history or webhooks."
+      },
+      "disable_log": {
+        "label": "Create extraction log",
+        "description": "Write unpackerred.txt after extraction in this watched folder. Application logging stays enabled."
       }
     },
     "hooks": {

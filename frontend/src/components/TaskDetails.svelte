@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import {
     Badge,
     Button,
@@ -47,6 +48,35 @@
   } = $props()
 
   const uid = $props.id()
+
+  function containFocus(node: HTMLElement) {
+    const dialog = node.closest<HTMLElement>('[role="dialog"]')
+    if (!dialog) return
+    // Sveltestrap focuses the dialog, but does not make it focusable or trap Tab.
+    dialog.tabIndex = -1
+    dialog.setAttribute('aria-modal', 'true')
+    void tick().then(() => {
+      if (dialog.isConnected) dialog.focus()
+    })
+
+    function trapTab(event: KeyboardEvent) {
+      if (event.key !== 'Tab' || !dialog) return
+      const buttons = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'))
+      const first = buttons[0]
+      const last = buttons.at(-1)
+      if (!first || !last) return
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    dialog.addEventListener('keydown', trapTab)
+    return { destroy: () => dialog.removeEventListener('keydown', trapTab) }
+  }
 
   const dueKeys: Record<string, string> = {
     start: 'pages.dashboard.DueStart',
@@ -295,7 +325,7 @@
 >
   {#if item}
     <ModalHeader toggle={onclose} id="item-detail-title">
-      <div class="item-detail-title">
+      <div class="item-detail-title" use:containFocus>
         <span class="d-inline-flex align-items-center gap-2 flex-wrap">
           <strong class="fs-5">{title || item.app}</strong>
           {#if title && title !== item.app}
@@ -397,7 +427,7 @@
           <dd>{speed}</dd>
         {/if}
         {#if eta}
-          <dt>{$_('pages.dashboard.ETA')}</dt>
+          <dt>{$_('pages.detail.ETA')}</dt>
           <dd>{eta}</dd>
         {/if}
         {#if due}

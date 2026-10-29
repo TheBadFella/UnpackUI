@@ -291,7 +291,7 @@ export interface StarrConfig {
   httpUser?: string
   username?: string
   password?: string
-  path: string
+  path?: string
   paths: string[]
   protocols: string
   delete_orig: boolean
