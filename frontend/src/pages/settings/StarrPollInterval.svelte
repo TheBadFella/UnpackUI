@@ -49,7 +49,7 @@
         <Col md="6">
           <Input
             id="config.general.logQueues"
-            type="interval"
+            type="logqueue"
             bind:value={starrPoll.general.logQueues}
             original={starrPoll.orig?.logQueues}
             disabled={!canWrite}
