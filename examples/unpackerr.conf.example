@@ -73,6 +73,15 @@ keep_history = 400
 ## Recommend 1m-5m. Uses Go Duration.
 interval = "2m"
 
+## Used when an app or hook does not set its own timeout.
+## Restart after changing this default so existing clients are rebuilt.
+timeout = "10s"
+
+## Used when a Starr app does not set its own delete_delay.
+## Restart after changing this default so existing apps use the new delay.
+## This does not control watched-folder cleanup; use folder delete_after.
+delete_delay = "5m"
+
 ## How often status is logged for in-progress extractions.
 ## `0` uses the default `15s`. Uses Go Duration.
 progress = "15s"
@@ -470,7 +479,7 @@ passwords = []
 # delete_files = false
 ## Delete original items after successful extraction? delete_after must be greater than 0.
 # delete_original = false
-## Disable extraction log (unpackerred.txt) file creation?
+## Disable extraction log (_unpackerred.*.txt) file creation?
 # disable_log = false
 ## Move extracted files into original folder? If false, files go into an _unpackerred folder.
 # move_back = false
@@ -586,4 +595,4 @@ passwords = []
 ## You can adjust how long to wait for the command to run.
 # timeout = "10s"
 
-## => Content Auto Generated, 04 OCT 2026 06:03 UTC
+## => Content Auto Generated, 29 OCT 2026 19:18 UTC

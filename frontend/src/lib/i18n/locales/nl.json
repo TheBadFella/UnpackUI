@@ -147,8 +147,6 @@
     "LogFiles": "Logs",
     "API": "API",
     "Theme": "Thema",
-    "ThemeLight": "Licht",
-    "ThemeDark": "Donker",
     "Language": "Taal",
     "Toggle": "Navigatie in- of uitschakelen"
   },
@@ -217,7 +215,7 @@
       "Status": "Status",
       "Item": "Item",
       "Progress": "Voortgang",
-      "ETA": "ETA",
+      "ETA": "ETA {remain}",
       "Retries": "Pogingen",
       "Updated": "Bijgewerkt",
       "Actions": "Acties",
@@ -232,7 +230,6 @@
       "ArchiveOf": "Archief {n} van {total}",
       "SpeedAvg": "{speed}/s gem.",
       "SpeedNow": "{speed}/s",
-      "ETA": "ETA {remain}",
       "DueStart": "Start over {remain}",
       "DueRetry": "Opnieuw over {remain}",
       "DueCleanup": "Opschonen over {remain}",
@@ -299,7 +296,8 @@
       "ScheduledCleanup": "Geplande opruiming",
       "LoadingDetails": "Volledige details laden...",
       "RecordUnavailable": "Dit item bevindt zich niet langer in de actieve wachtrij of geschiedenis.",
-      "Unavailable": "Niet beschikbaar"
+      "Unavailable": "Niet beschikbaar",
+      "ETA": "Resterende tijd"
     },
     "settings": {
       "Title": "Configuratie",
@@ -524,7 +522,7 @@
       "logQueues": {
         "label": "Interval wachtrijlog",
         "description": "Hoe vaak Starr-wachtrijtellingen worden afgedrukt.",
-        "tooltip": "Uit stopt die regels. Activiteitsmodus verbergt nog steeds nultellingen als je dit aan laat."
+        "tooltip": "Interval voor het loggen van wachtrijaantallen. Activiteitsmodus verbergt lege aantallen."
       },
       "keepHistory": {
         "label": "Geschiedenis bewaren",
@@ -571,6 +569,14 @@
         "label": "RAR/7z-wachtwoorden",
         "description": "Wachtwoorden om te proberen op versleutelde archieven, één per regel.",
         "tooltip": "Worden op volgorde geprobeerd tot er één werkt. Een regel filepath:/pad/naar/passwords.txt leest meer wachtwoorden uit dat bestand."
+      },
+      "logFileMode": {
+        "label": "Logbestandsrechten",
+        "description": "POSIX-rechten voor nieuwe applicatielogbestanden."
+      },
+      "timeout": {
+        "label": "Standaard time-out",
+        "description": "Standaard time-out voor Starr en hooks. Bestaande clients vereisen een herstart voor een gewijzigde standaard."
       }
     },
     "webserver": {
@@ -706,11 +712,11 @@
         "description": "API-sleutel uit Instellingen → Algemeen in de Starr-app.",
         "tooltip": "32 of meer tekens. Een filepath:/pad-waarde wordt ook geaccepteerd. Laat het veld ongewijzigd om de huidige sleutel te houden."
       },
-      "path": {
-        "label": "Pad",
-        "description": "Map waaruit Unpackerr de downloads van deze app leest.",
-        "tooltip": "Terugval als het pad dat Starr meldt ontbreekt of voor Unpackerr niet zichtbaar is.",
-        "config": "In het configuratiebestand is dit een lijst genaamd paths."
+      "paths": {
+        "label": "Paden",
+        "description": "Mappen waaruit Unpackerr de downloads van deze app leest. Eén pad per regel.",
+        "tooltip": "Terugval als het pad dat Starr meldt ontbreekt of voor Unpackerr niet zichtbaar is. De eerste omgevingsvariabele is UN_*_PATHS_0.",
+        "config": "Opgeslagen als de lijst paths."
       },
       "protocols": {
         "label": "Protocollen",
@@ -872,6 +878,10 @@
         "label": "Lege mappen overslaan",
         "description": "Mappen zonder archieven niet in de wachtrij zetten.",
         "tooltip": "Na de startvertraging verlaten archiefloze mappen de wachtstatus zonder geschiedenis of webhooks."
+      },
+      "disable_log": {
+        "label": "Extractielog maken",
+        "description": "Maak een tekstlog naast de uitgepakte bestanden. Het applicatielog blijft actief."
       }
     },
     "hooks": {

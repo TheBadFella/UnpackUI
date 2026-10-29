@@ -35,6 +35,38 @@ HTTPS or open the service through `localhost`.
 
 ## Dashboard behavior
 
+### Upcoming release: v2.0.16
+
+Implementation: [3ccfe3a](https://github.com/TheBadFella/UnpackUI/commit/3ccfe3a).
+
+The UI uses dark mode throughout. The theme switch is removed, and a saved
+light-mode preference or a light operating-system theme no longer changes it.
+Queue and history details use the same rounded dialog, with lighter charcoal
+surfaces, clearer labels and larger touch targets. Tab stays inside the dialog;
+Escape closes it and returns focus to the entry or button that opened it.
+
+Under **Configuration → Folders → Extraction**, **Create extraction log**
+controls `disable_log`. Choose **Disabled** to stop creating extraction logs named `_unpackerred.*.txt`
+for that watched folder. This does not disable application or HTTP access logs
+and does not remove existing extraction logs. Save and restart to apply folder
+changes.
+
+**Configuration → General** also exposes the default request timeout and, on
+POSIX hosts, log-file permissions. A changed default timeout needs a restart
+for existing Starr clients and hooks. Changing permissions affects newly
+created application log files, not files already on disk.
+
+Global `timeout` and `delete_delay` now survive settings saves. The queue-log
+interval no longer offers **Off**, which the backend treated as 15 seconds;
+use activity-only logging to hide queue counts that are all zero.
+
+In v2.0.15 the light/dark switch is still present, and the three new controls
+described above are not available. See [settings coverage](settings-coverage.md)
+and [config-file saving](configuration.md#saving-from-the-ui) before changing
+settings.
+
+### Queue and history
+
 The dashboard combines the upstream API resources with the live WebSocket:
 
 - `/api/stats` supplies counters, queue-buffer depth, and Starr activity-queue

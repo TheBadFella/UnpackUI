@@ -40,6 +40,7 @@ your setup.
 | [Configuration](docs/configuration.md) | Config files, precedence, recovery, and fork settings |
 | [Environment variables](docs/environment-variables.md) | Fork-specific variables and their upstream equivalents |
 | [Dashboard UI and API](docs/ui.md) | Dashboard controls, routes, Homepage, and security |
+| [Settings coverage](docs/settings-coverage.md) | UI controls, file/environment settings, and save behavior |
 | [Notifications](docs/notifications.md) | Discord, Notifiarr, events, and multiple destinations |
 
 ## 🔗 Project

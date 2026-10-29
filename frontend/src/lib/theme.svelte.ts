@@ -1,45 +1,5 @@
-import { readCookie, writeCookie } from './util'
+// Bootstrap tooltips use inverted colors on the dark page.
+document.documentElement.setAttribute('data-bs-theme', 'dark')
+document.documentElement.setAttribute('data-un-theme', 'dark')
 
-export type ThemeMode = 'light' | 'dark'
-
-const cookieName = 'un-theme'
-
-function prefersDark(): boolean {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
-function parseMode(raw: string): ThemeMode {
-  if (raw === 'light' || raw === 'dark') return raw
-  return prefersDark() ? 'dark' : 'light'
-}
-
-class Theme {
-  mode = $state<ThemeMode>('light')
-  resolved = $state<'light' | 'dark'>('light')
-  // Sveltestrap Tooltip uses Bootstrap's inverted colors (dark page → light bubble).
-  tooltip = $derived<'light' | 'dark'>(this.resolved === 'dark' ? 'light' : 'dark')
-
-  constructor() {
-    this.mode = parseMode(readCookie(cookieName))
-    this.apply()
-    writeCookie(cookieName, this.mode)
-  }
-
-  set(mode: ThemeMode) {
-    this.mode = mode
-    writeCookie(cookieName, mode)
-    this.apply()
-  }
-
-  toggle() {
-    this.set(this.mode === 'dark' ? 'light' : 'dark')
-  }
-
-  private apply() {
-    this.resolved = this.mode
-    document.documentElement.setAttribute('data-bs-theme', this.mode)
-    document.documentElement.setAttribute('data-un-theme', this.mode)
-  }
-}
-
-export const theme = new Theme()
+export const theme = { resolved: 'dark' as const, tooltip: 'light' as const }
