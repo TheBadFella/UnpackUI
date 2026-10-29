@@ -37,6 +37,8 @@ HTTPS or open the service through `localhost`.
 
 ### Upcoming release: v2.0.16
 
+Implementation: [3ccfe3a](https://github.com/TheBadFella/UnpackUI/commit/3ccfe3a).
+
 The UI uses dark mode throughout. The theme switch is removed, and a saved
 light-mode preference or a light operating-system theme no longer changes it.
 Queue and history details use the same rounded dialog, with lighter charcoal

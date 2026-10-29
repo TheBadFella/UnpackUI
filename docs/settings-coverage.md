@@ -4,6 +4,7 @@ Reviewed on 2026-10-29 against the backend configuration, configuration API,
 and all settings pages, including the shared Starr interval controls and
 notification profile fields. The additions below are upcoming in v2.0.16;
 v2.0.15 remains the published version until that release is available.
+Implementation: [3ccfe3a](https://github.com/TheBadFella/UnpackUI/commit/3ccfe3a).
 
 ## Missing controls found
 
