@@ -479,7 +479,7 @@ passwords = []
 # delete_files = false
 ## Delete original items after successful extraction? delete_after must be greater than 0.
 # delete_original = false
-## Disable extraction log (unpackerred.txt) file creation?
+## Disable extraction log (_unpackerred.*.txt) file creation?
 # disable_log = false
 ## Move extracted files into original folder? If false, files go into an _unpackerred folder.
 # move_back = false

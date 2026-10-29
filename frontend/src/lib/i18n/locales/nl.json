@@ -881,7 +881,7 @@
       },
       "disable_log": {
         "label": "Extractielog maken",
-        "description": "Schrijf unpackerred.txt na extractie in deze map. Het applicatielog blijft actief."
+        "description": "Maak een tekstlog naast de uitgepakte bestanden. Het applicatielog blijft actief."
       }
     },
     "hooks": {

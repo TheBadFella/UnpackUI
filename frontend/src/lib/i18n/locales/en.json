@@ -881,7 +881,7 @@
       },
       "disable_log": {
         "label": "Create extraction log",
-        "description": "Write unpackerred.txt after extraction in this watched folder. Application logging stays enabled."
+        "description": "Create a text log beside the extracted files. Application logging stays enabled."
       }
     },
     "hooks": {
