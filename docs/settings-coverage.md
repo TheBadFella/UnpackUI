@@ -2,13 +2,12 @@
 
 Reviewed on 2026-10-29 against the backend configuration, configuration API,
 and all settings pages, including the shared Starr interval controls and
-notification profile fields. The additions below are upcoming in v2.0.16;
-v2.0.15 remains the published version until that release is available.
+notification profile fields. The additions below first shipped in v2.0.16.
 Implementation: [3ccfe3a](https://github.com/TheBadFella/UnpackUI/commit/3ccfe3a).
 
 ## Missing controls found
 
-| Setting | In v2.0.15 | Upcoming change |
+| Setting | In v2.0.15 | Available from v2.0.16 |
 |---|---|---|
 | Watched-folder `disable_log` | Accepted by the API but has no control | **Folders → Extraction → Create extraction log**. Disabled writes `disable_log = true`; restart to apply. |
 | Global `log_file_mode` | Accepted by the API but has no control | **General → Logging → Log file permissions**, on POSIX hosts. Restart to apply to new log files. |

@@ -43,10 +43,12 @@ baseline, not a replacement for the repository contracts in
   Tab wrapping, Escape restoration, folder/general controls, environment locks,
   help expansion and phone touch targets. No production media/config used.
 - Documentation: [UI guide](../docs/ui.md), [configuration saving](../docs/configuration.md#saving-from-the-ui)
-  and [settings coverage](../docs/settings-coverage.md). New behavior is marked
-  upcoming until publication. Latest published version at review: `v2.0.15`.
-- Linux-native generation, macOS/FreeBSD lint and external archive integration
-  remain hosted CI gates. Native Windows checks do not establish those results.
+  and [settings coverage](../docs/settings-coverage.md). Release: `v2.0.16`.
+- Implementation PR: #72; merge commit: `16c614e2dc32014b14492a1ecd8a8c61a36a25be`. Final PR checks passed:
+  https://github.com/TheBadFella/UnpackUI/actions/runs/40941551852 and
+  https://github.com/TheBadFella/UnpackUI/actions/runs/40941551829.
+- Hosted Linux generation/tests, Linux/macOS/FreeBSD lint, frontend checks
+  and the external archive integration suite passed on the final PR head.
 - npm audit reports two low and two moderate dependency findings; no forced
   major-version changes were applied during the sync.
 
