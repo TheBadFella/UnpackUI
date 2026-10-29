@@ -37,8 +37,7 @@ the settings UI. Make file edits while UnpackUI is stopped, then restart it to
 load them. A UI save uses the configuration loaded by the running process and
 can overwrite edits made externally since startup.
 
-See [settings coverage](settings-coverage.md) for controls added in the upcoming
-release and settings that still require a file or environment variable.
+See [settings coverage](settings-coverage.md) for controls added in v2.0.16 and settings that still require a file or environment variable.
 
 ## Fork feature example
 

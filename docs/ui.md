@@ -35,7 +35,7 @@ HTTPS or open the service through `localhost`.
 
 ## Dashboard behavior
 
-### Upcoming release: v2.0.16
+### v2.0.16
 
 Implementation: [3ccfe3a](https://github.com/TheBadFella/UnpackUI/commit/3ccfe3a).
 
