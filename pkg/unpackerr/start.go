@@ -163,7 +163,7 @@ func New() *Unpackerr {
 		Config: &Config{
 			KeepHistory:         defaultHistory,
 			SuppressMissingURLs: true,
-			LogQueues:           cnfg.Duration{Duration: time.Minute + time.Second},
+			LogQueues:           cnfg.Duration{Duration: time.Minute},
 			MaxRetries:          defaultMaxRetries,
 			RemnantAction:       remnantAction(""),
 			LogFiles:            defaultLogFiles,

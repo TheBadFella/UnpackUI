@@ -20,6 +20,26 @@ Common config-file locations are:
 
 Pass `-c /path/to/unpackerr.conf` to select a file explicitly.
 
+## Saving from the UI
+
+Saving a settings page regenerates the complete TOML file from the file-backed
+configuration. It preserves supported setting values, but replaces hand-written
+comments, ordering and formatting with the generated layout. The previous file
+is kept as `<config-file>.bak`; this is one backup, replaced by the next write.
+New content is written to a temporary file before replacing the config file.
+
+Environment overrides remain separate. Fields owned by `UN_` variables are
+locked in the UI and must be changed in the service or container environment.
+Saving a file setting does not override an environment variable.
+
+If you maintain comments or formatting by hand, keep your own copy before using
+the settings UI. Make file edits while UnpackUI is stopped, then restart it to
+load them. A UI save uses the configuration loaded by the running process and
+can overwrite edits made externally since startup.
+
+See [settings coverage](settings-coverage.md) for controls added in the upcoming
+release and settings that still require a file or environment variable.
+
 ## Fork feature example
 
 ```toml

@@ -15,7 +15,6 @@
   } from '@sveltestrap/sveltestrap'
   import { _ } from '../lib/i18n/Translate.svelte'
   import { locale } from '../lib/i18n/locale.svelte'
-  import { theme } from '../lib/theme.svelte'
   import { router, hashLinkClick } from '../lib/router.svelte'
   import { profile, logout, has } from '../lib/auth.svelte'
   import { configPerm, systemPerm } from '../lib/perms'
@@ -26,8 +25,6 @@
   import Lock from 'phosphor-svelte/lib/Lock'
   import Monitor from 'phosphor-svelte/lib/Monitor'
   import Scroll from 'phosphor-svelte/lib/Scroll'
-  import Sun from 'phosphor-svelte/lib/Sun'
-  import Moon from 'phosphor-svelte/lib/Moon'
   import SignOut from 'phosphor-svelte/lib/SignOut'
   import icon from '../assets/icon.png'
   import githubIcon from '../assets/github.svg'
@@ -309,14 +306,6 @@
                 </ul>
               {/if}
             </li>
-            <DropdownItem on:click={() => theme.toggle()}>
-              <span class="menu-ico"
-                ><Icon i={theme.mode === 'dark' ? Moon : Sun} /></span
-              >
-              {theme.mode === 'dark'
-                ? $_('nav.ThemeDark')
-                : $_('nav.ThemeLight')}
-            </DropdownItem>
             {#if passwordAuth}
               <DropdownItem divider />
               <DropdownItem on:click={logout}>
@@ -418,18 +407,6 @@
             </NavItem>
           {/each}
         {/if}
-        <NavItem>
-          <button type="button" class="nav-link" onclick={() => theme.toggle()}>
-            <span class="menu-ico"
-              ><Icon
-                i={theme.mode === 'dark' ? Moon : Sun}
-                c1="#fff"
-                d1="#fff"
-              /></span
-            >
-            {theme.mode === 'dark' ? $_('nav.ThemeDark') : $_('nav.ThemeLight')}
-          </button>
-        </NavItem>
         {#if passwordAuth}
           <NavItem>
             <button type="button" class="nav-link" onclick={logout}>

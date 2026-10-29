@@ -119,6 +119,8 @@
       orig.dirMode = defaultMode(orig.dirMode, '0755')
       cfg.progress = defaultProgress(cfg.progress)
       orig.progress = defaultProgress(orig.progress)
+      cfg.logFileMode = defaultMode(cfg.logFileMode, '0600')
+      orig.logFileMode = defaultMode(orig.logFileMode, '0600')
       passwordsText = (cfg.passwords ?? []).join('\n')
       origPasswords = passwordsText
     }
@@ -192,6 +194,19 @@
             options={logFileMbChoices}
           />
         </Col>
+        {#if unixModes}
+          <Col md="6">
+            <Input
+              id="config.general.logFileMode"
+              type="select"
+              options={fileModeChoices}
+              bind:value={cfg.logFileMode}
+              original={orig.logFileMode}
+              disabled={!canWrite}
+              envVar="LOG_FILE_MODE"
+            />
+          </Col>
+        {/if}
         <Col md="6">
           <Input
             id="config.general.debug"
@@ -233,6 +248,16 @@
           />
         </Col>
         {@render heading($_('pages.settings.general.Extraction'))}
+        <Col md="6">
+          <Input
+            id="config.general.timeout"
+            type="timeout"
+            bind:value={cfg.timeout}
+            original={orig.timeout}
+            disabled={!canWrite}
+            envVar="TIMEOUT"
+          />
+        </Col>
         <Col md="6">
           <Input
             id="config.general.parallel"

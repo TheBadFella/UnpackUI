@@ -5,6 +5,51 @@ inspect only the upstream commits that arrived after that point. It is a review
 baseline, not a replacement for the repository contracts in
 [`repository-context.md`](repository-context.md).
 
+## Baseline recorded 2026-10-29
+
+- Last reviewed upstream commit: `afa377da4d13c736f8bcbbbf1756e9a6817deeee`
+  (PR #838, Vite 8.3.5). Previous baseline: `3ff4271eadae0c294e354458a86ca5f15be05e37`.
+- Reviewed 26 upstream commits across 30 paths (653 insertions, 270 deletions).
+  Merged in `f1cadcd`; final dependency reconciliation in `821f4fb`.
+- Adopted plain-HTTP UUID generation, blank login username, one-minute queue-log
+  default, Starr path-list controls and indexed/comma-separated environment
+  paths, editable file-owned fields on environment-configured instances,
+  notification profile/credential display fixes, Node 26 CI, Vite 8.3.5,
+  svelte-check 4.7.7, Carbon 2.7.0 and bytefmt 0.95.0.
+- Preserved singular Starr `path` as a compatibility input and help/API alias.
+  The frontend alias is optional; new forms use `paths`. Retained fork release
+  workflows, explicit disabled folder cleanup (`delete_after = "0s"`), default
+  missing-URL suppression, recovery, recursive folders, confinement and webhook
+  deduplication.
+- Dependabot PRs #66–#69 merged with passing checks. #67's original integration
+  failure was a smoke-test port collision (`bind: address already in use`);
+  its final head `f655c22` passed all six checks before merge.
+- Aligned the root source-build Dockerfile with #69's Alpine digest; the bot
+  had only changed the GoReleaser Dockerfile. Registry inspection confirmed
+  the new index and supported architectures. No user configuration changes.
+- This release removes `.commandcode/taste` and light-mode selection, adds
+  watched-folder extraction-log, global request-timeout and POSIX log-mode
+  controls, and improves the shared task dialog and keyboard focus handling.
+- The settings audit found global `timeout` and `delete_delay` missing from the
+  TOML renderer schema. Added both and verified non-default save/reload values,
+  extraction-log suppression and log permissions. Config saves still regenerate
+  the whole file and keep one `.bak`; preserving custom formatting is deferred.
+- Local verification: `go test ./...`, native Windows `go generate ./...` using
+  Git sh, cross-target `GOOS=linux golangci-lint run ./...` (0 issues), frontend
+  check (0 errors/warnings), 53 Vitest tests in 17 files, 7 detail-data tests,
+  production frontend build, and diff checks passed.
+- Browser review used synthetic API data at 320, 390, 768 and 1440 pixels:
+  queue/history dialogs, long paths, empty/error/loading details, focus entry,
+  Tab wrapping, Escape restoration, folder/general controls, environment locks,
+  help expansion and phone touch targets. No production media/config used.
+- Documentation: [UI guide](../docs/ui.md), [configuration saving](../docs/configuration.md#saving-from-the-ui)
+  and [settings coverage](../docs/settings-coverage.md). New behavior is marked
+  upcoming until publication. Latest published version at review: `v2.0.15`.
+- Linux-native generation, macOS/FreeBSD lint and external archive integration
+  remain hosted CI gates. Native Windows checks do not establish those results.
+- npm audit reports two low and two moderate dependency findings; no forced
+  major-version changes were applied during the sync.
+
 ## Baseline recorded 2026-10-25
 
 - Last reviewed upstream commit: `3ff4271eadae0c294e354458a86ca5f15be05e37`

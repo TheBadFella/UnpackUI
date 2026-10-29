@@ -278,6 +278,122 @@ func TestUnmarshalConfigDoesNotPersistEnvSecrets(t *testing.T) {
 	}
 }
 
+// Indexed UN_SONARR_0_PATHS_0 fills the download list.
+func TestUnmarshalIndexedStarrPaths(t *testing.T) {
+	dir := t.TempDir()
+	conf := filepath.Join(dir, "unpackerr.conf")
+	body := "[webserver]\nlisten_addr = \"127.0.0.1:0\"\nui_password = \"\"\n" +
+		"[sonarr.0]\nurl = \"http://sonarr:8989\"\napi_key = \"" + strings.Repeat("a", 32) + "\"\n"
+
+	if err := os.WriteFile(conf, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("UN_SONARR_0_PATHS_0", "/from/env")
+
+	unpack := New()
+	unpack.ConfigFile = conf
+
+	if _, _, _, err := unpack.unmarshalConfig(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := unpack.Sonarr["0"]
+	if got == nil || len(got.Paths) != 1 || got.Paths[0] != "/from/env" {
+		t.Fatalf("live paths %+v", got)
+	}
+
+	file := unpack.fileConfig.Sonarr["0"]
+	if file == nil || len(file.Paths) != 0 {
+		t.Fatalf("file snapshot %+v", file)
+	}
+
+	if unpack.envUsed["SONARR_0_PATHS_0"] == "" {
+		t.Fatalf("env used %+v", unpack.envUsed)
+	}
+}
+
+// An empty PATHS_0 used to be ignored. A blank entry must not block the default path.
+func TestEmptyIndexedStarrPathUsesDefault(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	conf := &StarrConfig{Paths: []string{"", "  "}}
+	conf.URL = "http://sonarr:8989"
+	conf.APIKey = strings.Repeat("a", 32)
+
+	if err := unpack.validateApp(conf, starr.Sonarr, "0"); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(conf.Paths) != 1 || conf.Paths[0] != defaultSavePath {
+		t.Fatalf("paths %+v", conf.Paths)
+	}
+}
+
+// UN_SONARR_0_PATHS=/a,/b is the pre-index form, still accepted when PATHS_0 is unset.
+func TestUnmarshalCommaStarrPaths(t *testing.T) {
+	dir := t.TempDir()
+	conf := filepath.Join(dir, "unpackerr.conf")
+	body := "[webserver]\nlisten_addr = \"127.0.0.1:0\"\nui_password = \"\"\n" +
+		"[sonarr.0]\nurl = \"http://sonarr:8989\"\napi_key = \"" + strings.Repeat("a", 32) + "\"\n" +
+		"paths = [\"/from/file\"]\n"
+
+	if err := os.WriteFile(conf, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("UN_SONARR_0_PATHS", "/from/env,/mnt/tv")
+
+	unpack := New()
+	unpack.ConfigFile = conf
+
+	if _, _, _, err := unpack.unmarshalConfig(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := unpack.Sonarr["0"]
+	if got == nil || len(got.Paths) != 2 || got.Paths[0] != "/from/env" || got.Paths[1] != "/mnt/tv" {
+		t.Fatalf("live paths %+v", got)
+	}
+
+	if unpack.envUsed["SONARR_0_PATHS"] != "/from/env,/mnt/tv" {
+		t.Fatalf("env used %+v", unpack.envUsed)
+	}
+
+	file := unpack.fileConfig.Sonarr["0"]
+	if file == nil || len(file.Paths) != 1 || file.Paths[0] != "/from/file" {
+		t.Fatalf("file snapshot %+v", file)
+	}
+}
+
+// PATHS_0 wins when the comma form is also set.
+func TestUnmarshalIndexedStarrPathsWinOverComma(t *testing.T) {
+	dir := t.TempDir()
+	conf := filepath.Join(dir, "unpackerr.conf")
+	body := "[webserver]\nlisten_addr = \"127.0.0.1:0\"\nui_password = \"\"\n" +
+		"[sonarr.0]\nurl = \"http://sonarr:8989\"\napi_key = \"" + strings.Repeat("b", 32) + "\"\n"
+
+	if err := os.WriteFile(conf, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("UN_SONARR_0_PATHS", "/from/comma")
+	t.Setenv("UN_SONARR_0_PATHS_0", "/from/index")
+
+	unpack := New()
+	unpack.ConfigFile = conf
+
+	if _, _, _, err := unpack.unmarshalConfig(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := unpack.Sonarr["0"]
+	if got == nil || len(got.Paths) != 1 || got.Paths[0] != "/from/index" {
+		t.Fatalf("live paths %+v", got)
+	}
+}
+
 func TestUnmarshalConfigKeepsFileInstanceFieldsAcrossEnvURL(t *testing.T) {
 	dir := t.TempDir()
 	conf := filepath.Join(dir, "unpackerr.conf")
@@ -432,8 +548,7 @@ func TestConfigTOMLTagsInSchema(t *testing.T) {
 	}
 
 	skip := map[string]struct{}{
-		"path": {}, // legacy StarrConfig alias for paths
-		"key":  {}, // nested [[webserver.api_keys]]; parent api_keys is in the schema
+		"key": {}, // nested [[webserver.api_keys]]; parent api_keys is in the schema
 		// nested [hooks.titles]; parent titles is in the schema
 		"waiting":          {},
 		"queued":           {},
@@ -604,10 +719,13 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 	unpack.LogFile = "/var/log/unpackerr.log"
 	unpack.LogFiles = 4
 	unpack.LogFileMb = 12
+	unpack.LogFileMode = "0640"
 	unpack.FileMode = "0640"
 	unpack.DirMode = "0750"
 	unpack.KeepHistory = 50
 	unpack.Interval = cnfg.Duration{Duration: 3 * time.Minute}
+	unpack.Timeout = cnfg.Duration{Duration: 37 * time.Second}
+	unpack.DeleteDelay = cnfg.Duration{Duration: 9 * time.Minute}
 	unpack.StartDelay = cnfg.Duration{Duration: 2 * time.Minute}
 	unpack.Passwords = StringSlice{"plain-pass", "filepath:/run/secrets/rarpass"}
 	unpack.Webserver.ListenAddr = "127.0.0.1:5656"
@@ -645,6 +763,7 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 	unpack.Folder.Buffer = 5000
 	unpack.Folders = instanceMap([]*FolderConfig{{
 		Path: "/watch", ExtractPath: "/extracted", DeleteOrig: true, MoveBack: true, ExtractISOs: true,
+		DisableLog:  true,
 		Interval:    cnfg.Duration{Duration: 4 * time.Second},
 		DeleteAfter: &cnfg.Duration{Duration: 11 * time.Minute}, MaxNested: 2, MaxFiles: 99, MaxRatio: 3.5,
 		ExcludePaths: []string{"/watch/skip"},

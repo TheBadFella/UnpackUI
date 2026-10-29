@@ -179,7 +179,7 @@
           ? 'phrases.ConfigDuration'
           : 'phrases.ConfigDurationDisabled'
       case 'logqueue':
-        return 'phrases.ConfigDurationOff'
+        return 'phrases.ConfigDuration'
       case 'folderpoll':
         return 'phrases.ConfigDurationFolderPoll'
       case 'nullable':
@@ -335,7 +335,6 @@
 
     if (type === 'logqueue') {
       return [
-        { value: '0s', name: $_('words.select-option.Off') },
         { value: '1m', name: unit(1, 'minute', 'minute') },
         { value: '2m', name: unit(2, 'minute', 'minutes') },
         { value: '5m', name: unit(5, 'minute', 'minutes') },
@@ -644,5 +643,13 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
     margin: 0.75rem 0 0;
+  }
+
+  @media (max-width: 767.98px) {
+    .input :global(.form-control),
+    .input :global(.form-select),
+    .input :global(.input-group > .btn) {
+      min-height: 44px;
+    }
   }
 </style>
