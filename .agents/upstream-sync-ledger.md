@@ -47,6 +47,9 @@ baseline, not a replacement for the repository contracts in
 - Implementation PR: #72; merge commit: `16c614e2dc32014b14492a1ecd8a8c61a36a25be`. Final PR checks passed:
   https://github.com/TheBadFella/UnpackUI/actions/runs/40941551852 and
   https://github.com/TheBadFella/UnpackUI/actions/runs/40941551829.
+- Image publication passed: https://github.com/TheBadFella/UnpackUI/actions/runs/40942256023.
+  Tags `2.0.16`, `v2.0.16` and `latest` resolve to index `sha256:1195eebb56a5e670ea63de5629849613e9367cba946ab1606982f3fce406b8c9`,
+  with `linux/amd64` and `linux/arm64`.
 - Hosted Linux generation/tests, Linux/macOS/FreeBSD lint, frontend checks
   and the external archive integration suite passed on the final PR head.
 - npm audit reports two low and two moderate dependency findings; no forced
@@ -339,7 +342,7 @@ tests/upstream-inttest.patch
 
 ### Release baseline
 
-- The next safe patch release is `v2.0.14`; existing `v2.0.13` remains untouched.
+- The next safe patch release is `v2.0.17`; published `v2.0.16` remains untouched.
 - The Git tag is the product version source: `settings.sh` and the Makefile
   derive build metadata from tags. The private frontend package version and
   embedded terminal-notifier metadata are not product release references.
@@ -353,7 +356,7 @@ with the value in this file before starting the next review.
 git fetch --prune upstream main
 git fetch --prune origin web-ui --tags
 git status --short --branch
-$lastReviewed = '3ff4271eadae0c294e354458a86ca5f15be05e37'
+$lastReviewed = 'afa377da4d13c736f8bcbbbf1756e9a6817deeee'
 git rev-parse upstream/main
 git rev-list --left-right --count "$lastReviewed..upstream/main"
 git log --oneline --decorate "$lastReviewed..upstream/main"
