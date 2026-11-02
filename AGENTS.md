@@ -2,9 +2,7 @@
 
 Maintain extraction, watched folders, recovery and web controls.
 
-Read [.agents/repository-context.md](.agents/repository-context.md) for source locations, invariants and verification commands.
 
-For upstream syncs, read the dated [upstream sync ledger](.agents/upstream-sync-ledger.md)
 before comparing or merging `upstream/main`; it records the last reviewed
 upstream commit and the fork-specific reconciliation decisions.
 
@@ -27,7 +25,7 @@ upstream commit and the fork-specific reconciliation decisions.
 
 ### PR descriptions and maintainer voice
 
-- Before creating or editing a PR description, read and apply [unslop-unpackui](.agents/skills/unslop-unpackui/SKILL.md). Reread the final prose for clarity and voice, and check the published body after writing it.
+- Before creating or editing a PR description, reread the final prose for clarity and voice, and check the published body after writing it.
 - Write as the maintainer explaining a concrete change to another person: what was awkward or broken, what users can do now, and why this approach fits. Use a short natural paragraph for small PRs. Headings are optional; remove unused template sections, `N/A` filler and repeated scaffolding.
 - First person is welcome when supported by the work (for example, "I moved the cutoff warning beside the download action so it is visible before confirmation"). Do not invent personal experiences, motivations, excitement, anecdotes or user feedback to manufacture a personal touch. Prefer plain words; avoid promotional openings, em dashes and canned summaries.
 - Keep implementation details only when they help review correctness or a tradeoff. Summarize checks proportionately: relevant results, a CI/evidence link and material gaps. Preserve failures, exclusions and not-run distinctions without pasting a command diary or repeating the same test totals several times.
@@ -45,11 +43,3 @@ Complete this review during UI work and before reporting the change as finished:
 - For shared component or CSS changes, inspect callers and render representative affected screens. Put reusable corrections in the shared component or semantic theme class.
 - Fix visual defects found in this review before presenting the result. When showing before/after screenshots, use matching data and viewport sizes.
 - Report the browser widths and states checked, relevant automated checks, and any missing visual verification. If browser review is unavailable, state that gap rather than claiming the UI is visually verified.
-
-## Repository skills
-
-- For documentation, UI prose and change summaries, read [unslop-unpackui](.agents/skills/unslop-unpackui/SKILL.md).
-- For verification, read [verify-unpackui](.agents/skills/verify-unpackui/SKILL.md).
-- For implementation, debugging or review, read [change-unpackui](.agents/skills/change-unpackui/SKILL.md).
-
-Load the relevant skill, not the full catalog. These workflows preserve the user's scope and the repository's specific contracts. [Source revisions and licenses](.agents/skill-provenance.md).
