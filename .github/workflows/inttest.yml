@@ -4,12 +4,12 @@ on:
     branches:
       - main
       - unstable
-      - web-ui
+      - master
   pull_request:
     branches:
       - main
       - unstable
-      - web-ui
+      - master
 permissions:
   contents: read
 jobs:
