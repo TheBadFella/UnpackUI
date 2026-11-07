@@ -3,7 +3,7 @@ module github.com/Unpackerr/unpackerr
 go 1.27.1
 
 require (
-	code.cloudfoundry.org/bytefmt v0.95.0
+	code.cloudfoundry.org/bytefmt v0.96.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/coder/websocket v1.8.15
 	github.com/dromara/carbon/v2 v2.7.0
@@ -73,3 +73,7 @@ require (
 	golift.io/udf v0.1.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
+
+// Go 1.24 and later opens Linux listen sockets with Multipath TCP, the
+// socket type used by the published CVE-2026-98432 exploit.
+godebug multipathtcp=0

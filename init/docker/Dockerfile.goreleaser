@@ -10,4 +10,6 @@ RUN apk add --no-cache ca-certificates openssl tzdata
 
 ENV TZ=UTC
 
+# Default web UI listen address (listen_addr).
+EXPOSE 5656
 ENTRYPOINT ["/unpackerr"]
