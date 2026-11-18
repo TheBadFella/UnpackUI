@@ -3,10 +3,10 @@ module github.com/Unpackerr/unpackerr
 go 1.27.1
 
 require (
-	code.cloudfoundry.org/bytefmt v0.96.0
+	code.cloudfoundry.org/bytefmt v0.98.0
 	github.com/BurntSushi/toml v1.6.0
 	github.com/coder/websocket v1.8.15
-	github.com/dromara/carbon/v2 v2.7.0
+	github.com/dromara/carbon/v2 v2.7.1
 	github.com/energye/systray v1.0.3
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gorilla/securecookie v1.1.2
@@ -15,10 +15,10 @@ require (
 	github.com/ncruces/zenity v0.10.15
 	github.com/prometheus/client_golang v1.25.0
 	github.com/radovskyb/watcher v1.0.7
-	github.com/spf13/pflag v1.0.10
-	golang.org/x/crypto v0.58.0
-	golang.org/x/mod v0.42.0
-	golang.org/x/sys v0.49.0
+	github.com/spf13/pflag v1.1.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/mod v0.43.0
+	golang.org/x/sys v0.50.0
 	golift.io/cnfg v0.5.0
 	golift.io/cnfgfile v0.1.0
 	golift.io/rotatorr v0.1.0
@@ -65,9 +65,10 @@ require (
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	go4.org v0.0.0-20260112195520-a5071408f32f // indirect
+	golang.org/x/crypto/openpgp v0.1.0-deprecated // indirect
 	golang.org/x/image v0.46.0 // indirect
-	golang.org/x/net v0.61.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golift.io/ape v0.2.0 // indirect
 	golift.io/asar v0.1.0 // indirect
 	golift.io/udf v0.1.0 // indirect
