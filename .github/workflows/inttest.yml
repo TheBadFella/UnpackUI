@@ -29,7 +29,7 @@ jobs:
       - name: Clone integration tests
         run: |
           git clone https://github.com/Unpackerr/unpackerr-inttest.git inttest
-          git -C inttest checkout c0586b22d42840d39fb774f7fbbf9971cbefda26
+          git -C inttest checkout db07bbf0429f279ef480dbcd9772f80705678161
           # The fork discovers nested archives at startup and tracks each archive separately.
           git -C inttest apply --check "${GITHUB_WORKSPACE}/tests/upstream-inttest.patch"
           git -C inttest apply "${GITHUB_WORKSPACE}/tests/upstream-inttest.patch"
