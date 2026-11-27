@@ -13,9 +13,9 @@ Implementation: [3ccfe3a](https://github.com/TheBadFella/UnpackUI/commit/3ccfe3a
 | Global `log_file_mode` | Accepted by the API but has no control | **General → Logging → Log file permissions**, on POSIX hosts. Restart to apply to new log files. |
 | Global `timeout` | Accepted by the API but has no control | **General → Extraction → Default request timeout**. Restart to rebuild existing clients and hooks. |
 
-The audit also found that global `timeout` and `delete_delay` were absent from
-the generated-file schema. UI saves omitted both values. Their configured
-values are now written to TOML and covered by a save/reload regression test.
+The audit also found that global `timeout` was absent from
+the generated-file schema. UI saves omitted its value. Its configured
+value is now written to TOML and covered by a save/reload regression test.
 This fixes value persistence; saves still regenerate the complete file.
 
 ## Settings that remain outside the UI
@@ -38,7 +38,7 @@ internal clients and counters are not settings controls.
 | Backend settings | UI location and conditions |
 |---|---|
 | `debug`, `quiet`, `error_stderr`, `log_file`, `log_files`, `log_file_mb`, `progress` | **General → Logging**. `error_stderr` is ignored on Windows. |
-| `parallel`, `max_retries`, `start_delay`, `retry_delay`, `delete_delay`, `keep_history`, `passwords`, `remnant_action` | **General → Extraction**. |
+| `parallel`, `max_retries`, `start_delay`, `retry_delay`, `keep_history`, `passwords`, `remnant_action` | **General → Extraction**. |
 | `file_mode`, `dir_mode` | **General → Extraction**, on POSIX hosts. |
 | `interval`, `log_queues`, `activity` | Shared controls above the **Starr** application list. These were already visible in v2.0.15. |
 | Server address, URL base, metrics, profiling, TLS certificate/key and access-log settings | **Webserver** settings. |

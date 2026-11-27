@@ -43,7 +43,6 @@ const (
 	cleanerInterval        = 5 * time.Second
 	defaultRetryDelay      = 5 * time.Minute
 	defaultStartDelay      = time.Minute
-	minimumDeleteDelay     = time.Second
 	defaultDeleteDelay     = 5 * time.Minute
 	staleItemTimeout       = 24 * time.Hour // Safety net: items stuck at intermediate states are cleaned up.
 	defaultHistory         = 400            // JSONL cap for unpackerr.history.jsonl and the history API.
@@ -116,7 +115,12 @@ type Unpackerr struct {
 }
 
 type fileDeleteReq struct {
-	Paths            []string
+	Paths []string
+	// Exact keeps a folder in Paths from being removed with everything in it.
+	// The files in Files that are inside such a folder are deleted, then every
+	// folder in it that is left empty. Anything else in there stays.
+	Exact            bool
+	Files            []string
 	PurgeEmptyParent bool
 	// PurgeEmptyRoot, when set with PurgeEmptyParent, allows purging empty parent dirs
 	// up to and including this path (e.g. the Starr app download folder). Stops above this root.
@@ -171,7 +175,6 @@ func New() *Unpackerr {
 			Interval:            cnfg.Duration{Duration: defaultInterval},
 			RetryDelay:          cnfg.Duration{Duration: defaultRetryDelay},
 			StartDelay:          cnfg.Duration{Duration: defaultStartDelay},
-			DeleteDelay:         cnfg.Duration{Duration: defaultDeleteDelay},
 			Webserver: &WebServer{
 				Metrics:    false,
 				LogFiles:   defaultLogFiles,
@@ -317,7 +320,14 @@ func (u *Unpackerr) deleteRequest(input *fileDeleteReq) {
 	}
 
 	u.Debugf("Deleting files: %s", strings.Join(fileList(input.Paths...), ", "))
-	u.DeleteFiles(input.Paths...)
+
+	if input.Exact {
+		paths, folders := exactDeletePaths(input.Paths, input.Files)
+		u.DeleteFiles(paths...)
+		u.removeEmptyFolders(folders)
+	} else {
+		u.DeleteFiles(input.Paths...)
+	}
 
 	if !input.PurgeEmptyParent {
 		return

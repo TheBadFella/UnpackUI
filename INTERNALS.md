@@ -226,7 +226,7 @@ Env-only (no config path): skip write, still apply live.
 
 **Webhooks / cmdhooks PUT:** slug maps, same file-body / live overlay as Starr. Env-only overlay slugs that fail validation are dropped from live, not 400. PUT-body hooks still validate (including HTTP client) then publish. First-ever hook starts the hook worker.
 
-**General PUT:** applies interval / delays / remnant action / keep_history / passwords in place and **`resetTickers()`**. Interval is **not** `restartRequired`. Logger construction, `parallel` (xtractr), `file_mode` / `dir_mode`, `timeout` / `delete_delay` (copied into apps at validate time) **are** restart.
+**General PUT:** applies interval / start and retry delays / remnant action / keep_history / passwords in place and **`resetTickers()`**. Interval is **not** `restartRequired`. Logger construction, `parallel` (xtractr), `file_mode` / `dir_mode`, and `timeout` (copied into apps at validate time) **are** restart.
 
 **Webserver PUT:** keys/roles/password/upstreams apply in place under `uiPassMu`. `listen_addr`, `urlbase`, TLS, metrics, pprof, HTTP log file settings stay on the running `http.Server` and set `restartRequired`. `urlbase` must not contain `{` or `}`.
 
@@ -343,7 +343,9 @@ Path: next to the log file if rotating, else next to the config file, else `~/.u
 
 Append-only one line per persisted transition (`queued`, `extracting`, `extractfailed`, `extracted`, `extractednothing`, `imported`, `deleting`, `deleted`, `deletefailed`). Compact on load and when appends reach `2 × keep_history`. `histMu` covers records + file; HTTP reads, main loop appends. `GET /api/history` still returns only completed or failed rows. `keep_history` caps those durable rows only; in-progress checkpoints (`queued` / `extracting` / `extracted` / `deleting`) sit on top until they finish. Clear and delete skip those rows so a UI clear cannot wipe restart resume; delete of those IDs is **409**. The live hub upserts only durable rows and sends `delete` for an in-flight ID so the UI history table does not keep extracting items.
 
-On startup (after `validateApps`) rows newer than 72 hours are copied into `History.Map` so a crash can resume import-wait and delete-delay. `queued` becomes `waiting` (extract again). `extracting` / `deleting` become `extractfailed` so remnant cleanup can run on retry. Folder rows are skipped here; watched-folder resume (delete_after / retry) is handled separately by `recoverInterruptedFolders` from `unpackerr.state.json`. Forgotten rows stay in the file with `forgotten: true` and are not put back on the live queue (the in-memory tombstone is rehydrated so a poll cannot recreate them). `sweepForgotten` waits until every configured Starr instance has polled this process before dropping a tombstone; a nil queue is not absence. `checkQueueChanges` must not treat `Queue == nil` as imported — that is “never polled this process”, not an empty queue. Startup pairs `retrieveAppQueues` with `checkQueueChanges`. `checkExtractDone` does not delete an `IMPORTED` item that is still in a polled Starr queue, or before that poll.
+A Starr `delete_delay` below zero keeps the extracted files and turns `delete_orig` off. When a polled queue no longer lists the title, the row is recorded `deleted` and removed from the live queue. There is no Imported step and no file-delete webhook. `queued` and `extracting` stay until the extract callback finishes. A `deleted` row is not restored.
+
+On startup (after `validateApps`) rows newer than 72 hours are copied into `History.Map` so a crash can resume import-wait and delete-delay. `queued` becomes `waiting` (extract again). `extracting` / `deleting` become `extractfailed` so remnant cleanup can run on retry. Folder rows use the same mapping for `queued` / `extracting` / `extracted` / `extractfailed` / `extractednothing`; `PollFolders` then `seedFolderTracker` copies those Map items onto the watch tracker (live `delete_after` / retry), alongside `recoverInterruptedFolders` from `unpackerr.state.json`. A restored folder whose watch path is gone is dropped. Forgotten folder rows stay out of Map and do not get a Starr tombstone (fsnotify can rediscover them). Forgotten Starr rows stay in the file with `forgotten: true` and are not put back on the live queue (the in-memory tombstone is rehydrated so a poll cannot recreate them). `sweepForgotten` waits until every configured Starr instance has polled this process before dropping a tombstone; a nil queue is not absence. `checkQueueChanges` must not treat `Queue == nil` as imported — that is “never polled this process”, not an empty queue. Startup pairs `retrieveAppQueues` with `checkQueueChanges`. `checkExtractDone` does not delete an `IMPORTED` item that is still in a polled Starr queue, or before that poll.
 
 This file is **ours**. Do not add line-length caps, atomic rename, or `.bak` hardening.
 
@@ -394,7 +396,7 @@ Two admins saving at once is not a design target. Do not add snapshot-merge.
 
 | Section | Live apply | Restart |
 | --- | --- | --- |
-| general | Yes; `resetTickers`; expand passwords | Logger / parallel / file+dir mode / timeout / delete_delay |
+| general | Yes; `resetTickers`; expand passwords | Logger / parallel / file+dir mode / timeout |
 | webserver | Auth fields in place | listen, urlbase, TLS, metrics, pprof, HTTP log |
 | sonarr…readarr | Rebuild clients, carry queues, grow workers | No |
 | folders | Live map updated | **Always** (watcher) |

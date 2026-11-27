@@ -50,14 +50,39 @@ type Extract struct {
 	// extraction to their Lstat info (nil when the stat failed). Dest folders
 	// come from FindCompressedFiles so nested archive dirs are included.
 	// Snapshot once per queue item; retries must not fold in leftovers that
-	// failed to clear.
+	// failed to clear. A finished Syncthing extract drops it: the item may be
+	// extracted again for a late archive, and that extract needs a snapshot
+	// that holds this one's output.
 	PreFiles map[string]os.FileInfo
+	// Unpacked lists the archives that finished extracts already unpacked for
+	// a Syncthing item: cleaned paths, every volume. A later search skips
+	// them in every status, so a retry or a late archive never unpacks one
+	// twice. It is emptied when the extracted files are deleted.
+	Unpacked []string
+	// OutputFiles lists the files inside the folders those extracts moved
+	// into the download, as they were when each extract ended. Resp.NewFiles
+	// names such a folder once. A file Syncthing adds to it later is not
+	// listed here, so it still counts as delivered and can be extracted.
+	OutputFiles []string
 	// NoRetry is set for limit errors, remnant_action=off, or exhausted retries.
 	// EXTRACTFAILED must not re-enter the retry loop or be promoted to DELETED
 	// (that bounces a still-completed Starr item back to WAITING).
 	NoRetry bool
 	// MaxBytes is the resolved byte cap for this Starr item (0 = unlimited).
 	MaxBytes uint64
+	// Size is the download size the Starr app reports for this item (0 = unknown).
+	// Every queue poll refreshes it. With Syncthing enabled, extraction waits
+	// until this many bytes are on disk.
+	Size uint64
+	// SyncSeen is the finished-file byte count last measured for a Syncthing
+	// item, and SyncSeenAt when it last changed or a Syncthing temp file was
+	// last seen. Used to tell a slow sync from a stalled one.
+	SyncSeen   uint64
+	SyncSeenAt time.Time
+	// SyncStall is how long this item may show no progress before a short
+	// download is extracted anyway. Zero uses the 30 minute default. Every
+	// queue poll refreshes it from the instance's syncthing_stall.
+	SyncStall time.Duration
 }
 
 // Label is the human-facing instance name, or the dialect when Name is empty.

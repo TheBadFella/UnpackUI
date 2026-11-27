@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/Unpackerr/unpackerr/pkg/configdef"
 	"github.com/Unpackerr/unpackerr/pkg/hooks"
 	"golift.io/cnfg"
@@ -328,6 +329,10 @@ func TestEmptyIndexedStarrPathUsesDefault(t *testing.T) {
 
 	if len(conf.Paths) != 1 || conf.Paths[0] != defaultSavePath {
 		t.Fatalf("paths %+v", conf.Paths)
+	}
+
+	if conf.SyncthingStall.Duration != syncthingStall {
+		t.Fatalf("syncthing stall %s, want %s", conf.SyncthingStall, syncthingStall)
 	}
 }
 
@@ -786,7 +791,6 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 	unpack.KeepHistory = 50
 	unpack.Interval = cnfg.Duration{Duration: 3 * time.Minute}
 	unpack.Timeout = cnfg.Duration{Duration: 37 * time.Second}
-	unpack.DeleteDelay = cnfg.Duration{Duration: 9 * time.Minute}
 	unpack.StartDelay = cnfg.Duration{Duration: 2 * time.Minute}
 	unpack.Passwords = StringSlice{"plain-pass", "filepath:/run/secrets/rarpass"}
 	unpack.Webserver.ListenAddr = "127.0.0.1:5656"
@@ -809,7 +813,9 @@ func TestWriteConfigFileFullRoundTrip(t *testing.T) { //nolint:funlen // one fie
 			URL: url, APIKey: secret,
 			Paths: StringSlice{"/downloads", "/mnt/dl"}, Protocols: "torrent",
 			DeleteOrig: true, Syncthing: true, ValidSSL: true, MaxBytes: "10GB",
-			DeleteDelay: cnfg.Duration{Duration: 7 * time.Minute}, Timeout: cnfg.Duration{Duration: 42 * time.Second},
+			DeleteDelay:    cnfg.Duration{Duration: 7 * time.Minute},
+			SyncthingStall: cnfg.Duration{Duration: 2 * time.Hour},
+			Timeout:        cnfg.Duration{Duration: 42 * time.Second},
 		}
 	}
 
@@ -1000,6 +1006,67 @@ func TestCheckStarrName(t *testing.T) {
 		if err := checkStarrName(name); !errors.Is(err, ErrInvalidName) {
 			t.Fatalf("%q: got %v want ErrInvalidName", name, err)
 		}
+	}
+}
+
+func TestValidateAppDisablesDeleteOriginal(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	conf := &StarrConfig{
+		Name:        "Sportarr",
+		URL:         "http://127.0.0.1:8989",
+		APIKey:      strings.Repeat("a", apiKeyMinLength),
+		DeleteOrig:  true,
+		DeleteDelay: cnfg.Duration{Duration: -time.Second},
+	}
+
+	if err := unpack.validateApp(conf, starr.Sonarr, "uhd"); err != nil {
+		t.Fatal(err)
+	}
+
+	if conf.DeleteOrig {
+		t.Fatal("negative delete delay left delete_orig enabled")
+	}
+}
+
+func TestValidateAppDeleteDelay(t *testing.T) {
+	t.Parallel()
+
+	unpack := New()
+	key := strings.Repeat("a", apiKeyMinLength)
+
+	tests := []struct {
+		name  string
+		field string
+		want  time.Duration
+	}{
+		{name: "omitted", want: 5 * time.Minute},
+		{name: "zero", field: "delete_delay = \"0s\"\n", want: 5 * time.Minute},
+		{name: "explicit", field: "delete_delay = \"20m\"\n", want: 20 * time.Minute},
+		{name: "disabled", field: "delete_delay = \"-1s\"\n", want: -time.Second},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var conf StarrConfig
+			if err := toml.Unmarshal([]byte(test.field), &conf); err != nil {
+				t.Fatal(err)
+			}
+
+			conf.URL = "http://127.0.0.1:8989"
+			conf.APIKey = key
+
+			if err := unpack.validateApp(&conf, starr.Sonarr, "tv"); err != nil {
+				t.Fatal(err)
+			}
+
+			if conf.DeleteDelay.Duration != test.want {
+				t.Fatalf("delay %s, want %s", conf.DeleteDelay.Duration, test.want)
+			}
+		})
 	}
 }
 

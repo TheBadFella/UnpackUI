@@ -103,7 +103,7 @@ func (u *Unpackerr) logGeneral(printf configLine) {
 	printf(" => Parallel: %d", u.Parallel)
 	printf(" => Passwords: %d (rar/7z)", len(u.Passwords))
 	printf(" => Interval / Progress: %s/%s", u.Interval.String(), u.Progress.String())
-	printf(" => Start/Delete Delay: %s/%s", u.StartDelay.String(), u.DeleteDelay.String())
+	printf(" => Start Delay: %s", u.StartDelay.String())
 	printf(" => Retry Delay: %v, max: %d", u.RetryDelay, u.maxRetries())
 	printf(" => Remnant Action: %s", u.RemnantAction)
 	printf(" => GUI / StdErr: %v / %v", ui.HasGUI(), u.ErrorStdErr)
@@ -134,7 +134,7 @@ func logStarr[T any, P starrApp[T]](printf configLine, app starr.App, list Insta
 		c := server.conf()
 		printf(" => %s Config: 1 server: %s"+starrLogLine+"%s",
 			app, starrNamePrefix(c.Name), c.URL, c.APIKey != "", c.Timeout.String(),
-			c.ValidSSL, c.Protocols, c.Syncthing,
+			c.ValidSSL, c.Protocols, c.Syncthing, c.SyncthingStall.String(),
 			c.DeleteOrig, c.DeleteDelay.String(),
 			logMaxBytes(c.MaxBytes, defaultAppMaxBytes(app)), c.Paths, server.logExtra())
 
@@ -149,7 +149,7 @@ func logStarr[T any, P starrApp[T]](printf configLine, app starr.App, list Insta
 		printf(starrLogPfx+"%s"+starrLogLine+"%s",
 			starrNamePrefix(c.Name),
 			c.URL, c.APIKey != "", c.Timeout.String(), c.ValidSSL, c.Protocols,
-			c.Syncthing, c.DeleteOrig, c.DeleteDelay.String(),
+			c.Syncthing, c.SyncthingStall.String(), c.DeleteOrig, c.DeleteDelay.String(),
 			logMaxBytes(c.MaxBytes, defaultAppMaxBytes(app)), c.Paths, server.logExtra())
 	}
 }
@@ -255,8 +255,8 @@ func (u *Unpackerr) logCmdhook(printf configLine) {
 	}
 
 	for _, hook := range cmds {
-		printf("%s: %s, timeout: %v, silent: %v, events: %v, shell: %v, cmd: %s",
-			prefix, hook.Name, hook.Timeout, hook.Silent, hooks.LogEvents(hook.Events), hook.Shell, hook.Command)
+		printf("%s: %s, timeout: %v, silent: %v, events: %v, shell: %v, gate: %v, cmd: %s",
+			prefix, hook.Name, hook.Timeout, hook.Silent, hooks.LogEvents(hook.Events), hook.Shell, hook.Gate, hook.Command)
 	}
 }
 

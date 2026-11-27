@@ -99,8 +99,11 @@ func (u *Unpackerr) historyRestoreGate(
 		return "", time.Time{}, 0, "", "", false
 	}
 
+	// A Syncthing download with a record of unpacked archives is restored at
+	// any age. It stays in the queue for as long as the Starr app lists it,
+	// and without the record the next poll would extract it from the start.
 	stamp := historyStamp(rec)
-	if stamp.IsZero() || stamp.Before(cutoff) {
+	if stamp.IsZero() || (stamp.Before(cutoff) && (!rec.Syncthing || len(rec.Unpacked) == 0)) {
 		return "", time.Time{}, 0, "", "", false
 	}
 
@@ -152,6 +155,8 @@ func (u *Unpackerr) extractFromHistoryRecord(
 		NoRetry:        rec.NoRetry,
 		MaxBytes:       rec.MaxBytes,
 		PreFiles:       preFilesFromKeys(rec.PreFiles),
+		Unpacked:       slices.Clone(rec.Unpacked),
+		OutputFiles:    slices.Clone(rec.OutputFiles),
 		IDs:            cloneIDs(rec.IDs),
 		Event:          rec.Event,
 	}
@@ -160,12 +165,54 @@ func (u *Unpackerr) extractFromHistoryRecord(
 		item.Name = rec.App
 	}
 
-	applyHistoryRestoreDelay(item, rec.DeleteDelay, u.DeleteDelay.Duration)
+	applyHistoryRestoreDelay(item, rec.DeleteDelay, defaultDeleteDelay)
+
+	if u.applyDisabledDelete(item) {
+		itemID := rec.ID
+		if itemID == "" {
+			itemID = rec.Path
+		}
+
+		u.persistDeletePolicy(itemID, item)
+	}
+
 	applyHistoryRestoreResp(item, rec, errMsg)
+	applyHistoryRestoreUnpacked(item, rec)
+	applyHistoryRestoreOutputFiles(item)
 	applyHistoryRestoreClock(item, rec.Status, now, stamp, u.RetryDelay.Duration)
 	item.XProg = &ExtractProgress{Extract: item}
 
 	return item
+}
+
+// applyHistoryRestoreUnpacked fills Unpacked for a Syncthing row written
+// before that field existed. A row saved after a finished extract lists that
+// extract's archives. Its snapshot is from before the extract, so it is
+// dropped the way a finished extract drops it now.
+func applyHistoryRestoreUnpacked(item *Extract, rec HistoryRecord) {
+	if !rec.Syncthing || len(rec.Unpacked) > 0 || rec.Error != "" || len(rec.OrigFiles) == 0 {
+		return
+	}
+
+	if rec.Status != EXTRACTED && rec.Status != IMPORTED {
+		return
+	}
+
+	item.Unpacked = appendUnique(nil, rec.OrigFiles)
+	item.PreFiles = nil
+}
+
+// applyHistoryRestoreOutputFiles lists the files in a restored item's
+// extracted folders when its row has no such list. The row was written before
+// the list existed. What those folders hold now is taken for output, the way
+// the release that wrote the row treated it. Anything that arrives after this
+// is a delivery.
+func applyHistoryRestoreOutputFiles(item *Extract) {
+	if !hasUnpacked(item) || len(item.OutputFiles) > 0 || item.Resp == nil {
+		return
+	}
+
+	item.OutputFiles = outputFiles(item.Resp, true, nil)
 }
 
 func applyHistoryRestoreDelay(item *Extract, delay string, fallback time.Duration) {
@@ -178,6 +225,32 @@ func applyHistoryRestoreDelay(item *Extract, delay string, fallback time.Duratio
 	if item.DeleteDelay == 0 {
 		item.DeleteDelay = fallback
 	}
+
+	if item.DeleteDelay < 0 {
+		item.DeleteOrig = false
+	}
+}
+
+// applyDisabledDelete copies a negative instance delay onto an item that still
+// has a positive one, and turns delete originals off. A delay already below
+// zero stays there when the instance is later given a positive delay, so
+// turning deletes back on does not clean up files that were kept. Items that
+// are already deleting or deleted keep the delay they finished with.
+// Returns true when the item changed.
+func (u *Unpackerr) applyDisabledDelete(item *Extract) bool {
+	if item == nil || item.App == FolderString || item.DeleteDelay < 0 || item.Status > IMPORTED {
+		return false
+	}
+
+	delay, ok := u.instanceDeleteDelay(item.App, item.URL)
+	if !ok || delay >= 0 {
+		return false
+	}
+
+	item.DeleteDelay = delay
+	item.DeleteOrig = false
+
+	return true
 }
 
 func applyHistoryRestoreResp(item *Extract, rec HistoryRecord, errMsg string) {

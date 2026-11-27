@@ -159,6 +159,8 @@ func checkStarrQueue[T any, P starrApp[T]](unpack *Unpackerr, list InstanceMap[T
 			item, found := unpack.Map[rec.Title]
 			if found && item.App == app && item.URL == cfg.URL {
 				item.Name = cfg.Name
+				item.Size = uint64(max(rec.Size, 0))
+				item.SyncStall = cfg.SyncthingStall.Duration
 			}
 
 			switch {
@@ -171,10 +173,12 @@ func checkStarrQueue[T any, P starrApp[T]](unpack *Unpackerr, list InstanceMap[T
 					URL:         cfg.URL,
 					Updated:     now,
 					Status:      WAITING,
-					DeleteOrig:  cfg.DeleteOrig,
+					DeleteOrig:  cfg.DeleteOrig && cfg.DeleteDelay.Duration >= 0,
 					DeleteDelay: cfg.DeleteDelay.Duration,
 					Syncthing:   cfg.Syncthing,
+					SyncStall:   cfg.SyncthingStall.Duration,
 					MaxBytes:    cfg.maxBytes,
+					Size:        uint64(max(rec.Size, 0)),
 					Path:        unpack.getDownloadPath(rec.OutputPath, cfg.Label(app), rec.Title, cfg.Paths),
 					IDs:         rec.IDs,
 				}
@@ -210,6 +214,38 @@ func haveStarrQitem[T any, P starrApp[T]](list InstanceMap[T], name string) bool
 	}
 
 	return false
+}
+
+// instanceDeleteDelay is the delete delay of the Starr instance with this URL.
+// The second result is false when no configured instance has that URL.
+func (u *Unpackerr) instanceDeleteDelay(app starr.App, url string) (time.Duration, bool) {
+	switch app {
+	case starr.Lidarr:
+		return starrDeleteDelay[LidarrConfig, *LidarrConfig](u.Lidarr, url)
+	case starr.Radarr:
+		return starrDeleteDelay[RadarrConfig, *RadarrConfig](u.Radarr, url)
+	case starr.Readarr:
+		return starrDeleteDelay[ReadarrConfig, *ReadarrConfig](u.Readarr, url)
+	case starr.Sonarr:
+		return starrDeleteDelay[SonarrConfig, *SonarrConfig](u.Sonarr, url)
+	default:
+		return 0, false
+	}
+}
+
+func starrDeleteDelay[T any, P starrApp[T]](list InstanceMap[T], url string) (time.Duration, bool) {
+	if url == "" {
+		return 0, false
+	}
+
+	for _, item := range instanceValues(list) {
+		server := asStarr[T, P](item)
+		if server.conf().URL == url {
+			return server.conf().DeleteDelay.Duration, true
+		}
+	}
+
+	return 0, false
 }
 
 // queueSnapshotReady is true when "not in the Starr queue" may mean imported.

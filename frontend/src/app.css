@@ -212,20 +212,6 @@ code.wrap {
   width: 100%;
 }
 
-/* 1% + nowrap shrink-wraps App/Status/Retries/Updated/Actions to content.
-   Progress at 99% takes the leftover so telemetry does not wrap in a 8–12rem strip. */
-.queue-table > thead > tr > *,
-.queue-table > tbody > tr:first-child > * {
-  width: 1%;
-  white-space: nowrap;
-}
-
-.queue-table > thead > tr > .queue-progress,
-.queue-table > tbody > tr:first-child > .queue-progress {
-  width: 99%;
-  white-space: normal;
-}
-
 .queue-progress-inner {
   min-width: 0;
   width: 100%;
@@ -1745,12 +1731,14 @@ html [data-sonner-toaster][data-sonner-theme='dark'] {
 .dashboard-page .items-cell-item,
 .dashboard-page .items-cell-path {
   min-width: 0;
+  white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .dashboard-page .item-title {
   line-height: 1.45;
+  white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
 }

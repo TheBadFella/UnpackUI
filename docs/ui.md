@@ -56,7 +56,7 @@ POSIX hosts, log-file permissions. A changed default timeout needs a restart
 for existing Starr clients and hooks. Changing permissions affects newly
 created application log files, not files already on disk.
 
-Global `timeout` and `delete_delay` now survive settings saves. The queue-log
+Global `timeout` now survives settings saves. The queue-log
 interval no longer offers **Off**, which the backend treated as 15 seconds;
 use activity-only logging to hide queue counts that are all zero.
 

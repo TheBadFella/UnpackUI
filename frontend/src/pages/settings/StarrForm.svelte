@@ -30,6 +30,7 @@
     deepCopy,
     deepEqual,
     explicitDeleteDelay,
+    explicitSyncthingStall,
     explicitTimeout,
   } from '../../lib/util'
   import { trackDirty } from '../../lib/dirty.svelte'
@@ -176,6 +177,7 @@
       delete_orig: false,
       delete_delay: '5m',
       syncthing: false,
+      syncthing_stall: '30m',
       valid_ssl: false,
       timeout: '10s',
       maxBytes: defaultMaxBytes(section),
@@ -190,6 +192,7 @@
 
   function normalizeOne(a: StarrConfig): StarrConfig {
     const maxBytes = (a.maxBytes ?? '').trim() || defaultMaxBytes(section)
+    const deleteDelay = explicitDeleteDelay(a.delete_delay)
     const row = {
       ...a,
       name: a.name ?? '',
@@ -197,7 +200,9 @@
       protocols: canonicalizeProtocols(a.protocols),
       maxBytes,
       timeout: explicitTimeout(a.timeout),
-      delete_delay: explicitDeleteDelay(a.delete_delay),
+      delete_delay: deleteDelay,
+      delete_orig: deleteDelay === '-1s' ? false : a.delete_orig,
+      syncthing_stall: explicitSyncthingStall(a.syncthing_stall),
     }
     if (section === 'lidarr') {
       row.split_flac = a.split_flac ?? false
@@ -229,6 +234,11 @@
       .filter(Boolean)
   }
 
+  function setDeleteDelay(app: StarrConfig, value: string) {
+    app.delete_delay = value
+    if (value === '-1s') app.delete_orig = false
+  }
+
   function setName(row: InstanceRow<StarrConfig>, name: string) {
     row.value.name = name
     if (row.locked || !row.autoSlug) return
@@ -250,10 +260,13 @@
       const value = current[row.slug]
       if (!value) continue
       const { split_flac, ape_format, ape_compression, ...rest } = value
+      const deleteDelay = explicitDeleteDelay(value.delete_delay)
       const item: StarrConfig = {
         ...rest,
         paths: pathLines(pathsText[row.id] ?? ''),
-        delete_delay: explicitDeleteDelay(value.delete_delay),
+        delete_delay: deleteDelay,
+        delete_orig: deleteDelay === '-1s' ? false : value.delete_orig,
+        syncthing_stall: explicitSyncthingStall(value.syncthing_stall),
       }
       if (section === 'lidarr') {
         item.split_flac = split_flac ?? false
@@ -592,7 +605,7 @@
               helpKey="config.starr.delete_delay"
               type="deletedelay"
               label={$_('config.starr.delete_delay.label')}
-              bind:value={app.delete_delay}
+              bind:value={() => app.delete_delay, (v) => setDeleteDelay(app, v)}
               original={prev?.delete_delay}
               disabled={!canWrite}
               envVar={envField(envPrefix, slug, 'DELETE_DELAY')}
@@ -619,7 +632,7 @@
               label={$_('config.starr.delete_orig.label')}
               bind:value={app.delete_orig}
               original={prev?.delete_orig}
-              disabled={!canWrite}
+              disabled={!canWrite || app.delete_delay === '-1s'}
               envVar={envField(envPrefix, slug, 'DELETE_ORIG')}
             />
           </Col>
@@ -633,6 +646,18 @@
               original={prev?.syncthing}
               disabled={!canWrite}
               envVar={envField(envPrefix, slug, 'SYNCTHING')}
+            />
+          </Col>
+          <Col md="6">
+            <Input
+              id={`${section}-${row.id}-syncthing-stall`}
+              helpKey="config.starr.syncthing_stall"
+              type="stall"
+              label={$_('config.starr.syncthing_stall.label')}
+              bind:value={app.syncthing_stall}
+              original={prev?.syncthing_stall}
+              disabled={!canWrite}
+              envVar={envField(envPrefix, slug, 'SYNCTHING_STALL')}
             />
           </Col>
           {#if section === 'lidarr'}

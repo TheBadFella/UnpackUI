@@ -15,6 +15,7 @@
       "InstanceDisabled": "Desactivado",
       "NoTimeout": "Sin tiempo de espera",
       "ChecksDisabled": "Desactivado",
+      "DeletesDisabled": "Borrados desactivados",
       "Unlimited": "Ilimitado",
       "NoRotation": "(sin rotación)"
     }
@@ -451,6 +452,7 @@
     "NoCompressedFiles": "No se encontraron archivos comprimidos",
     "NoExtractableFiles": "No hay archivos extraíbles",
     "WaitingSyncthing": "Esperando a Syncthing",
+    "WaitingGate": "Esperando al gancho de comando",
     "InterruptedRestart": "Interrumpido por reinicio",
     "UnknownArchiveType": "Tipo de archivo desconocido",
     "Checksum": "La suma de comprobación del archivo no coincide",
@@ -508,11 +510,6 @@
         "label": "Retraso de reintento",
         "description": "Pausa entre reintentos de extracción.",
         "tooltip": "Tras un fallo, Unpackerr espera este tiempo antes de tratar el elemento como nuevo e intentarlo otra vez."
-      },
-      "deleteDelay": {
-        "label": "Retraso de borrado",
-        "description": "Cuánto tiempo conservar los archivos extraídos tras la importación.",
-        "tooltip": "Aplica a las apps Starr. Las apps que ya están en marcha lo toman tras un reinicio. La opción más corta es 1 segundo."
       },
       "progress": {
         "label": "Intervalo de progreso",
@@ -734,7 +731,7 @@
       "delete_delay": {
         "label": "Retraso de borrado",
         "description": "Cuánto conservar las extracciones tras importarlas esta app.",
-        "tooltip": "Anula el retraso de borrado general de esta instancia."
+        "tooltip": "Cuánto tiempo esta instancia conserva las extracciones tras importarlas. Un valor vacío o 0s usa 5 minutos. Con los borrados desactivados, los archivos se quedan en su sitio y se desactiva Eliminar originales."
       },
       "maxBytes": {
         "label": "Bytes máximos",
@@ -750,6 +747,11 @@
         "label": "Syncthing",
         "description": "Esperar a que Syncthing termine antes de extraer.",
         "tooltip": "Actívalo si las descargas llegan por Syncthing y las extracciones empiezan demasiado pronto."
+      },
+      "syncthing_stall": {
+        "label": "Espera de Syncthing",
+        "description": "Extraer de todos modos tras este tiempo sin archivos nuevos.",
+        "tooltip": "Una descarga que deja de crecer espera este tiempo y luego extrae lo que ya está en disco. El valor predeterminado es 30 minutos. Un archivo incompleto sigue esperando."
       },
       "valid_ssl": {
         "label": "Solo SSL válido"
@@ -820,9 +822,9 @@
         "tooltip": "Apagado los deja en una carpeta _unpackerred junto al archivo. Activado también clasifica restos con Acción con restos."
       },
       "extract_isos": {
-        "label": "Extraer ISO",
-        "description": "Tratar los archivos .iso como archivos comprimidos.",
-        "tooltip": "Apagado ignora las imágenes ISO. Actívalo solo si de verdad quieres desempaquetarlas."
+        "label": "Extraer imágenes de disco",
+        "description": "Tratar los archivos .iso y .img como archivos comprimidos.",
+        "tooltip": "Apagado ignora las imágenes de disco. Actívalo solo si de verdad quieres desempaquetarlas."
       },
       "preserve_exec": {
         "label": "Conservar bits de ejecución",
@@ -904,6 +906,11 @@
         "label": "Ejecutar en el shell",
         "description": "Ejecutar el comando dentro de un shell.",
         "tooltip": "Usa /bin/sh -c en Unix y cmd.exe /c en Windows. Hace falta si el comando es una tubería o usa sintaxis de shell."
+      },
+      "gate": {
+        "label": "Retener la cola",
+        "description": "Ejecutar este comando antes de encolar, y esperar si sale con 75.",
+        "tooltip": "Este gancho no se ejecuta en los eventos de extracción. La salida 0 encola la descarga. La salida 75 la deja en espera hasta el siguiente ciclo. Cualquier otra salida, o un tiempo agotado, no la retiene. La espera es el tiempo límite del gancho."
       },
       "contentType": {
         "label": "Tipo de contenido",

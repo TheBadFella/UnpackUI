@@ -32,6 +32,7 @@
     | 'timeout'
     | 'delay'
     | 'deletedelay'
+    | 'stall'
     | 'short'
     | 'logqueue'
     | 'folderpoll'
@@ -113,6 +114,7 @@
     'timeout',
     'delay',
     'deletedelay',
+    'stall',
     'short',
     'logqueue',
     'folderpoll',
@@ -172,6 +174,7 @@
       case 'interval':
       case 'delay':
       case 'deletedelay':
+      case 'stall':
       case 'short':
         return 'phrases.ConfigDuration'
       case 'timeout':
@@ -304,8 +307,21 @@
       ]
     }
 
+    if (type === 'stall') {
+      return [
+        { value: '5m', name: unit(5, 'minute', 'minutes') },
+        { value: '10m', name: unit(10, 'minute', 'minutes') },
+        { value: '15m', name: unit(15, 'minute', 'minutes') },
+        { value: '30m', name: unit(30, 'minute', 'minutes') },
+        { value: '1h', name: unit(1, 'hour', 'hour') },
+        { value: '2h', name: unit(2, 'hour', 'hours') },
+        { value: '6h', name: unit(6, 'hour', 'hours') },
+      ]
+    }
+
     if (type === 'deletedelay') {
       return [
+        { value: '-1s', name: $_('words.select-option.DeletesDisabled') },
         { value: '5s', name: unit(5, 'second', 'seconds') },
         { value: '15s', name: unit(15, 'second', 'seconds') },
         { value: '30s', name: unit(30, 'second', 'seconds') },

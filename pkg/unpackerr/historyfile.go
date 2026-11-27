@@ -71,6 +71,8 @@ type HistoryRecord struct {
 	OrigFiles      []string            `json:"origFiles,omitempty"`  // Archive paths; folder delete_orig after a restart.
 	ExtraFiles     []string            `json:"extraFiles,omitempty"` // Nested extras; display + restore Resp.Extras.
 	PreFiles       []string            `json:"preFiles,omitempty"`
+	Unpacked       []string            `json:"unpacked,omitempty"`    // Unpacked archives; a Syncthing rescan skips them.
+	OutputFiles    []string            `json:"outputFiles,omitempty"` // Files in extracted folders; skipped the same way.
 	Forgotten      bool                `json:"forgotten,omitempty"`
 	IDs            map[string]any      `json:"ids,omitempty"` // Starr hook metadata (title, downloadId, …).
 	Event          string              `json:"event,omitempty"`
@@ -299,6 +301,45 @@ func (u *Unpackerr) capHistoryLocked(list []HistoryRecord) []HistoryRecord {
 	return out
 }
 
+// persistDeletePolicy writes a disabled delay and delete-original flag onto the
+// existing history row. Status and timestamps stay, so a later restart keeps
+// the protection after deletes are turned back on. Caller may hold History.mu.
+func (u *Unpackerr) persistDeletePolicy(itemID string, item *Extract) {
+	if u.KeepHistory == 0 || item == nil {
+		return
+	}
+
+	if itemID == "" {
+		itemID = item.Path
+	}
+
+	if itemID == "" {
+		return
+	}
+
+	delay := ""
+	if item.DeleteDelay != 0 {
+		delay = item.DeleteDelay.String()
+	}
+
+	u.histMu.Lock()
+	defer u.histMu.Unlock()
+
+	idx := slices.IndexFunc(u.records, func(r HistoryRecord) bool { return r.ID == itemID })
+	if idx < 0 {
+		return
+	}
+
+	rec := u.records[idx]
+	if rec.DeleteDelay == delay && rec.DeleteOrig == item.DeleteOrig {
+		return
+	}
+
+	rec.DeleteDelay = delay
+	rec.DeleteOrig = item.DeleteOrig
+	u.upsertHistoryLocked(rec)
+}
+
 func (u *Unpackerr) maybeRecordHistory(itemID string, item *Extract) {
 	if u.KeepHistory == 0 || !isPersistedHistory(item) {
 		return
@@ -336,6 +377,8 @@ func historyFromExtract(itemID string, item *Extract) HistoryRecord {
 		MaxBytes:       item.MaxBytes,
 		NoRetry:        item.NoRetry,
 		PreFiles:       preFileKeys(item.PreFiles),
+		Unpacked:       slices.Clone(item.Unpacked),
+		OutputFiles:    slices.Clone(item.OutputFiles),
 		IDs:            cloneIDs(item.IDs),
 		Event:          item.Event,
 	}

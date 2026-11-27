@@ -458,7 +458,7 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 				continue
 			}
 
-			if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
+			if recoveryPathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) {
 				return cfg
 			}
 		}
@@ -477,7 +477,7 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 		}
 
 		cfgPath := filepath.Clean(cfg.Path)
-		if pathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) && len(cfgPath) > bestLen {
+		if recoveryPathWithin(path, cfgPath) && !cfg.IsExcludedPath(path) && len(cfgPath) > bestLen {
 			best = cfg
 			bestLen = len(cfgPath)
 		}
@@ -486,7 +486,7 @@ func (u *Unpackerr) recoveryFolderConfig(path, watchPath string) *FolderConfig {
 	return best
 }
 
-func pathWithin(path, root string) bool {
+func recoveryPathWithin(path, root string) bool {
 	rel, err := filepath.Rel(root, path)
 	if err != nil {
 		return false
@@ -506,7 +506,7 @@ func recoveryPathsWithin(paths []string, root string) []string {
 
 	for _, path := range paths {
 		path = filepath.Clean(path)
-		if !pathWithin(path, root) {
+		if !recoveryPathWithin(path, root) {
 			continue
 		}
 		if _, ok := seen[path]; ok {

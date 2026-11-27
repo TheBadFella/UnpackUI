@@ -15,6 +15,7 @@
       "InstanceDisabled": "Disabled",
       "NoTimeout": "No timeout",
       "ChecksDisabled": "Disabled",
+      "DeletesDisabled": "Deletes Disabled",
       "Unlimited": "Unlimited",
       "NoRotation": "(no rotation)"
     }
@@ -451,6 +452,7 @@
     "NoCompressedFiles": "No compressed files found",
     "NoExtractableFiles": "No extractable files",
     "WaitingSyncthing": "Waiting for Syncthing",
+    "WaitingGate": "Waiting for command hook",
     "InterruptedRestart": "Interrupted by restart",
     "UnknownArchiveType": "Unknown archive file type",
     "Checksum": "Archived file checksum mismatch",
@@ -508,11 +510,6 @@
         "label": "Retry delay",
         "description": "Pause between extraction retries.",
         "tooltip": "After a failure, Unpackerr waits this long before treating the item as new and trying again."
-      },
-      "deleteDelay": {
-        "label": "Delete delay",
-        "description": "How long to keep extracted files after import.",
-        "tooltip": "Applies to Starr apps. Already-running apps pick this up after a restart. The shortest choice is 1 second."
       },
       "progress": {
         "label": "Progress interval",
@@ -734,7 +731,7 @@
       "delete_delay": {
         "label": "Delete delay",
         "description": "How long to keep extracts after this app imports them.",
-        "tooltip": "Overrides the general delete delay for this instance."
+        "tooltip": "How long this instance keeps extracts after import. An empty value or 0s uses 5 minutes. Deletes Disabled leaves the files in place and turns off delete originals."
       },
       "maxBytes": {
         "label": "Max bytes",
@@ -750,6 +747,11 @@
         "label": "Syncthing",
         "description": "Wait until Syncthing finishes before extracting.",
         "tooltip": "Enable this if downloads land through Syncthing and extracts start too early."
+      },
+      "syncthing_stall": {
+        "label": "Syncthing stall",
+        "description": "Extract anyway after this long with no new files.",
+        "tooltip": "A download that stops growing waits this long, then extracts what is already on disk. The default is 30 minutes. An incomplete archive set keeps waiting."
       },
       "valid_ssl": {
         "label": "Valid SSL only"
@@ -820,9 +822,9 @@
         "tooltip": "Off leaves them in an _unpackerred folder beside the archive. On also classifies leftover files with Remnant action."
       },
       "extract_isos": {
-        "label": "Extract ISOs",
-        "description": "Treat .iso files as archives.",
-        "tooltip": "Off ignores ISO images. Turn this on only if you really want them unpacked."
+        "label": "Extract disc images",
+        "description": "Treat .iso and .img files as archives.",
+        "tooltip": "Off ignores disc images. Turn this on only if you really want them unpacked."
       },
       "preserve_exec": {
         "label": "Keep execute bits",
@@ -904,6 +906,11 @@
         "label": "Run in shell",
         "description": "Run the command inside a shell.",
         "tooltip": "Uses /bin/sh -c on Unix and cmd.exe /c on Windows. Needed if the command is a pipeline or uses shell syntax."
+      },
+      "gate": {
+        "label": "Gate the queue",
+        "description": "Run this command before queueing, and wait when it exits 75.",
+        "tooltip": "This hook does not run on extract events. Exit 0 queues the download. Exit 75 leaves it waiting until the next poll. Any other exit, or a timeout, does not hold it. The wait is the hook's timeout."
       },
       "contentType": {
         "label": "Content type",

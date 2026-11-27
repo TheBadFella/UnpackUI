@@ -752,7 +752,11 @@ sections:
         default: 5m
         recommend: *GLOBAL_INTERVALS
         short: Extracts are deleted this long after import, `-1s` to disable.
-        desc: How long to wait after import before deleting the extracted items.
+        desc: |
+          How long to wait after import before deleting the extracted items.
+          Set this to -1s to keep those files. Once the app stops listing the
+          download, the item is marked deleted and leaves the queue. Delete
+          originals stays off.
       - name: delete_orig
         envvar: DELETE_ORIG
         default: false
@@ -768,6 +772,29 @@ sections:
         recommend: *BOOLEAN
         short: Setting this to true makes unpackerr wait for syncthing to finish.
         desc: If you use Syncthing, setting this to true will make unpackerr wait for syncs to finish.
+      - name: syncthing_stall
+        envvar: SYNCTHING_STALL
+        default: 30m
+        recommend:
+          - name: 5 minutes
+            value: 5m
+          - name: 10 minutes
+            value: 10m
+          - name: 15 minutes
+            value: 15m
+          - name: 30 minutes
+            value: 30m
+          - name: 1 hour
+            value: 1h
+          - name: 2 hours
+            value: 2h
+          - name: 6 hours
+            value: 6h
+        short: Extract anyway after this long with no new Syncthing files.
+        desc: |
+          How long a Syncthing download may sit unchanged before Unpackerr
+          extracts the files already on disk. An incomplete archive set keeps
+          waiting. Zero uses 30 minutes.
       - name: valid_ssl
         envvar: VALID_SSL
         default: false
@@ -1047,8 +1074,8 @@ sections:
         envvar: EXTRACT_ISOS
         default: false
         recommend: *BOOLEAN
-        short: Setting this to true enables .iso file extraction.
-        desc: Set this to true if you want this app to extract ISO files with .iso extension.
+        short: Setting this to true enables .iso and .img disc extraction.
+        desc: Set this to true to extract disc images with a .iso or .img extension.
       - name: preserve_exec
         envvar: PRESERVE_EXEC
         default: false
@@ -1368,6 +1395,18 @@ sections:
         recommend: *BOOLEAN
         short: Run command inside a shell.
         desc: Runs the command inside /bin/sh ('nix) or cmd.exe (Windows).
+      - name: gate
+        envvar: GATE
+        default: false
+        recommend: *BOOLEAN
+        short: Hold the queue until this command exits 0.
+        desc: |
+          When true, this hook is not an event hook. Unpackerr runs it
+          before queueing a Starr download and waits up to the timeout.
+          Exit 0 means ready. Exit 75 means not yet, and the download is
+          tried again on the next poll. Any other exit, or a timeout, does
+          not hold the download. The first line the command prints is
+          logged when it holds the download or fails.
       - name: silent
         envvar: SILENT
         default: false
